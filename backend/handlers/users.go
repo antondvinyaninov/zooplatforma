@@ -43,7 +43,7 @@ func UserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func handleGetUsers(w http.ResponseWriter, r *http.Request) {
+func handleGetUsers(w http.ResponseWriter, _ *http.Request) {
 	rows, err := database.DB.Query("SELECT id, name, email, created_at FROM users")
 	if err != nil {
 		sendError(w, err.Error(), http.StatusInternalServerError)
@@ -64,7 +64,7 @@ func handleGetUsers(w http.ResponseWriter, r *http.Request) {
 	sendSuccess(w, users)
 }
 
-func handleGetUser(w http.ResponseWriter, r *http.Request, id int) {
+func handleGetUser(w http.ResponseWriter, _ *http.Request, id int) {
 	var user models.User
 	err := database.DB.QueryRow("SELECT id, name, email, created_at FROM users WHERE id = ?", id).
 		Scan(&user.ID, &user.Name, &user.Email, &user.CreatedAt)
@@ -115,7 +115,7 @@ func handleUpdateUser(w http.ResponseWriter, r *http.Request, id int) {
 	sendSuccess(w, map[string]interface{}{"id": id, "name": req.Name, "email": req.Email})
 }
 
-func handleDeleteUser(w http.ResponseWriter, r *http.Request, id int) {
+func handleDeleteUser(w http.ResponseWriter, _ *http.Request, id int) {
 	_, err := database.DB.Exec("DELETE FROM users WHERE id = ?", id)
 	if err != nil {
 		sendError(w, err.Error(), http.StatusInternalServerError)
