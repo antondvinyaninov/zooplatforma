@@ -6,23 +6,30 @@
 
 ```
 .
-├── backend/              # Go API сервер
-├── frontend/             # Next.js веб-приложение
-├── mobile/               # React Native мобильное приложение
-├── database/             # SQLite база данных (отдельный модуль)
+├── backend/              # Go Main API сервер (порт 8000)
+├── admin/                # Админ-панель (микросервис)
+│   ├── backend/          # Admin API сервер (порт 9000)
+│   └── frontend/         # Admin UI (Next.js, порт 4000)
+├── frontend/             # Next.js веб-приложение (порт 3000)
+├── mobile/               # React Native мобильное приложение (порт 8081)
+├── database/             # SQLite база данных (общая для всех)
 ├── shared/               # Общая логика для всех платформ
-├── tests/                # Тесты производительности и функциональные
+├── docs/                 # Документация проекта
+│   ├── README.md         # Обзор документации
+│   ├── CHANGELOG.md      # История изменений
+│   ├── ROADMAP.md        # План развития
+│   ├── STRUCTURE.md      # Этот файл
+│   ├── PERFORMANCE.md    # Метрики производительности
+│   ├── TEMPLATES.md      # Шаблоны компонентов
+│   ├── SSO_ARCHITECTURE.md  # Архитектура SSO
+│   ├── SSO_FLOW.md       # Схема SSO
+│   └── API_KEYS.md       # API ключи (не в git)
+├── tests/                # Тесты и скрипты отладки
 ├── .kiro/                # Конфигурация Kiro IDE
 │   └── steering/         # Правила и гайды разработки
-├── run                   # Скрипт запуска всего проекта
+├── run                   # Скрипт запуска всех сервисов
 ├── .gitignore           # Игнорируемые файлы
-├── README.md            # Основная документация
-├── CHANGELOG.md         # История изменений
-├── ROADMAP.md           # План развития проекта
-├── PERFORMANCE.md       # Метрики производительности
-├── TEMPLATES.md         # Шаблоны страниц и компонентов
-├── API_KEYS.md          # API ключи (не в git)
-└── STRUCTURE.md         # Этот файл
+└── README.md            # Основная документация
 ```
 
 ---
@@ -46,16 +53,27 @@ backend/
 └── tmp/                 # Временные файлы Air (игнорируется)
 ```
 
-**Порт:** 8080
+**Порт:** 8000
 
 **Endpoints:**
 - `GET /` - Welcome message
 - `GET /api/health` - Health check
+- `POST /api/auth/register` - Регистрация
+- `POST /api/auth/login` - Вход
+- `POST /api/auth/logout` - Выход
+- `GET /api/auth/me` - Текущий пользователь
+- `GET /api/auth/verify` - Проверка токена (для SSO)
+- `GET /api/users` - Список пользователей (защищено)
+- `PUT /api/profile` - Обновление профиля (защищено)
+- `GET/POST/PUT/DELETE /api/posts` - CRUD постов (защищено)
+- `GET/POST/DELETE /api/pets` - CRUD питомцев (защищено)
 
 **Особенности:**
-- CORS настроен на `*` (все источники)
-- Автоматический hot reload при изменении .go файлов
+- CORS настроен для всех клиентов
+- JWT авторизация с ролями (user, superadmin)
+- Автоматический hot reload через Air
 - Интеграция с модулем database
+- Логирование событий в system_logs
 
 ---
 
@@ -77,16 +95,127 @@ database/
 ```
 
 **Таблицы:**
-- `users` - Пример таблицы пользователей
-  - id (INTEGER PRIMARY KEY AUTOINCREMENT)
-  - name (TEXT NOT NULL)
-  - email (TEXT UNIQUE NOT NULL)
-  - created_at (DATETIME DEFAULT CURRENT_TIMESTAMP)
+- `users` - Пользователи платформы
+  - id, name, email, password, bio, phone, location, avatar, cover_photo, created_at
+- `posts` - Публикации пользователей
+  - id, user_id, content, post_type, status, created_at
+- `pets` - Питомцы пользователей
+  - id, user_id, name, species, photo, created_at
+- `admins` - Администраторы
+  - id, user_id, role, permissions, created_at, created_by
+- `admin_logs` - Логи действий администраторов
+  - id, admin_id, action, target_type, target_id, details, ip_address, created_at
+- `system_logs` - Системные логи всей платформы
+  - id, level, category, action, user_id, target_type, target_id, message, details, ip_address, user_agent, created_at
 
 **Особенности:**
 - Отдельный модуль для переиспользования
 - Автоматическое создание таблиц при первом запуске
 - База создается в `database/data.db`
+
+---
+
+## Admin Panel (Микросервис)
+
+**Путь:** `admin/`
+
+### Admin Backend
+
+**Путь:** `admin/backend/`
+
+**Технологии:**
+- Go 1.25.5
+- net/http (standard library)
+- Air (hot reload)
+
+**Структура:**
+```
+admin/backend/
+├── main.go              # Точка входа, HTTP сервер
+├── handlers/            # HTTP handlers
+│   ├── auth.go          # Авторизация админов
+│   ├── users.go         # Управление пользователями
+│   ├── posts.go         # Модерация постов
+│   ├── stats.go         # Статистика
+│   └── logs.go          # Системные логи
+├── middleware/          # Middleware
+│   └── admin.go         # Проверка прав суперадмина
+├── go.mod               # Go модуль
+├── go.sum               # Checksums
+├── .air.toml            # Конфигурация Air
+├── create-superadmin.sh # Скрипт создания суперадмина
+└── tmp/                 # Временные файлы Air
+```
+
+**Порт:** 9000
+
+**Endpoints:**
+- `GET /api/admin/health` - Health check
+- `GET /api/admin/auth/me` - Текущий админ
+- `GET /api/admin/users` - Список пользователей
+- `PUT /api/admin/users/:id` - Обновление пользователя
+- `DELETE /api/admin/users/:id` - Удаление пользователя
+- `GET /api/admin/posts` - Список постов
+- `PUT /api/admin/posts/:id` - Модерация поста
+- `DELETE /api/admin/posts/:id` - Удаление поста
+- `GET /api/admin/stats/overview` - Статистика
+- `GET /api/admin/logs` - Системные логи
+
+**Особенности:**
+- SSO через общий токен `auth_token`
+- Проверка ролей из JWT (superadmin)
+- Общая база данных с Main Backend
+- Hot reload через Air
+
+### Admin Frontend
+
+**Путь:** `admin/frontend/`
+
+**Технологии:**
+- Next.js 15.1.3
+- React 19.0.0
+- TypeScript 5.x
+- Tailwind CSS 4.x
+- Heroicons 2.x
+
+**Структура:**
+```
+admin/frontend/
+├── app/
+│   ├── layout.tsx       # Корневой layout
+│   ├── page.tsx         # Дашборд
+│   ├── page.module.css  # Стили дашборда
+│   ├── globals.css      # Глобальные стили
+│   └── auth/            # Страница входа
+│       ├── page.tsx
+│       └── auth.module.css
+├── lib/
+│   └── api.ts           # API клиент для Admin Backend
+├── package.json
+├── tsconfig.json
+├── tailwind.config.js
+├── next.config.ts
+└── .env.local           # NEXT_PUBLIC_API_URL=http://localhost:9000
+```
+
+**Порт:** 4000
+
+**Страницы:**
+- `/` - Дашборд с вкладками
+- `/auth` - Страница входа
+
+**Вкладки дашборда:**
+- Пользователи - управление пользователями
+- Посты - модерация постов
+- Статистика - метрики платформы
+- Логирование - системные логи
+
+**Особенности:**
+- Дизайн в стиле VK Реклама
+- Сворачиваемое боковое меню
+- SSO авторизация через Main Backend
+- Tailwind CSS + Heroicons
+- Hot reload из коробки
 
 ---
 
@@ -294,11 +423,13 @@ tests/
 
 ## Порты
 
-| Сервис   | Порт | URL                      |
-|----------|------|--------------------------|
-| Backend  | 8080 | http://localhost:8080    |
-| Frontend | 3000 | http://localhost:3000    |
-| Mobile   | 8081 | http://localhost:8081    |
+| Сервис          | Порт | URL                      |
+|-----------------|------|--------------------------|
+| Main Backend    | 8000 | http://localhost:8000    |
+| Admin Backend   | 9000 | http://localhost:9000    |
+| Web Frontend    | 3000 | http://localhost:3000    |
+| Admin Frontend  | 4000 | http://localhost:4000    |
+| Mobile          | 8081 | http://localhost:8081    |
 
 ---
 
