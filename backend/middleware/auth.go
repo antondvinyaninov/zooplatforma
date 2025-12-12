@@ -2,6 +2,7 @@ package middleware
 
 import (
 	"backend/models"
+	"context"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -32,7 +33,9 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 
 		if err == nil {
 			tokenString = cookie.Value
+			log.Printf("✅ Cookie found: %s...\n", tokenString[:20])
 		} else {
+			log.Printf("❌ Cookie not found: %v\n", err)
 			// Fallback to Authorization header for backward compatibility
 			authHeader := r.Header.Get("Authorization")
 			if authHeader == "" {
@@ -51,12 +54,39 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 			return jwtSecret, nil
 		})
 
-		if err != nil || !token.Valid {
+		if err != nil {
+			log.Printf("❌ Token parse error: %v\n", err)
 			sendError(w, "Неверный токен", http.StatusUnauthorized)
 			return
 		}
 
-		next(w, r)
+		if !token.Valid {
+			log.Printf("❌ Token invalid\n")
+			sendError(w, "Неверный токен", http.StatusUnauthorized)
+			return
+		}
+
+		// Извлекаем данные из токена и добавляем в контекст
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			log.Printf("❌ Failed to parse claims\n")
+			sendError(w, "Неверный токен", http.StatusUnauthorized)
+			return
+		}
+
+		userID, ok := claims["user_id"].(float64)
+		if !ok {
+			log.Printf("❌ user_id not found in token\n")
+			sendError(w, "Неверный токен", http.StatusUnauthorized)
+			return
+		}
+
+		// Добавляем userID в контекст
+		ctx := r.Context()
+		ctx = context.WithValue(ctx, "userID", int(userID))
+
+		log.Printf("✅ Token valid, userID=%d, calling next handler\n", int(userID))
+		next(w, r.WithContext(ctx))
 	}
 }
 
