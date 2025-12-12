@@ -1,17 +1,28 @@
 package models
 
 type User struct {
-	ID        int    `json:"id"`
-	Name      string `json:"name"`
-	Email     string `json:"email"`
-	Password  string `json:"-"`
-	CreatedAt string `json:"created_at"`
+	ID         int    `json:"id"`
+	Name       string `json:"name"`
+	Email      string `json:"email"`
+	Password   string `json:"-"`
+	Bio        string `json:"bio"`
+	Phone      string `json:"phone"`
+	Location   string `json:"location"`
+	Avatar     string `json:"avatar"`
+	CoverPhoto string `json:"cover_photo"`
+	CreatedAt  string `json:"created_at"`
 }
 
 type UserResponse struct {
-	ID    int    `json:"id"`
-	Name  string `json:"name"`
-	Email string `json:"email"`
+	ID         int    `json:"id"`
+	Name       string `json:"name"`
+	Email      string `json:"email"`
+	Bio        string `json:"bio"`
+	Phone      string `json:"phone"`
+	Location   string `json:"location"`
+	Avatar     string `json:"avatar"`
+	CoverPhoto string `json:"cover_photo"`
+	CreatedAt  string `json:"created_at"`
 }
 
 type CreateUserRequest struct {

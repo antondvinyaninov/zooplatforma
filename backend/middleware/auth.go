@@ -21,16 +21,25 @@ func getEnv(key, fallback string) string {
 
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		authHeader := r.Header.Get("Authorization")
-		if authHeader == "" {
-			sendError(w, "Authorization header required", http.StatusUnauthorized)
-			return
-		}
+		// Try to get token from cookie first
+		cookie, err := r.Cookie("auth_token")
+		var tokenString string
 
-		tokenString := strings.TrimPrefix(authHeader, "Bearer ")
-		if tokenString == authHeader {
-			sendError(w, "Invalid authorization format", http.StatusUnauthorized)
-			return
+		if err == nil {
+			tokenString = cookie.Value
+		} else {
+			// Fallback to Authorization header for backward compatibility
+			authHeader := r.Header.Get("Authorization")
+			if authHeader == "" {
+				sendError(w, "Требуется авторизация", http.StatusUnauthorized)
+				return
+			}
+
+			tokenString = strings.TrimPrefix(authHeader, "Bearer ")
+			if tokenString == authHeader {
+				sendError(w, "Неверный формат авторизации", http.StatusUnauthorized)
+				return
+			}
 		}
 
 		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
@@ -38,7 +47,7 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		})
 
 		if err != nil || !token.Valid {
-			sendError(w, "Invalid token", http.StatusUnauthorized)
+			sendError(w, "Неверный токен", http.StatusUnauthorized)
 			return
 		}
 
@@ -53,6 +62,41 @@ func GenerateToken(userID int, email string) (string, error) {
 	})
 
 	return token.SignedString(jwtSecret)
+}
+
+type TokenClaims struct {
+	UserID int    `json:"user_id"`
+	Email  string `json:"email"`
+}
+
+func ParseToken(tokenString string) (*TokenClaims, error) {
+	token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+		return jwtSecret, nil
+	})
+
+	if err != nil || !token.Valid {
+		return nil, err
+	}
+
+	claims, ok := token.Claims.(jwt.MapClaims)
+	if !ok {
+		return nil, jwt.ErrInvalidKey
+	}
+
+	userID, ok := claims["user_id"].(float64)
+	if !ok {
+		return nil, jwt.ErrInvalidKey
+	}
+
+	email, ok := claims["email"].(string)
+	if !ok {
+		return nil, jwt.ErrInvalidKey
+	}
+
+	return &TokenClaims{
+		UserID: int(userID),
+		Email:  email,
+	}, nil
 }
 
 func sendError(w http.ResponseWriter, message string, status int) {

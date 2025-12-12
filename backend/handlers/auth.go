@@ -25,7 +25,7 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Name == "" || req.Email == "" || req.Password == "" {
-		sendError(w, "Name, email and password are required", http.StatusBadRequest)
+		sendError(w, "Имя, email и пароль обязательны", http.StatusBadRequest)
 		return
 	}
 
@@ -40,7 +40,9 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	result, err := database.DB.Exec("INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
 		req.Name, req.Email, string(hashedPassword))
 	if err != nil {
-		sendError(w, "Email already exists", http.StatusConflict)
+		// Log the actual error for debugging
+		println("Database error:", err.Error())
+		sendError(w, "Ошибка создания пользователя: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 
@@ -53,14 +55,91 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set httpOnly cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false, // Set to true in production with HTTPS
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   86400 * 7, // 7 days
+	})
+
 	sendSuccess(w, models.AuthResponse{
-		Token: token,
 		User: models.UserResponse{
 			ID:    int(id),
 			Name:  req.Name,
 			Email: req.Email,
 		},
 	})
+}
+
+func MeHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodGet {
+		sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get token from cookie
+	cookie, err := r.Cookie("auth_token")
+	if err != nil {
+		sendError(w, "Не авторизован", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse token
+	token, err := middleware.ParseToken(cookie.Value)
+	if err != nil {
+		sendError(w, "Неверный токен", http.StatusUnauthorized)
+		return
+	}
+
+	// Get user from database
+	var user models.User
+	err = database.DB.QueryRow("SELECT id, name, email, bio, phone, location, avatar, cover_photo, created_at FROM users WHERE id = ?", token.UserID).
+		Scan(&user.ID, &user.Name, &user.Email, &user.Bio, &user.Phone, &user.Location, &user.Avatar, &user.CoverPhoto, &user.CreatedAt)
+
+	if err != nil {
+		sendError(w, "Пользователь не найден", http.StatusNotFound)
+		return
+	}
+
+	sendSuccess(w, models.UserResponse{
+		ID:         user.ID,
+		Name:       user.Name,
+		Email:      user.Email,
+		Bio:        user.Bio,
+		Phone:      user.Phone,
+		Location:   user.Location,
+		Avatar:     user.Avatar,
+		CoverPhoto: user.CoverPhoto,
+		CreatedAt:  user.CreatedAt,
+	})
+}
+
+func LogoutHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodPost {
+		sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Clear cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    "",
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   -1, // Delete cookie
+	})
+
+	sendSuccess(w, map[string]string{"message": "Logged out successfully"})
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -78,7 +157,7 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	if req.Email == "" || req.Password == "" {
-		sendError(w, "Email and password are required", http.StatusBadRequest)
+		sendError(w, "Email и пароль обязательны", http.StatusBadRequest)
 		return
 	}
 
@@ -89,13 +168,13 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		Scan(&user.ID, &user.Name, &user.Email, &hashedPassword)
 
 	if err != nil {
-		sendError(w, "Invalid credentials", http.StatusUnauthorized)
+		sendError(w, "Неверный email или пароль", http.StatusUnauthorized)
 		return
 	}
 
 	// Check password
 	if err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(req.Password)); err != nil {
-		sendError(w, "Invalid credentials", http.StatusUnauthorized)
+		sendError(w, "Неверный email или пароль", http.StatusUnauthorized)
 		return
 	}
 
@@ -106,8 +185,18 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Set httpOnly cookie
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Path:     "/",
+		HttpOnly: true,
+		Secure:   false, // Set to true in production with HTTPS
+		SameSite: http.SameSiteLaxMode,
+		MaxAge:   86400 * 7, // 7 days
+	})
+
 	sendSuccess(w, models.AuthResponse{
-		Token: token,
 		User: models.UserResponse{
 			ID:    user.ID,
 			Name:  user.Name,

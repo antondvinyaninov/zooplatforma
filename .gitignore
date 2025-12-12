@@ -12,6 +12,7 @@ build/
 .env
 .env.local
 .env*.local
+backend/.env
 
 # OS files
 .DS_Store
@@ -40,3 +41,7 @@ database/data.db
 npm-debug.log*
 yarn-debug.log*
 yarn-error.log*
+
+# API Keys (sensitive data)
+API_KEYS.md
+docs/API_KEYS.md
