@@ -7,6 +7,7 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 
 	"github.com/joho/godotenv"
 )
@@ -38,6 +39,17 @@ func main() {
 		log.Println("Warning: .env file not found, using default values")
 	}
 
+	// Debug: проверяем JWT_SECRET
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		log.Println("⚠️  JWT_SECRET not set, using default")
+	} else {
+		log.Printf("✅ JWT_SECRET loaded: %s...\n", secret[:10])
+	}
+
+	// Initialize JWT Secret AFTER loading .env
+	middleware.InitJWTSecret()
+
 	// Initialize database
 	if err := database.InitDB(); err != nil {
 		log.Fatal("Failed to initialize database:", err)
@@ -51,6 +63,7 @@ func main() {
 	http.HandleFunc("/api/auth/login", enableCORS(handlers.LoginHandler))
 	http.HandleFunc("/api/auth/logout", enableCORS(handlers.LogoutHandler))
 	http.HandleFunc("/api/auth/me", enableCORS(handlers.MeHandler))
+	http.HandleFunc("/api/auth/verify", enableCORS(handlers.VerifyTokenHandler))
 
 	// Protected routes
 	http.HandleFunc("/api/users", enableCORS(middleware.AuthMiddleware(handlers.UsersHandler)))
@@ -63,7 +76,7 @@ func main() {
 	http.HandleFunc("/api/pets/", enableCORS(middleware.AuthMiddleware(handlers.PetHandler)))
 	http.HandleFunc("/api/pets/user/", enableCORS(middleware.AuthMiddleware(handlers.UserPetsHandler)))
 
-	port := ":8080"
+	port := ":8000"
 	fmt.Printf("Server starting on port %s\n", port)
 	log.Fatal(http.ListenAndServe(port, nil))
 }

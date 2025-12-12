@@ -1,41 +1,91 @@
 #!/bin/bash
 
-echo "🚀 Starting project..."
+echo "🚀 Starting ЗооПлатформа..."
 
-# Kill processes on ports 3000, 8080, and 8081
+# Kill processes on ports
 echo "🧹 Cleaning up ports..."
 lsof -ti:3000 | xargs kill -9 2>/dev/null || true
-lsof -ti:8080 | xargs kill -9 2>/dev/null || true
+lsof -ti:4000 | xargs kill -9 2>/dev/null || true
+lsof -ti:8000 | xargs kill -9 2>/dev/null || true
 lsof -ti:8081 | xargs kill -9 2>/dev/null || true
+lsof -ti:9000 | xargs kill -9 2>/dev/null || true
 
 echo "✅ Ports cleared"
 
-# Start backend with Air
-echo "🔧 Starting backend on port 8080 (with hot reload)..."
-cd backend && /Users/dvinyaninov/go/bin/air &
+# Start main backend with Air
+echo "🔧 Starting Main Backend on port 8000 (with hot reload)..."
+(cd backend && /Users/dvinyaninov/go/bin/air) &
 BACKEND_PID=$!
 
 # Wait a bit for backend to start
 sleep 2
 
-# Start frontend
-echo "⚛️  Starting web frontend on port 3000..."
-cd frontend && npm run dev &
+# Start admin backend with Air
+echo "🔐 Starting Admin Backend on port 9000 (with hot reload)..."
+(cd admin/backend && /Users/dvinyaninov/go/bin/air) &
+ADMIN_BACKEND_PID=$!
+
+# Wait a bit for admin backend to start
+sleep 1
+
+# Start web frontend
+echo "⚛️  Starting Web Frontend on port 3000..."
+(cd frontend && npm run dev) &
 FRONTEND_PID=$!
 
+# Start admin frontend
+echo "🔐 Starting Admin Frontend on port 4000..."
+(cd admin/frontend && npm run dev) &
+ADMIN_FRONTEND_PID=$!
+
 # Start mobile
-echo "📱 Starting mobile on port 8081..."
-cd mobile && npm run web &
+echo "📱 Starting Mobile on port 8081 (Expo default)..."
+(cd mobile && npm run web) &
 MOBILE_PID=$!
 
 echo ""
-echo "✅ Project is running!"
-echo "   Web:     http://localhost:3000"
-echo "   Mobile:  http://localhost:8081"
-echo "   Backend: http://localhost:8080"
+echo "⏳ Ожидание запуска сервисов..."
+sleep 3
+
+echo ""
+echo "🔍 Проверка портов:"
+echo "───────────────────────────────────────────────────────────"
+
+# Проверяем каждый порт
+check_port() {
+  local port=$1
+  local name=$2
+  if lsof -i :$port -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "✅ $name (порт $port) - запущен"
+  else
+    echo "❌ $name (порт $port) - НЕ запущен"
+  fi
+}
+
+check_port 3000 "Web Frontend   "
+check_port 4000 "Admin Frontend "
+check_port 8081 "Mobile         "
+check_port 8000 "Main Backend   "
+check_port 9000 "Admin Backend  "
+
+echo ""
+echo "✅ ЗооПлатформа запущена!"
+echo ""
+echo "   🌐 Web Frontend:    http://localhost:3000"
+echo "   🔐 Admin Frontend:  http://localhost:4000"
+echo "   📱 Mobile:          http://localhost:8081"
+echo "   🔧 Main Backend:    http://localhost:8000"
+echo "   🛡️  Admin Backend:   http://localhost:9000"
+echo ""
+echo "📚 Документация:"
+echo "   - Админ-панель:  admin/README.md"
+echo "   - SSO Setup:     admin/SSO_SETUP.md"
+echo "   - Тесты:         tests/README.md"
+echo ""
+echo "🧪 Тест SSO:        ./tests/debug-sso.sh"
 echo ""
 echo "Press Ctrl+C to stop all services"
 
 # Wait for Ctrl+C
-trap "kill $BACKEND_PID $FRONTEND_PID $MOBILE_PID 2>/dev/null; exit" INT
+trap "echo ''; echo '🛑 Stopping all services...'; kill $BACKEND_PID $ADMIN_BACKEND_PID $FRONTEND_PID $ADMIN_FRONTEND_PID $MOBILE_PID 2>/dev/null; exit" INT
 wait

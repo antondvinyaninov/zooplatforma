@@ -10,8 +10,12 @@ import (
 var DB *sql.DB
 
 func InitDB() error {
+	return InitDBWithPath("../database/data.db")
+}
+
+func InitDBWithPath(path string) error {
 	var err error
-	DB, err = sql.Open("sqlite3", "../database/data.db")
+	DB, err = sql.Open("sqlite3", path)
 	if err != nil {
 		return err
 	}

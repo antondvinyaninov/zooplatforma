@@ -3,20 +3,25 @@ package middleware
 import (
 	"backend/models"
 	"encoding/json"
+	"log"
 	"net/http"
 	"os"
 	"strings"
+	"time"
 
 	"github.com/golang-jwt/jwt/v5"
 )
 
-var jwtSecret = []byte(getEnv("JWT_SECRET", "your-secret-key-change-in-production"))
+var jwtSecret []byte
 
-func getEnv(key, fallback string) string {
-	if value := os.Getenv(key); value != "" {
-		return value
+func InitJWTSecret() {
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		secret = "your-secret-key-change-in-production"
+		log.Println("⚠️  JWT_SECRET not set, using default")
 	}
-	return fallback
+	jwtSecret = []byte(secret)
+	log.Printf("🔑 JWT Secret initialized: length=%d, first 10=%s\n", len(jwtSecret), string(jwtSecret[:10]))
 }
 
 func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
@@ -55,18 +60,24 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 	}
 }
 
-func GenerateToken(userID int, email string) (string, error) {
+func GenerateToken(userID int, email string, roles []string) (string, error) {
+	log.Printf("🔑 GenerateToken: secret length=%d, first 10 chars=%s\n", len(jwtSecret), string(jwtSecret[:10]))
+
 	token := jwt.NewWithClaims(jwt.SigningMethodHS256, jwt.MapClaims{
 		"user_id": userID,
 		"email":   email,
+		"roles":   roles,
+		"exp":     time.Now().Add(7 * 24 * time.Hour).Unix(), // 7 дней
+		"iat":     time.Now().Unix(),
 	})
 
 	return token.SignedString(jwtSecret)
 }
 
 type TokenClaims struct {
-	UserID int    `json:"user_id"`
-	Email  string `json:"email"`
+	UserID int      `json:"user_id"`
+	Email  string   `json:"email"`
+	Roles  []string `json:"roles"`
 }
 
 func ParseToken(tokenString string) (*TokenClaims, error) {
@@ -93,9 +104,20 @@ func ParseToken(tokenString string) (*TokenClaims, error) {
 		return nil, jwt.ErrInvalidKey
 	}
 
+	// Roles могут отсутствовать в старых токенах
+	var roles []string
+	if rolesInterface, ok := claims["roles"].([]interface{}); ok {
+		for _, r := range rolesInterface {
+			if roleStr, ok := r.(string); ok {
+				roles = append(roles, roleStr)
+			}
+		}
+	}
+
 	return &TokenClaims{
 		UserID: int(userID),
 		Email:  email,
+		Roles:  roles,
 	}, nil
 }
 

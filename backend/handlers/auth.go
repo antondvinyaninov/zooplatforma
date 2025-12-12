@@ -6,9 +6,33 @@ import (
 	"database"
 	"encoding/json"
 	"net/http"
+	"time"
 
 	"golang.org/x/crypto/bcrypt"
 )
+
+// logSystemEvent - логирует событие в системе
+func logSystemEvent(level, category, action, message string, userID *int, ipAddress string) {
+	query := `
+		INSERT INTO system_logs (level, category, action, message, user_id, ip_address, created_at)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`
+	database.DB.Exec(query, level, category, action, message, userID, ipAddress, time.Now())
+}
+
+// getUserRoles получает роли пользователя из таблицы admins
+func getUserRoles(userID int) []string {
+	roles := []string{"user"} // По умолчанию все пользователи имеют роль "user"
+
+	// Проверяем, есть ли у пользователя роль админа
+	var adminRole string
+	err := database.DB.QueryRow("SELECT role FROM admins WHERE user_id = ?", userID).Scan(&adminRole)
+	if err == nil {
+		roles = append(roles, adminRole)
+	}
+
+	return roles
+}
 
 func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
@@ -48,18 +72,22 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	id, _ := result.LastInsertId()
 
+	// Получаем роли пользователя (по умолчанию только "user")
+	roles := getUserRoles(int(id))
+
 	// Generate token
-	token, err := middleware.GenerateToken(int(id), req.Email)
+	token, err := middleware.GenerateToken(int(id), req.Email, roles)
 	if err != nil {
 		sendError(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
-	// Set httpOnly cookie
+	// Set httpOnly cookie (доступен всем поддоменам для SSO)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
 		Value:    token,
 		Path:     "/",
+		Domain:   "", // Пустой для localhost, ".zooplatforma.ru" для production
 		HttpOnly: true,
 		Secure:   false, // Set to true in production with HTTPS
 		SameSite: http.SameSiteLaxMode,
@@ -128,11 +156,12 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Clear cookie
+	// Clear cookie (для всех поддоменов)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
 		Value:    "",
 		Path:     "/",
+		Domain:   "", // Пустой для localhost, ".zooplatforma.ru" для production
 		HttpOnly: true,
 		Secure:   false,
 		SameSite: http.SameSiteLaxMode,
@@ -140,6 +169,44 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 	})
 
 	sendSuccess(w, map[string]string{"message": "Logged out successfully"})
+}
+
+func VerifyTokenHandler(w http.ResponseWriter, r *http.Request) {
+	w.Header().Set("Content-Type", "application/json")
+
+	if r.Method != http.MethodGet {
+		sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Get token from cookie
+	cookie, err := r.Cookie("auth_token")
+	if err != nil {
+		sendError(w, "Токен не найден", http.StatusUnauthorized)
+		return
+	}
+
+	// Parse token
+	token, err := middleware.ParseToken(cookie.Value)
+	if err != nil {
+		sendError(w, "Неверный токен", http.StatusUnauthorized)
+		return
+	}
+
+	// Verify user exists
+	var exists int
+	err = database.DB.QueryRow("SELECT 1 FROM users WHERE id = ?", token.UserID).Scan(&exists)
+	if err != nil {
+		sendError(w, "Пользователь не найден", http.StatusUnauthorized)
+		return
+	}
+
+	sendSuccess(w, map[string]interface{}{
+		"user_id": token.UserID,
+		"email":   token.Email,
+		"roles":   token.Roles,
+		"valid":   true,
+	})
 }
 
 func LoginHandler(w http.ResponseWriter, r *http.Request) {
@@ -178,23 +245,31 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Получаем роли пользователя
+	roles := getUserRoles(user.ID)
+
 	// Generate token
-	token, err := middleware.GenerateToken(user.ID, user.Email)
+	token, err := middleware.GenerateToken(user.ID, user.Email, roles)
 	if err != nil {
 		sendError(w, "Failed to generate token", http.StatusInternalServerError)
 		return
 	}
 
-	// Set httpOnly cookie
+	// Set httpOnly cookie (доступен всем поддоменам для SSO)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
 		Value:    token,
 		Path:     "/",
+		Domain:   "", // Пустой для localhost, ".zooplatforma.ru" для production
 		HttpOnly: true,
 		Secure:   false, // Set to true in production with HTTPS
 		SameSite: http.SameSiteLaxMode,
 		MaxAge:   86400 * 7, // 7 days
 	})
+
+	// Логируем успешный вход
+	ipAddress := r.RemoteAddr
+	logSystemEvent("info", "auth", "login", "Пользователь вошел в систему", &user.ID, ipAddress)
 
 	sendSuccess(w, models.AuthResponse{
 		User: models.UserResponse{
