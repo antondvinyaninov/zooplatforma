@@ -21,6 +21,7 @@ func UpdateProfileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	var req struct {
+		Name       string `json:"name"`
 		Bio        string `json:"bio"`
 		Phone      string `json:"phone"`
 		Location   string `json:"location"`
@@ -34,8 +35,8 @@ func UpdateProfileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Обновляем профиль
-	query := `UPDATE users SET bio = ?, phone = ?, location = ?, avatar = ?, cover_photo = ? WHERE id = ?`
-	_, err := database.DB.Exec(query, req.Bio, req.Phone, req.Location, req.Avatar, req.CoverPhoto, userID)
+	query := `UPDATE users SET name = ?, bio = ?, phone = ?, location = ?, avatar = ?, cover_photo = ? WHERE id = ?`
+	_, err := database.DB.Exec(query, req.Name, req.Bio, req.Phone, req.Location, req.Avatar, req.CoverPhoto, userID)
 	if err != nil {
 		sendErrorResponse(w, "Ошибка обновления профиля: "+err.Error(), http.StatusInternalServerError)
 		return

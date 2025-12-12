@@ -59,7 +59,8 @@ func UserPostsHandler(w http.ResponseWriter, r *http.Request) {
 func getAllPosts(w http.ResponseWriter, r *http.Request) {
 	query := `
 		SELECT p.id, p.user_id, p.content, p.post_type, p.created_at,
-		       u.name, u.email, u.avatar
+		       u.name, u.email, u.avatar,
+		       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count
 		FROM posts p
 		JOIN users u ON p.user_id = u.id
 		ORDER BY p.created_at DESC
@@ -79,6 +80,7 @@ func getAllPosts(w http.ResponseWriter, r *http.Request) {
 		err := rows.Scan(
 			&post.ID, &post.UserID, &post.Content, &post.PostType, &post.CreatedAt,
 			&user.Name, &user.Email, &user.Avatar,
+			&post.CommentsCount,
 		)
 		if err != nil {
 			sendErrorResponse(w, "Ошибка чтения данных: "+err.Error(), http.StatusInternalServerError)
@@ -99,7 +101,8 @@ func getAllPosts(w http.ResponseWriter, r *http.Request) {
 func getUserPosts(w http.ResponseWriter, r *http.Request, userID int) {
 	query := `
 		SELECT p.id, p.user_id, p.content, p.post_type, p.created_at,
-		       u.name, u.email, u.avatar
+		       u.name, u.email, u.avatar,
+		       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count
 		FROM posts p
 		JOIN users u ON p.user_id = u.id
 		WHERE p.user_id = ?
@@ -117,14 +120,17 @@ func getUserPosts(w http.ResponseWriter, r *http.Request, userID int) {
 	for rows.Next() {
 		var post models.Post
 		var user models.User
+
 		err := rows.Scan(
 			&post.ID, &post.UserID, &post.Content, &post.PostType, &post.CreatedAt,
 			&user.Name, &user.Email, &user.Avatar,
+			&post.CommentsCount,
 		)
 		if err != nil {
 			sendErrorResponse(w, "Ошибка чтения данных: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+
 		user.ID = post.UserID
 		post.User = &user
 		posts = append(posts, post)
