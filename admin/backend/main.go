@@ -14,10 +14,11 @@ import (
 
 func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		// Только для admin frontend
+		// Для admin frontend и других admin сервисов
 		origin := r.Header.Get("Origin")
 		allowedOrigins := []string{
-			"http://localhost:4000",
+			"http://localhost:4000", // Admin панель
+			"http://localhost:4100", // PetBase (ЗооБаза)
 			"https://sadmin.zooplatforma.ru",
 		}
 

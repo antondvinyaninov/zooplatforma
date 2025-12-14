@@ -32,7 +32,15 @@ import { AuthForm } from '@pet/shared';
 shared/
 ├── src/
 │   ├── components/     # React компоненты (копировать в сервисы!)
-│   │   └── AuthForm.tsx
+│   │   ├── AuthForm.tsx
+│   │   └── admin/      # Шаблон админ-панели
+│   │       ├── AdminLayout.tsx
+│   │       ├── widgets/
+│   │       │   ├── StatsWidget.tsx
+│   │       │   ├── TableWidget.tsx
+│   │       │   └── ChartWidget.tsx
+│   │       ├── index.ts
+│   │       └── README.md
 │   ├── api/           # API клиенты (можно импортировать)
 │   ├── types/         # TypeScript типы (можно импортировать)
 │   └── hooks/         # React хуки (можно импортировать)
@@ -59,8 +67,12 @@ shared/
 # 1. Копируем компонент
 cp shared/src/components/AuthForm.tsx your-service/app/components/
 
-# 2. Импортируем локально
+# 2. Для админ-шаблона копируем всю папку
+cp -r shared/src/components/admin your-service/app/components/
+
+# 3. Импортируем локально
 import AuthForm from '../components/AuthForm';
+import AdminLayout from '../components/admin/AdminLayout';
 ```
 
 ### Для типов и API

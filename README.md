@@ -44,6 +44,14 @@
 │   ├── frontend/     # Admin UI (порт 4000)
 │   ├── README.md
 │   └── SSO_SETUP.md
+├── petbase/          # ЗооБаза - справочник животных
+│   ├── backend/      # PetBase API (порт 8100)
+│   │   ├── main.go
+│   │   ├── handlers/
+│   │   └── models/
+│   ├── frontend/     # PetBase UI (порт 4100)
+│   ├── README.md
+│   └── run-petbase.sh
 ├── mobile/           # React Native приложение (порт 8081)
 ├── shared/           # Общие компоненты (@pet/shared npm пакет)
 │   ├── src/

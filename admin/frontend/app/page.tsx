@@ -18,6 +18,9 @@ import {
   DocumentDuplicateIcon,
 } from '@heroicons/react/24/outline';
 import styles from './page.module.css';
+import StatsWidget from './components/widgets/StatsWidget';
+import TableWidget from './components/widgets/TableWidget';
+import ChartWidget from './components/widgets/ChartWidget';
 
 export default function AdminDashboard() {
   const router = useRouter();
@@ -32,6 +35,7 @@ export default function AdminDashboard() {
   const [adminUser, setAdminUser] = useState<{ email: string; role: string } | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
   const [userMenuOpen, setUserMenuOpen] = useState(false);
+  const [mobileMenuOpen, setMobileMenuOpen] = useState(false);
 
   // Инициализация из localStorage после монтирования
   useEffect(() => {
@@ -152,10 +156,20 @@ export default function AdminDashboard() {
     <div className={styles.container}>
       <header className={styles.header}>
         <div className={styles.headerContent}>
-          <h1 className={styles.logo}>
-            <img src="/favicon.svg" alt="ЗооАдминка" className={styles.logoImage} />
-            <span className={styles.logoText}>ЗооАдминка</span>
-          </h1>
+          <div className="flex items-center gap-4">
+            <button
+              className="lg:hidden p-2 hover:bg-gray-100 rounded-lg transition-colors"
+              onClick={() => setMobileMenuOpen(!mobileMenuOpen)}
+            >
+              <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4 6h16M4 12h16M4 18h16" />
+              </svg>
+            </button>
+            <h1 className={styles.logo}>
+              <img src="/favicon.svg" alt="ЗооАдминка" className={styles.logoImage} />
+              <span className={styles.logoText}>ЗооАдминка</span>
+            </h1>
+          </div>
           <div className={styles.headerRight}>
             {adminUser && (
               <>
@@ -217,7 +231,15 @@ export default function AdminDashboard() {
       </header>
 
       <div className={styles.layout}>
-        <aside className={`${styles.sidebar} ${sidebarCollapsed ? styles.sidebarCollapsed : ''}`}>
+        {/* Mobile overlay */}
+        {mobileMenuOpen && (
+          <div 
+            className="fixed inset-0 bg-black bg-opacity-50 z-40 lg:hidden"
+            onClick={() => setMobileMenuOpen(false)}
+          />
+        )}
+        
+        <aside className={`${styles.sidebar} ${sidebarCollapsed ? styles.sidebarCollapsed : ''} ${mobileMenuOpen ? styles.sidebarMobile : styles.sidebarHidden}`}>
           {isClient ? (
             <nav className={styles.nav}>
               <button
@@ -289,237 +311,325 @@ export default function AdminDashboard() {
           ) : (
             <>
               {activeTab === 'users' && (
-                <>
-                  <div className={styles.toolbar}>
-                    <button className={styles.createBtn}>Создать пользователя</button>
-                    <div className={styles.filters}>
-                      <div className={styles.searchWrapper}>
-                        <MagnifyingGlassIcon className="w-3.5 h-3.5 text-gray-400" />
-                        <input 
-                          type="text" 
-                          placeholder="Поиск" 
-                          className={styles.searchInput}
-                        />
-                      </div>
-                    </div>
+                <div className="space-y-8">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">Управление пользователями</h2>
+                    <p className="text-gray-600">Просмотр и управление учетными записями</p>
                   </div>
-                  
-                  <div className={styles.tableWrapper}>
-                    <table className={styles.dataTable}>
-                      <thead>
-                        <tr>
-                          <th>Пользователи ▼</th>
-                          <th>Email</th>
-                          <th>Посты</th>
-                          <th>Питомцы</th>
-                          <th>Дата регистрации</th>
-                          <th>Действия</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {users.map(user => (
-                          <tr key={user.id}>
-                            <td>
-                              <div className={styles.userCell}>
-                                <span className={styles.userName}>{user.name}</span>
-                              </div>
-                            </td>
-                            <td>{user.email}</td>
-                            <td>0</td>
-                            <td>0</td>
-                            <td>{new Date(user.created_at).toLocaleDateString('ru-RU')}</td>
-                            <td>
-                              <button
-                                className={styles.deleteBtn}
-                                onClick={() => handleDeleteUser(user.id)}
-                              >
-                                <TrashIcon className="w-3.5 h-3.5" />
-                              </button>
-                            </td>
+
+                  <TableWidget
+                    title={`Пользователи (${users.length})`}
+                    actions={
+                      <>
+                        <div className="relative">
+                          <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            placeholder="Поиск..."
+                            className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                        <button className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
+                          Создать пользователя
+                        </button>
+                      </>
+                    }
+                  >
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-100">
+                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Пользователь</th>
+                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Email</th>
+                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Посты</th>
+                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Питомцы</th>
+                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Дата регистрации</th>
+                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Действия</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div className={styles.tableFooter}>
-                      Итого: {users.length} пользователей
+                        </thead>
+                        <tbody>
+                          {users.map(user => (
+                            <tr key={user.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-3">
+                                  <div className="w-8 h-8 rounded-full bg-blue-100 flex items-center justify-center">
+                                    <span className="text-sm font-medium text-blue-600">
+                                      {user.name.charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                  <span className="text-sm font-medium text-gray-900">{user.name}</span>
+                                </div>
+                              </td>
+                              <td className="py-3 px-4 text-sm text-gray-600">{user.email}</td>
+                              <td className="py-3 px-4 text-sm text-gray-600">0</td>
+                              <td className="py-3 px-4 text-sm text-gray-600">0</td>
+                              <td className="py-3 px-4 text-sm text-gray-600">
+                                {new Date(user.created_at).toLocaleDateString('ru-RU')}
+                              </td>
+                              <td className="py-3 px-4">
+                                <button
+                                  onClick={() => handleDeleteUser(user.id)}
+                                  className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                  title="Удалить"
+                                >
+                                  <TrashIcon className="w-4 h-4" />
+                                </button>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  </div>
-                </>
+                  </TableWidget>
+                </div>
               )}
 
               {activeTab === 'posts' && (
-                <>
-                  <div className={styles.toolbar}>
-                    <div className={styles.filters}>
-                      <select className={styles.filterSelect}>
-                        <option>Все статусы</option>
-                        <option>На модерации</option>
-                        <option>Одобрено</option>
-                        <option>Отклонено</option>
-                      </select>
-                      <div className={styles.searchWrapper}>
-                        <MagnifyingGlassIcon className="w-3.5 h-3.5 text-gray-400" />
-                        <input 
-                          type="text" 
-                          placeholder="Поиск" 
-                          className={styles.searchInput}
-                        />
-                      </div>
-                    </div>
+                <div className="space-y-8">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">Модерация постов</h2>
+                    <p className="text-gray-600">Проверка и управление публикациями</p>
                   </div>
-                  
-                  <div className={styles.tableWrapper}>
-                    <table className={styles.dataTable}>
-                      <thead>
-                        <tr>
-                          <th>ID</th>
-                          <th>Содержание</th>
-                          <th>Автор</th>
-                          <th>Статус</th>
-                          <th>Дата</th>
-                          <th>Действия</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {posts.map(post => (
-                          <tr key={post.id}>
-                            <td>{post.id}</td>
-                            <td>{post.content.substring(0, 60)}...</td>
-                            <td>User #{post.user_id}</td>
-                            <td>
-                              <span className={`${styles.statusBadge} ${styles[`status${post.status}`]}`}>
-                                {post.status === 'pending' ? 'На модерации' : 
-                                 post.status === 'approved' ? 'Одобрен' : 'Отклонен'}
-                              </span>
-                            </td>
-                            <td>{new Date(post.created_at).toLocaleDateString('ru-RU')}</td>
-                            <td>
-                              <div className={styles.actionBtns}>
-                                {post.status === 'pending' && (
-                                  <>
-                                    <button
-                                      className={styles.approveBtn}
-                                      onClick={() => handleModeratePost(post.id, 'approved')}
-                                      title="Одобрить"
-                                    >
-                                      <CheckIcon className="w-3.5 h-3.5" />
-                                    </button>
-                                    <button
-                                      className={styles.rejectBtn}
-                                      onClick={() => handleModeratePost(post.id, 'rejected')}
-                                      title="Отклонить"
-                                    >
-                                      <XMarkIcon className="w-3.5 h-3.5" />
-                                    </button>
-                                  </>
-                                )}
-                                <button
-                                  className={styles.deleteBtn}
-                                  onClick={() => handleDeletePost(post.id)}
-                                  title="Удалить"
-                                >
-                                  <TrashIcon className="w-3.5 h-3.5" />
-                                </button>
-                              </div>
-                            </td>
+
+                  <TableWidget
+                    title={`Посты (${posts.length})`}
+                    actions={
+                      <>
+                        <select className="px-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                          <option>Все статусы</option>
+                          <option>На модерации</option>
+                          <option>Одобрено</option>
+                          <option>Отклонено</option>
+                        </select>
+                        <div className="relative">
+                          <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            placeholder="Поиск..."
+                            className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </>
+                    }
+                  >
+                    <div className="overflow-x-auto">
+                      <table className="w-full">
+                        <thead>
+                          <tr className="border-b border-gray-100">
+                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">ID</th>
+                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Содержание</th>
+                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Автор</th>
+                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Статус</th>
+                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Дата</th>
+                            <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Действия</th>
                           </tr>
-                        ))}
-                      </tbody>
-                    </table>
-                    <div className={styles.tableFooter}>
-                      Итого: {posts.length} постов
+                        </thead>
+                        <tbody>
+                          {posts.map(post => (
+                            <tr key={post.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                              <td className="py-3 px-4 text-sm text-gray-600">#{post.id}</td>
+                              <td className="py-3 px-4 text-sm text-gray-900 max-w-md truncate">
+                                {post.content}
+                              </td>
+                              <td className="py-3 px-4 text-sm text-gray-600">User #{post.user_id}</td>
+                              <td className="py-3 px-4">
+                                <span className={`inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium ${
+                                  post.status === 'pending' ? 'bg-yellow-100 text-yellow-800' :
+                                  post.status === 'approved' ? 'bg-green-100 text-green-800' :
+                                  'bg-red-100 text-red-800'
+                                }`}>
+                                  {post.status === 'pending' ? 'На модерации' :
+                                   post.status === 'approved' ? 'Одобрен' : 'Отклонен'}
+                                </span>
+                              </td>
+                              <td className="py-3 px-4 text-sm text-gray-600">
+                                {new Date(post.created_at).toLocaleDateString('ru-RU')}
+                              </td>
+                              <td className="py-3 px-4">
+                                <div className="flex items-center gap-2">
+                                  {post.status === 'pending' && (
+                                    <>
+                                      <button
+                                        onClick={() => handleModeratePost(post.id, 'approved')}
+                                        className="p-2 text-green-600 hover:bg-green-50 rounded-lg transition-colors"
+                                        title="Одобрить"
+                                      >
+                                        <CheckIcon className="w-4 h-4" />
+                                      </button>
+                                      <button
+                                        onClick={() => handleModeratePost(post.id, 'rejected')}
+                                        className="p-2 text-orange-600 hover:bg-orange-50 rounded-lg transition-colors"
+                                        title="Отклонить"
+                                      >
+                                        <XMarkIcon className="w-4 h-4" />
+                                      </button>
+                                    </>
+                                  )}
+                                  <button
+                                    onClick={() => handleDeletePost(post.id)}
+                                    className="p-2 text-red-600 hover:bg-red-50 rounded-lg transition-colors"
+                                    title="Удалить"
+                                  >
+                                    <TrashIcon className="w-4 h-4" />
+                                  </button>
+                                </div>
+                              </td>
+                            </tr>
+                          ))}
+                        </tbody>
+                      </table>
                     </div>
-                  </div>
-                </>
+                  </TableWidget>
+                </div>
               )}
 
               {activeTab === 'stats' && stats && (
-                <div className={styles.statsContainer}>
-                  <h2 className={styles.statsTitle}>Статистика платформы</h2>
-                  <div className={styles.statsGrid}>
-                    <div className={styles.statCard}>
-                      <div className={styles.statValue}>{stats.total_users}</div>
-                      <div className={styles.statLabel}>Всего пользователей</div>
-                    </div>
-                    <div className={styles.statCard}>
-                      <div className={styles.statValue}>{stats.total_posts}</div>
-                      <div className={styles.statLabel}>Всего постов</div>
-                    </div>
-                    <div className={styles.statCard}>
-                      <div className={styles.statValue}>{stats.pending_posts}</div>
-                      <div className={styles.statLabel}>На модерации</div>
-                    </div>
-                    <div className={styles.statCard}>
-                      <div className={styles.statValue}>{stats.active_users_today}</div>
-                      <div className={styles.statLabel}>Активных сегодня</div>
+                <div className="space-y-8">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">Обзор платформы</h2>
+                    <p className="text-gray-600">Основные метрики и статистика</p>
+                  </div>
+                  <div>
+                    <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
+                      <StatsWidget
+                        title="Всего пользователей"
+                        value={stats.total_users}
+                        icon={<UsersIcon className="w-6 h-6" />}
+                        color="blue"
+                        trend={{ value: '+12% за месяц', isPositive: true }}
+                      />
+                      <StatsWidget
+                        title="Всего постов"
+                        value={stats.total_posts}
+                        icon={<DocumentTextIcon className="w-6 h-6" />}
+                        color="green"
+                        trend={{ value: '+8% за неделю', isPositive: true }}
+                      />
+                      <StatsWidget
+                        title="На модерации"
+                        value={stats.pending_posts}
+                        icon={<ClipboardDocumentListIcon className="w-6 h-6" />}
+                        color="orange"
+                      />
+                      <StatsWidget
+                        title="Активных сегодня"
+                        value={stats.active_users_today}
+                        icon={<ChartBarIcon className="w-6 h-6" />}
+                        color="purple"
+                      />
                     </div>
                   </div>
+
+                  <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+                    <ChartWidget title="Активность пользователей" subtitle="За последние 7 дней">
+                      <div className="h-64 flex items-center justify-center text-gray-400">
+                        График активности (в разработке)
+                      </div>
+                    </ChartWidget>
+                    
+                    <ChartWidget title="Новые регистрации" subtitle="За последний месяц">
+                      <div className="h-64 flex items-center justify-center text-gray-400">
+                        График регистраций (в разработке)
+                      </div>
+                    </ChartWidget>
+                  </div>
+
+                  <TableWidget 
+                    title="Последние действия"
+                    actions={
+                      <button className="text-sm text-blue-600 hover:text-blue-700">
+                        Посмотреть все
+                      </button>
+                    }
+                  >
+                    <div className="text-sm text-gray-600">
+                      <div className="space-y-3">
+                        <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                          <span>Новый пользователь зарегистрирован</span>
+                          <span className="text-gray-400">2 мин назад</span>
+                        </div>
+                        <div className="flex items-center justify-between py-2 border-b border-gray-100">
+                          <span>Пост отправлен на модерацию</span>
+                          <span className="text-gray-400">15 мин назад</span>
+                        </div>
+                        <div className="flex items-center justify-between py-2">
+                          <span>Пост одобрен модератором</span>
+                          <span className="text-gray-400">1 час назад</span>
+                        </div>
+                      </div>
+                    </div>
+                  </TableWidget>
                 </div>
               )}
 
               {activeTab === 'logs' && (
-                <>
-                  <div className={styles.toolbar}>
-                    <h2 className={styles.pageTitle}>Логи системы</h2>
-                    <div className={styles.filters}>
-                      <select className={styles.filterSelect}>
-                        <option>Все действия</option>
-                        <option>Создание</option>
-                        <option>Обновление</option>
-                        <option>Удаление</option>
-                        <option>Ошибки</option>
-                      </select>
-                      <div className={styles.searchWrapper}>
-                        <MagnifyingGlassIcon className="w-3.5 h-3.5 text-gray-400" />
-                        <input 
-                          type="text" 
-                          placeholder="Поиск" 
-                          className={styles.searchInput}
-                        />
+                <div className="space-y-8">
+                  <div>
+                    <h2 className="text-3xl font-bold text-gray-900 mb-2">Логи системы</h2>
+                    <p className="text-gray-600">История действий администраторов</p>
+                  </div>
+
+                  <TableWidget
+                    title={`Логи (${logs.length})`}
+                    actions={
+                      <>
+                        <select className="px-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500">
+                          <option>Все действия</option>
+                          <option>Создание</option>
+                          <option>Обновление</option>
+                          <option>Удаление</option>
+                          <option>Ошибки</option>
+                        </select>
+                        <div className="relative">
+                          <MagnifyingGlassIcon className="w-4 h-4 text-gray-400 absolute left-3 top-1/2 -translate-y-1/2" />
+                          <input
+                            type="text"
+                            placeholder="Поиск..."
+                            className="pl-9 pr-4 py-2 text-sm border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500"
+                          />
+                        </div>
+                      </>
+                    }
+                  >
+                    {logs.length === 0 ? (
+                      <div className="text-center py-12 text-gray-400">
+                        <DocumentDuplicateIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                        <p>Логи отсутствуют</p>
                       </div>
-                    </div>
-                  </div>
-                  
-                  <div className={styles.tableWrapper}>
-                    <table className={styles.dataTable}>
-                      <thead>
-                        <tr>
-                          <th>ID</th>
-                          <th>Администратор</th>
-                          <th>Действие</th>
-                          <th>Детали</th>
-                          <th>Дата и время</th>
-                        </tr>
-                      </thead>
-                      <tbody>
-                        {logs.length === 0 ? (
-                          <tr>
-                            <td colSpan={5} style={{ textAlign: 'center', padding: '40px', color: '#99a2ad' }}>
-                              Логи отсутствуют
-                            </td>
-                          </tr>
-                        ) : (
-                          logs.map(log => (
-                            <tr key={log.id}>
-                              <td>{log.id}</td>
-                              <td>{log.admin_name}</td>
-                              <td>
-                                <span className={`${styles.logAction} ${styles[`action${log.action.toLowerCase().replace(/\s/g, '')}`]}`}>
-                                  {log.action}
-                                </span>
-                              </td>
-                              <td>{log.details}</td>
-                              <td>{new Date(log.created_at).toLocaleString('ru-RU')}</td>
+                    ) : (
+                      <div className="overflow-x-auto">
+                        <table className="w-full">
+                          <thead>
+                            <tr className="border-b border-gray-100">
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">ID</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Администратор</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Действие</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Детали</th>
+                              <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Дата и время</th>
                             </tr>
-                          ))
-                        )}
-                      </tbody>
-                    </table>
-                    <div className={styles.tableFooter}>
-                      Итого: {logs.length} записей
-                    </div>
-                  </div>
-                </>
+                          </thead>
+                          <tbody>
+                            {logs.map(log => (
+                              <tr key={log.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
+                                <td className="py-3 px-4 text-sm text-gray-600">#{log.id}</td>
+                                <td className="py-3 px-4 text-sm text-gray-900">{log.admin_name}</td>
+                                <td className="py-3 px-4">
+                                  <span className="inline-flex items-center px-2.5 py-0.5 rounded-full text-xs font-medium bg-blue-100 text-blue-800">
+                                    {log.action}
+                                  </span>
+                                </td>
+                                <td className="py-3 px-4 text-sm text-gray-600">{log.details}</td>
+                                <td className="py-3 px-4 text-sm text-gray-600">
+                                  {new Date(log.created_at).toLocaleString('ru-RU')}
+                                </td>
+                              </tr>
+                            ))}
+                          </tbody>
+                        </table>
+                      </div>
+                    )}
+                  </TableWidget>
+                </div>
               )}
             </>
           )}

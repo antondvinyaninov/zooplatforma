@@ -6,6 +6,7 @@ echo "🚀 Starting ЗооПлатформа..."
 echo "🧹 Cleaning cache..."
 rm -rf main/frontend/.next 2>/dev/null || true
 rm -rf admin/frontend/.next 2>/dev/null || true
+rm -rf petbase/frontend/.next 2>/dev/null || true
 rm -rf mobile/.expo 2>/dev/null || true
 rm -rf mobile/node_modules/.cache 2>/dev/null || true
 echo "✅ Cache cleared"
@@ -14,8 +15,10 @@ echo "✅ Cache cleared"
 echo "🧹 Cleaning up ports..."
 lsof -ti:3000 | xargs kill -9 2>/dev/null || true
 lsof -ti:4000 | xargs kill -9 2>/dev/null || true
+lsof -ti:4100 | xargs kill -9 2>/dev/null || true
 lsof -ti:8000 | xargs kill -9 2>/dev/null || true
 lsof -ti:8081 | xargs kill -9 2>/dev/null || true
+lsof -ti:8100 | xargs kill -9 2>/dev/null || true
 lsof -ti:9000 | xargs kill -9 2>/dev/null || true
 
 echo "✅ Ports cleared"
@@ -36,6 +39,11 @@ ADMIN_BACKEND_PID=$!
 # Wait a bit for admin backend to start
 sleep 1
 
+# Start petbase backend with Air
+echo "🐾 Starting PetBase Backend on port 8100 (with hot reload)..."
+(cd petbase/backend && /Users/dvinyaninov/go/bin/air) &
+PETBASE_BACKEND_PID=$!
+
 # Start web frontend
 echo "⚛️  Starting Web Frontend on port 3000..."
 (cd main/frontend && npm run dev) &
@@ -45,6 +53,11 @@ FRONTEND_PID=$!
 echo "🔐 Starting Admin Frontend on port 4000..."
 (cd admin/frontend && npm run dev) &
 ADMIN_FRONTEND_PID=$!
+
+# Start petbase frontend
+echo "🐾 Starting PetBase Frontend on port 4100..."
+(cd petbase/frontend && npm run dev) &
+PETBASE_FRONTEND_PID=$!
 
 # Start mobile
 echo "📱 Starting Mobile on port 8081 (Expo default)..."
@@ -70,23 +83,28 @@ check_port() {
   fi
 }
 
-check_port 3000 "Web Frontend   "
-check_port 4000 "Admin Frontend "
-check_port 8081 "Mobile         "
-check_port 8000 "Main Backend   "
-check_port 9000 "Admin Backend  "
+check_port 3000 "Web Frontend    "
+check_port 4000 "Admin Frontend  "
+check_port 4100 "PetBase Frontend"
+check_port 8081 "Mobile          "
+check_port 8000 "Main Backend    "
+check_port 8100 "PetBase Backend "
+check_port 9000 "Admin Backend   "
 
 echo ""
 echo "✅ ЗооПлатформа запущена!"
 echo ""
-echo "   🌐 Web Frontend:    http://localhost:3000"
-echo "   🔐 Admin Frontend:  http://localhost:4000"
-echo "   📱 Mobile:          http://localhost:8081"
-echo "   🔧 Main Backend:    http://localhost:8000"
-echo "   🛡️  Admin Backend:   http://localhost:9000"
+echo "   🌐 Web Frontend:     http://localhost:3000"
+echo "   🔐 Admin Frontend:   http://localhost:4000"
+echo "   🐾 PetBase Frontend: http://localhost:4100"
+echo "   📱 Mobile:           http://localhost:8081"
+echo "   🔧 Main Backend:     http://localhost:8000"
+echo "   🐾 PetBase Backend:  http://localhost:8100"
+echo "   🛡️  Admin Backend:    http://localhost:9000"
 echo ""
 echo "📚 Документация:"
 echo "   - Админ-панель:  admin/README.md"
+echo "   - ЗооБаза:       petbase/README.md"
 echo "   - SSO Setup:     admin/SSO_SETUP.md"
 echo "   - Тесты:         tests/README.md"
 echo ""
@@ -95,5 +113,5 @@ echo ""
 echo "Press Ctrl+C to stop all services"
 
 # Wait for Ctrl+C
-trap "echo ''; echo '🛑 Stopping all services...'; kill $BACKEND_PID $ADMIN_BACKEND_PID $FRONTEND_PID $ADMIN_FRONTEND_PID $MOBILE_PID 2>/dev/null; exit" INT
+trap "echo ''; echo '🛑 Stopping all services...'; kill $BACKEND_PID $ADMIN_BACKEND_PID $PETBASE_BACKEND_PID $FRONTEND_PID $ADMIN_FRONTEND_PID $PETBASE_FRONTEND_PID $MOBILE_PID 2>/dev/null; exit" INT
 wait
