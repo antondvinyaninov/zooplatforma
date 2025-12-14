@@ -2,6 +2,14 @@
 
 echo "🚀 Starting ЗооПлатформа..."
 
+# Clean cache
+echo "🧹 Cleaning cache..."
+rm -rf main/frontend/.next 2>/dev/null || true
+rm -rf admin/frontend/.next 2>/dev/null || true
+rm -rf mobile/.expo 2>/dev/null || true
+rm -rf mobile/node_modules/.cache 2>/dev/null || true
+echo "✅ Cache cleared"
+
 # Kill processes on ports
 echo "🧹 Cleaning up ports..."
 lsof -ti:3000 | xargs kill -9 2>/dev/null || true
@@ -14,7 +22,7 @@ echo "✅ Ports cleared"
 
 # Start main backend with Air
 echo "🔧 Starting Main Backend on port 8000 (with hot reload)..."
-(cd backend && /Users/dvinyaninov/go/bin/air) &
+(cd main/backend && /Users/dvinyaninov/go/bin/air) &
 BACKEND_PID=$!
 
 # Wait a bit for backend to start
@@ -30,7 +38,7 @@ sleep 1
 
 # Start web frontend
 echo "⚛️  Starting Web Frontend on port 3000..."
-(cd frontend && npm run dev) &
+(cd main/frontend && npm run dev) &
 FRONTEND_PID=$!
 
 # Start admin frontend

@@ -1,13 +1,28 @@
 {
-  "name": "shared",
+  "name": "@pet/shared",
   "version": "0.0.1",
   "private": true,
   "main": "src/index.ts",
   "types": "src/index.ts",
+  "files": [
+    "dist",
+    "src"
+  ],
   "scripts": {
-    "type-check": "tsc --noEmit"
+    "build": "tsc",
+    "dev": "tsc --watch",
+    "type-check": "tsc --noEmit",
+    "clean": "rm -rf dist"
+  },
+  "peerDependencies": {
+    "next": "^16.0.0",
+    "react": "^19.0.0",
+    "react-dom": "^19.0.0"
   },
   "devDependencies": {
+    "@heroicons/react": "^2.2.0",
+    "@types/node": "^22.19.3",
+    "@types/react": "^19.2.7",
     "typescript": "^5"
   }
 }

@@ -1,0 +1,60 @@
+version: '3.8'
+
+services:
+  # Main Backend
+  main-backend:
+    build:
+      context: ../main/backend
+      dockerfile: ../../infrastructure/docker/main/Dockerfile.backend
+    ports:
+      - "8000:8000"
+    environment:
+      - PORT=8000
+      - DB_PATH=/app/data/data.db
+    volumes:
+      - ../database:/app/data
+    restart: unless-stopped
+
+  # Main Frontend
+  main-frontend:
+    build:
+      context: ../main/frontend
+      dockerfile: ../../infrastructure/docker/main/Dockerfile.frontend
+    ports:
+      - "3000:3000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8000
+    depends_on:
+      - main-backend
+    restart: unless-stopped
+
+  # Admin Backend
+  admin-backend:
+    build:
+      context: ../admin/backend
+      dockerfile: ../../infrastructure/docker/admin/Dockerfile.backend
+    ports:
+      - "9000:9000"
+    environment:
+      - PORT=9000
+      - DB_PATH=/app/data/data.db
+    volumes:
+      - ../database:/app/data
+    restart: unless-stopped
+
+  # Admin Frontend
+  admin-frontend:
+    build:
+      context: ../admin/frontend
+      dockerfile: ../../infrastructure/docker/admin/Dockerfile.frontend
+    ports:
+      - "4000:4000"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:9000
+    depends_on:
+      - admin-backend
+    restart: unless-stopped
+
+networks:
+  default:
+    name: pet-platform

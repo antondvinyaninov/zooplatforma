@@ -1,6 +1,8 @@
 .container {
   min-height: 100vh;
   background: #fff;
+  width: 100vw;
+  overflow-x: hidden;
 }
 
 .header {
@@ -24,14 +26,24 @@
 .logo {
   font-size: 16px;
   font-weight: 500;
-  color: #2787f5;
+  color: #111827;
   display: flex;
   align-items: center;
-  gap: 6px;
+  gap: 8px;
+  margin: 0;
 }
 
-.logoIcon {
-  font-size: 20px;
+.logoImage {
+  width: 28px;
+  height: 28px;
+}
+
+.logoText {
+  font-size: 14px;
+  font-weight: 700;
+  text-transform: uppercase;
+  letter-spacing: 0;
+  color: #111827;
 }
 
 .headerRight {
@@ -69,29 +81,112 @@
   background: #f0f2f5;
 }
 
-.userMenu {
+.userMenuWrapper {
+  position: relative;
+}
+
+.userMenuButton {
   display: flex;
   align-items: center;
   gap: 8px;
-}
-
-.userName {
-  font-size: 13px;
-  color: #000;
-}
-
-.logoutBtn {
   padding: 4px 8px;
   background: none;
   border: none;
   cursor: pointer;
+  border-radius: 8px;
+  transition: background 0.15s;
+}
+
+.userMenuButton:hover {
+  background: #f0f2f5;
+}
+
+.userAvatar {
+  width: 32px;
+  height: 32px;
+  border-radius: 50%;
+  background: #e1e8ed;
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  color: #6d7885;
+  flex-shrink: 0;
+}
+
+.userAvatar svg {
+  width: 16px;
+  height: 16px;
+}
+
+.userMenuArrow {
   font-size: 12px;
   color: #99a2ad;
+}
+
+.userMenuDropdown {
+  position: absolute;
+  right: 0;
+  top: calc(100% + 8px);
+  width: 280px;
+  background: #fff;
+  border-radius: 8px;
+  box-shadow: 0 4px 16px rgba(0, 0, 0, 0.15);
+  border: 1px solid #e7e8ec;
+  overflow: hidden;
+  z-index: 1000;
+}
+
+.userMenuHeader {
+  padding: 16px;
+  border-bottom: 1px solid #e7e8ec;
+  display: flex;
+  align-items: center;
+  gap: 12px;
+}
+
+.userInfo {
+  flex: 1;
+}
+
+.userEmail {
+  font-size: 14px;
+  font-weight: 500;
+  color: #000;
+  margin-bottom: 2px;
+}
+
+.userRole {
+  font-size: 12px;
+  color: #6d7885;
+}
+
+.userMenuItems {
+  padding: 8px 0;
+}
+
+.userMenuItem {
+  width: 100%;
+  padding: 12px 16px;
+  background: none;
+  border: none;
+  cursor: pointer;
+  text-align: left;
+  font-size: 14px;
+  color: #000;
+  transition: background 0.15s;
+  display: block;
+  text-decoration: none;
+}
+
+.userMenuItem:hover {
+  background: #f0f2f5;
 }
 
 .layout {
   display: flex;
   height: calc(100vh - 54px);
+  width: 100%;
+  max-width: 100vw;
 }
 
 .sidebar {
@@ -218,7 +313,9 @@
 
 .main {
   flex: 1;
+  min-width: 0;
   overflow-y: auto;
+  overflow-x: hidden;
   background: #fff;
 }
 
@@ -312,10 +409,12 @@
 .tableWrapper {
   background: #fff;
   margin: 0;
+  overflow-x: auto;
 }
 
 .dataTable {
   width: 100%;
+  min-width: 800px;
   border-collapse: collapse;
   font-size: 13px;
 }
@@ -430,6 +529,8 @@
 
 .statsContainer {
   padding: 24px;
+  max-width: 100%;
+  box-sizing: border-box;
 }
 
 .statsTitle {
@@ -441,8 +542,9 @@
 
 .statsGrid {
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(240px, 1fr));
+  grid-template-columns: repeat(auto-fit, minmax(200px, 1fr));
   gap: 16px;
+  max-width: 100%;
 }
 
 .statCard {

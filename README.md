@@ -25,32 +25,45 @@
 - Общая логика (API клиент, типы, хуки)
 - TypeScript
 
-## Структура проекта
+## Структура проекта (Микросервисная архитектура)
 
 ```
-├── backend/          # Go API сервер (порт 8080)
-│   ├── main.go
-│   ├── handlers/     # HTTP handlers
-│   ├── models/       # Data models
-│   ├── middleware/   # Middleware (auth, CORS)
-│   └── .air.toml     # Конфигурация hot reload
-├── admin/            # Микросервис админ-панели
-│   ├── backend/      # Admin API (порт 8081)
+├── main/             # Главный сервис (платформа)
+│   ├── backend/      # Go API сервер (порт 8000)
 │   │   ├── main.go
 │   │   ├── handlers/
-│   │   ├── middleware/
-│   │   └── create-superadmin.sh
-│   ├── frontend/     # Admin UI (порт 3001)
+│   │   ├── models/
+│   │   └── middleware/
+│   └── frontend/     # Next.js веб-приложение (порт 3000)
+│       └── app/
+├── admin/            # Административная панель
+│   ├── backend/      # Admin API (порт 9000)
+│   │   ├── main.go
+│   │   ├── handlers/
+│   │   └── middleware/
+│   ├── frontend/     # Admin UI (порт 4000)
 │   ├── README.md
 │   └── SSO_SETUP.md
+├── mobile/           # React Native приложение (порт 8081)
+├── shared/           # Общие компоненты (@pet/shared npm пакет)
+│   ├── src/
+│   │   ├── api/      # API клиент
+│   │   ├── components/ # Переиспользуемые компоненты
+│   │   ├── types/    # TypeScript типы
+│   │   └── hooks/    # React хуки
+│   └── package.json
 ├── database/         # SQLite база данных (отдельный модуль)
-│   ├── db.go         # Инициализация и работа с БД
-│   └── data.db       # Файл базы данных
-├── frontend/         # Next.js веб-приложение (порт 3000)
-│   └── app/
-│       ├── (main)/       # Страницы с layout
-│       ├── components/   # React компоненты
-│       ├── contexts/     # React contexts
+│   ├── db.go
+│   └── data.db
+├── infrastructure/   # Конфигурации для деплоя
+│   ├── docker/       # Dockerfile для каждого сервиса
+│   ├── kubernetes/   # K8s манифесты
+│   └── docker-compose.yml
+├── scripts/          # Утилиты и автоматизация
+│   ├── migrations/   # Миграции БД
+│   └── seeds/        # Тестовые данные
+├── docs/             # Документация
+└── tests/            # Тесты
 │       └── lib/          # Утилиты и API клиент
 ├── mobile/           # React Native приложение
 │   ├── App.tsx

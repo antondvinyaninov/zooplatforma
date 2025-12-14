@@ -26,14 +26,39 @@ export default function AdminDashboard() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
   const [activeTab, setActiveTab] = useState<'users' | 'posts' | 'stats' | 'logs'>('stats');
+  const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
   const [adminUser, setAdminUser] = useState<{ email: string; role: string } | null>(null);
   const [sidebarCollapsed, setSidebarCollapsed] = useState(false);
+  const [userMenuOpen, setUserMenuOpen] = useState(false);
+
+  // Инициализация из localStorage после монтирования
+  useEffect(() => {
+    setIsClient(true);
+    const savedTab = localStorage.getItem('adminActiveTab') as 'users' | 'posts' | 'stats' | 'logs' | null;
+    if (savedTab) {
+      setActiveTab(savedTab);
+    }
+  }, []);
 
   useEffect(() => {
-    loadData();
-  }, [activeTab]);
+    if (isClient) {
+      loadData();
+    }
+  }, [activeTab, isClient]);
+
+  // Закрытие меню при клике вне его
+  useEffect(() => {
+    function handleClickOutside(event: MouseEvent) {
+      const target = event.target as HTMLElement;
+      if (userMenuOpen && !target.closest(`.${styles.userMenuWrapper}`)) {
+        setUserMenuOpen(false);
+      }
+    }
+    document.addEventListener('mousedown', handleClickOutside);
+    return () => document.removeEventListener('mousedown', handleClickOutside);
+  }, [userMenuOpen]);
 
   const loadData = async () => {
     setLoading(true);
@@ -128,13 +153,12 @@ export default function AdminDashboard() {
       <header className={styles.header}>
         <div className={styles.headerContent}>
           <h1 className={styles.logo}>
-            <span className={styles.logoIcon}>🐾</span>
-            ЗооПлатформа
+            <img src="/favicon.svg" alt="ЗооАдминка" className={styles.logoImage} />
+            <span className={styles.logoText}>ЗооАдминка</span>
           </h1>
           <div className={styles.headerRight}>
             {adminUser && (
               <>
-                <span className={styles.balance}>0,00 ₽</span>
                 <button className={styles.iconBtn}>
                   <ClipboardDocumentListIcon className="w-4 h-4" />
                 </button>
@@ -144,11 +168,47 @@ export default function AdminDashboard() {
                 <button className={styles.iconBtn}>
                   <Cog6ToothIcon className="w-4 h-4" />
                 </button>
-                <div className={styles.userMenu}>
-                  <span className={styles.userName}>{adminUser.email}</span>
-                  <button className={styles.logoutBtn} onClick={handleLogout}>
-                    ▼
+                <div className={styles.userMenuWrapper}>
+                  <button 
+                    className={styles.userMenuButton}
+                    onClick={() => setUserMenuOpen(!userMenuOpen)}
+                  >
+                    <div className={styles.userAvatar}>
+                      <UsersIcon className="w-4 h-4" />
+                    </div>
+                    <span className={styles.userMenuArrow}>▼</span>
                   </button>
+                  
+                  {userMenuOpen && (
+                    <div className={styles.userMenuDropdown}>
+                      <div className={styles.userMenuHeader}>
+                        <div className={styles.userAvatar}>
+                          <UsersIcon className="w-4 h-4" />
+                        </div>
+                        <div className={styles.userInfo}>
+                          <div className={styles.userEmail}>{adminUser.email}</div>
+                          <div className={styles.userRole}>{adminUser.role}</div>
+                        </div>
+                      </div>
+                      
+                      <div className={styles.userMenuItems}>
+                        <a 
+                          href="http://localhost:3000" 
+                          target="_blank"
+                          rel="noopener noreferrer"
+                          className={styles.userMenuItem}
+                        >
+                          Главная страница
+                        </a>
+                        <button 
+                          className={styles.userMenuItem}
+                          onClick={handleLogout}
+                        >
+                          Выйти
+                        </button>
+                      </div>
+                    </div>
+                  )}
                 </div>
               </>
             )}
@@ -158,40 +218,58 @@ export default function AdminDashboard() {
 
       <div className={styles.layout}>
         <aside className={`${styles.sidebar} ${sidebarCollapsed ? styles.sidebarCollapsed : ''}`}>
-          <nav className={styles.nav}>
-            <button
-              className={`${styles.navItem} ${activeTab === 'users' ? styles.navItemActive : ''}`}
-              onClick={() => setActiveTab('users')}
-              title="Пользователи"
-            >
-              <UsersIcon />
-              {!sidebarCollapsed && <span className={styles.navLabel}>Пользователи</span>}
-            </button>
-            <button
-              className={`${styles.navItem} ${activeTab === 'posts' ? styles.navItemActive : ''}`}
-              onClick={() => setActiveTab('posts')}
-              title="Посты"
-            >
-              <DocumentTextIcon />
-              {!sidebarCollapsed && <span className={styles.navLabel}>Посты</span>}
-            </button>
-            <button
-              className={`${styles.navItem} ${activeTab === 'stats' ? styles.navItemActive : ''}`}
-              onClick={() => setActiveTab('stats')}
-              title="Статистика"
-            >
-              <ChartBarIcon />
-              {!sidebarCollapsed && <span className={styles.navLabel}>Статистика</span>}
-            </button>
-            <button
-              className={`${styles.navItem} ${activeTab === 'logs' ? styles.navItemActive : ''}`}
-              onClick={() => setActiveTab('logs')}
-              title="Логирование"
-            >
-              <DocumentDuplicateIcon />
-              {!sidebarCollapsed && <span className={styles.navLabel}>Логирование</span>}
-            </button>
-          </nav>
+          {isClient ? (
+            <nav className={styles.nav}>
+              <button
+                className={`${styles.navItem} ${activeTab === 'users' ? styles.navItemActive : ''}`}
+                onClick={() => {
+                  setActiveTab('users');
+                  localStorage.setItem('adminActiveTab', 'users');
+                }}
+                title="Пользователи"
+              >
+                <UsersIcon />
+                {!sidebarCollapsed && <span className={styles.navLabel}>Пользователи</span>}
+              </button>
+              <button
+                className={`${styles.navItem} ${activeTab === 'posts' ? styles.navItemActive : ''}`}
+                onClick={() => {
+                  setActiveTab('posts');
+                  localStorage.setItem('adminActiveTab', 'posts');
+                }}
+                title="Посты"
+              >
+                <DocumentTextIcon />
+                {!sidebarCollapsed && <span className={styles.navLabel}>Посты</span>}
+              </button>
+              <button
+                className={`${styles.navItem} ${activeTab === 'stats' ? styles.navItemActive : ''}`}
+                onClick={() => {
+                  setActiveTab('stats');
+                  localStorage.setItem('adminActiveTab', 'stats');
+                }}
+                title="Статистика"
+              >
+                <ChartBarIcon />
+                {!sidebarCollapsed && <span className={styles.navLabel}>Статистика</span>}
+              </button>
+              <button
+                className={`${styles.navItem} ${activeTab === 'logs' ? styles.navItemActive : ''}`}
+                onClick={() => {
+                  setActiveTab('logs');
+                  localStorage.setItem('adminActiveTab', 'logs');
+                }}
+                title="Логирование"
+              >
+                <DocumentDuplicateIcon />
+                {!sidebarCollapsed && <span className={styles.navLabel}>Логирование</span>}
+              </button>
+            </nav>
+          ) : (
+            <nav className={styles.nav}>
+              <div style={{ height: '200px' }}></div>
+            </nav>
+          )}
 
           <button 
             className={styles.collapseBtn}
@@ -206,7 +284,7 @@ export default function AdminDashboard() {
         <main className={styles.main}>
           {error && <div className={styles.error}>{error}</div>}
           
-          {loading ? (
+          {!isClient || loading ? (
             <div className={styles.loading}>Загрузка...</div>
           ) : (
             <>

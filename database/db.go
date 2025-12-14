@@ -10,7 +10,7 @@ import (
 var DB *sql.DB
 
 func InitDB() error {
-	return InitDBWithPath("../database/data.db")
+	return InitDBWithPath("../../database/data.db")
 }
 
 func InitDBWithPath(path string) error {
