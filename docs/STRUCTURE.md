@@ -12,6 +12,9 @@
 ├── admin/                # Административная панель (микросервис)
 │   ├── backend/          # Admin API сервер (порт 9000)
 │   └── frontend/         # Admin UI (Next.js, порт 4000)
+├── petbase/              # ЗооБаза - справочник животных (микросервис)
+│   ├── backend/          # PetBase API сервер (порт 8100)
+│   └── frontend/         # PetBase UI (Next.js, порт 4100)
 ├── mobile/               # React Native мобильное приложение (порт 8081)
 ├── shared/               # Общие компоненты (@pet/shared npm пакет)
 │   ├── src/
@@ -228,6 +231,80 @@ admin/frontend/
 
 ---
 
+## PetBase Service (ЗооБаза)
+
+### Backend (Go API)
+
+**Путь:** `petbase/backend/`
+
+**Порт:** 8100
+
+**Endpoints:**
+- `GET /api/species` - Список видов животных
+- `POST /api/species` - Создать вид
+- `GET /api/species/:id` - Получить вид
+- `PUT /api/species/:id` - Обновить вид
+- `DELETE /api/species/:id` - Удалить вид
+- `GET /api/breeds` - Список пород
+- `GET /api/breeds/species/:id` - Породы по виду
+- `POST /api/breeds` - Создать породу
+- `GET /api/breeds/:id` - Получить породу
+- `PUT /api/breeds/:id` - Обновить породу
+- `DELETE /api/breeds/:id` - Удалить породу
+- `GET /api/cards` - Список карточек
+- `GET /api/cards/breed/:id` - Карточки по породе
+- `POST /api/cards` - Создать карточку
+- `GET /api/cards/:id` - Получить карточку
+- `PUT /api/cards/:id` - Обновить карточку
+- `DELETE /api/cards/:id` - Удалить карточку
+
+**Структура:**
+```
+petbase/backend/
+├── main.go              # Точка входа
+├── handlers/
+│   ├── species.go       # CRUD для видов
+│   ├── breeds.go        # CRUD для пород
+│   └── cards.go         # CRUD для карточек
+├── models/
+│   ├── species.go       # Модель вида
+│   ├── breed.go         # Модель породы
+│   └── pet_card.go      # Модель карточки
+├── seed.sql             # Тестовые данные
+├── go.mod
+└── go.sum
+```
+
+**Таблицы БД:**
+- `species` - виды животных (собаки, кошки, птицы и т.д.)
+- `breeds` - породы с характеристиками
+- `pet_cards` - подробные карточки животных
+
+### Frontend (Next.js Admin UI)
+
+**Путь:** `petbase/frontend/`
+
+**Порт:** 4100
+
+**Страницы:**
+- `/` - Дашборд с вкладками
+- `/auth` - Страница входа (проверка прав суперадмина)
+
+**Вкладки дашборда:**
+- Статистика - общая информация
+- Виды - управление видами животных
+- Породы - управление породами
+- Карточки - управление карточками
+
+**Особенности:**
+- Использует AdminLayout из shared (скопирован локально)
+- Доступ только для суперадминов
+- SSO интеграция через Main + Admin Backend
+- Tailwind CSS v4 + Heroicons
+- Hot reload из коробки
+
+---
+
 ## Frontend (Next.js Web)
 
 **Путь:** `frontend/`
@@ -436,8 +513,10 @@ tests/
 |-----------------|------|--------------------------|
 | Main Backend    | 8000 | http://localhost:8000    |
 | Admin Backend   | 9000 | http://localhost:9000    |
+| PetBase Backend | 8100 | http://localhost:8100    |
 | Web Frontend    | 3000 | http://localhost:3000    |
 | Admin Frontend  | 4000 | http://localhost:4000    |
+| PetBase Frontend| 4100 | http://localhost:4100    |
 | Mobile          | 8081 | http://localhost:8081    |
 
 ---
