@@ -112,10 +112,12 @@
 
 Это запустит все сервисы:
 - **Web Frontend:** http://localhost:3000
-- **Admin Frontend:** http://localhost:4000 (в разработке)
+- **Admin Frontend:** http://localhost:4000
+- **PetBase Frontend:** http://localhost:4100
 - **Mobile:** http://localhost:8081
 - **Main Backend:** http://localhost:8000 (с hot reload)
 - **Admin Backend:** http://localhost:9000
+- **PetBase Backend:** http://localhost:8100
 
 Остановка: `Ctrl+C`
 
@@ -130,10 +132,23 @@ cd admin/backend
 cd admin/backend
 go run main.go
 
-# Админ-панель будет доступна на http://localhost:8081
+# Админ-панель будет доступна на http://localhost:4000
 ```
 
 Подробнее: `admin/README.md` и `admin/SSO_SETUP.md`
+
+### ЗооБаза (справочник животных)
+
+```bash
+# Запустите PetBase Backend
+cd petbase/backend
+go run main.go
+
+# ЗооБаза будет доступна на http://localhost:4100
+# Доступ только для суперадминов
+```
+
+Подробнее: `petbase/README.md`
 
 ## Структура URL
 
@@ -154,7 +169,8 @@ go run main.go
 Платформа использует единую систему авторизации для всех микросервисов:
 
 - **Основной сайт** (localhost:3000) - вход пользователей
-- **Админ-панель** (localhost:8081) - управление платформой
+- **Админ-панель** (localhost:4000) - управление платформой
+- **ЗооБаза** (localhost:4100) - справочник животных (только для суперадминов)
 - **Будущие сервисы** - аналитика, API и т.д.
 
 **Как это работает:**
