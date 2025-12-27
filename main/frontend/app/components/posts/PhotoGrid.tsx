@@ -84,65 +84,62 @@ export default function PhotoGrid({ photos, onClick }: PhotoGridProps) {
   return (
     <div 
       ref={containerRef}
-      className="relative rounded-lg overflow-hidden cursor-pointer group" 
+      className="relative aspect-square rounded-lg overflow-hidden cursor-pointer group bg-white dark:bg-gray-900"
       onClick={onClick}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
+      style={{
+        backgroundImage: `url(${getPhotoUrl(photos[currentIndex].url)})`,
+        backgroundSize: 'contain',
+        backgroundPosition: 'center',
+        backgroundRepeat: 'no-repeat'
+      }}
     >
-      {/* Карусель - квадратный контейнер */}
-      <div className="relative aspect-square bg-white dark:bg-gray-900 flex items-center justify-center">
-        <img
-          src={getPhotoUrl(photos[currentIndex].url)}
-          alt={photos[currentIndex].file_name || `Фото ${currentIndex + 1}`}
-          className="max-w-full max-h-full object-contain"
-        />
+      {/* Счетчик фото */}
+      {photos.length > 1 && (
+        <div className="absolute top-3 right-3 bg-black/60 text-white px-3 py-1 rounded-full text-sm font-medium">
+          {currentIndex + 1} / {photos.length}
+        </div>
+      )}
 
-        {/* Счетчик фото */}
-        {photos.length > 1 && (
-          <div className="absolute top-3 right-3 bg-black/60 text-white px-3 py-1 rounded-full text-sm font-medium">
-            {currentIndex + 1} / {photos.length}
-          </div>
-        )}
+      {/* Стрелки навигации */}
+      {photos.length > 1 && (
+        <>
+          <button
+            onClick={goToPrevious}
+            className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-label="Предыдущее фото"
+          >
+            <ChevronLeftIcon className="w-6 h-6 text-gray-800" />
+          </button>
+          <button
+            onClick={goToNext}
+            className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
+            aria-label="Следующее фото"
+          >
+            <ChevronRightIcon className="w-6 h-6 text-gray-800" />
+          </button>
+        </>
+      )}
 
-        {/* Стрелки навигации */}
-        {photos.length > 1 && (
-          <>
+      {/* Точки навигации */}
+      {photos.length > 1 && (
+        <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
+          {photos.map((_, index) => (
             <button
-              onClick={goToPrevious}
-              className="absolute left-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-              aria-label="Предыдущее фото"
-            >
-              <ChevronLeftIcon className="w-6 h-6 text-gray-800" />
-            </button>
-            <button
-              onClick={goToNext}
-              className="absolute right-2 top-1/2 -translate-y-1/2 w-10 h-10 bg-white/90 hover:bg-white rounded-full flex items-center justify-center shadow-lg opacity-0 group-hover:opacity-100 transition-opacity"
-              aria-label="Следующее фото"
-            >
-              <ChevronRightIcon className="w-6 h-6 text-gray-800" />
-            </button>
-          </>
-        )}
-
-        {/* Точки навигации */}
-        {photos.length > 1 && (
-          <div className="absolute bottom-3 left-1/2 -translate-x-1/2 flex gap-1.5">
-            {photos.map((_, index) => (
-              <button
-                key={index}
-                onClick={(e) => goToSlide(index, e)}
-                className={`w-2 h-2 rounded-full transition-all ${
-                  index === currentIndex
-                    ? 'bg-white w-6'
-                    : 'bg-white/60 hover:bg-white/80'
-                }`}
-                aria-label={`Перейти к фото ${index + 1}`}
-              />
-            ))}
-          </div>
-        )}
-      </div>
+              key={index}
+              onClick={(e) => goToSlide(index, e)}
+              className={`w-2 h-2 rounded-full transition-all ${
+                index === currentIndex
+                  ? 'bg-white w-6'
+                  : 'bg-white/60 hover:bg-white/80'
+              }`}
+              aria-label={`Перейти к фото ${index + 1}`}
+            />
+          ))}
+        </div>
+      )}
     </div>
   );
 }
