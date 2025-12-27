@@ -421,7 +421,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
 
               {/* Photos Preview */}
               {uploadedMedia.length > 0 && (
-                <div className="mb-3 ml-12">
+                <div className="mb-3 ml-12 max-h-[400px] overflow-y-auto">
                   <div className="grid grid-cols-2 gap-2">
                     {uploadedMedia.map((media, index) => (
                       <div key={media.id} className="relative group rounded-lg overflow-hidden bg-gray-100">
