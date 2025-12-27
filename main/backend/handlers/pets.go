@@ -52,7 +52,7 @@ func PetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getUserPets(w http.ResponseWriter, r *http.Request, userID int) {
+func getUserPets(w http.ResponseWriter, _ *http.Request, userID int) {
 	query := `SELECT id, user_id, name, species, photo, created_at FROM pets WHERE user_id = ? ORDER BY created_at DESC`
 
 	rows, err := database.DB.Query(query, userID)

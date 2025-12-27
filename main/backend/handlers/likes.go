@@ -35,7 +35,7 @@ func LikesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // toggleLike добавляет или удаляет лайк
-func toggleLike(w http.ResponseWriter, r *http.Request, postID int, userID int) {
+func toggleLike(w http.ResponseWriter, _ *http.Request, postID int, userID int) {
 	// Проверяем, есть ли уже лайк
 	var exists bool
 	err := database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = ?)", userID, postID).Scan(&exists)
@@ -75,7 +75,7 @@ func toggleLike(w http.ResponseWriter, r *http.Request, postID int, userID int) 
 }
 
 // getLikeStatus получает статус лайка и количество
-func getLikeStatus(w http.ResponseWriter, r *http.Request, postID int, userID int) {
+func getLikeStatus(w http.ResponseWriter, _ *http.Request, postID int, userID int) {
 	var liked bool
 	err := database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = ?)", userID, postID).Scan(&liked)
 	if err != nil {

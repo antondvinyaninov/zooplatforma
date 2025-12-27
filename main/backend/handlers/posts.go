@@ -40,11 +40,12 @@ func PostHandler(w http.ResponseWriter, r *http.Request) {
 			return
 		}
 
-		if r.Method == http.MethodPost {
+		switch r.Method {
+		case http.MethodPost:
 			toggleLike(w, r, postID, userID)
-		} else if r.Method == http.MethodGet {
+		case http.MethodGet:
 			getLikeStatus(w, r, postID, userID)
-		} else {
+		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 		return

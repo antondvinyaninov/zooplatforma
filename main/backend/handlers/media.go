@@ -2,13 +2,13 @@ package handlers
 
 import (
 	"database/sql"
-	"encoding/json"
 	"fmt"
 	"image"
 	_ "image/gif"
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
+	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -16,7 +16,7 @@ import (
 	"strings"
 	"time"
 
-	"main/backend/models"
+	"backend/models"
 
 	"github.com/google/uuid"
 )
@@ -36,17 +36,23 @@ func NewMediaHandler(db *sql.DB) *MediaHandler {
 
 // UploadMedia загружает медиа-файл
 func (h *MediaHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
+	log.Printf("📥 UploadMedia вызван: метод=%s, путь=%s", r.Method, r.URL.Path)
+
 	if r.Method != http.MethodPost {
+		log.Printf("❌ Неверный метод: %s", r.Method)
 		sendErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	// Получаем user_id из контекста
 	userID, ok := r.Context().Value("userID").(int)
+	log.Printf("🔑 userID из контекста: %v, ok=%v", userID, ok)
 	if !ok {
+		log.Printf("❌ Не удалось получить userID из контекста")
 		sendErrorResponse(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
+	log.Printf("✅ Пользователь авторизован: userID=%d", userID)
 
 	// Ограничение размера
 	r.Body = http.MaxBytesReader(w, r.Body, MaxUploadSize)
@@ -273,7 +279,7 @@ func (h *MediaHandler) DeleteMedia(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем media_id из URL
-	mediaIDStr := strings.TrimPrefix(r.URL.Path, "/api/media/")
+	mediaIDStr := strings.TrimPrefix(r.URL.Path, "/api/media/delete/")
 	mediaID, err := strconv.Atoi(mediaIDStr)
 	if err != nil {
 		sendErrorResponse(w, "Invalid media ID", http.StatusBadRequest)
@@ -377,21 +383,4 @@ func isAllowedMimeType(mimeType, mediaType string) bool {
 		}
 	}
 	return false
-}
-
-func sendSuccessResponse(w http.ResponseWriter, data interface{}) {
-	w.Header().Set("Content-Type", "application/json")
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": true,
-		"data":    data,
-	})
-}
-
-func sendErrorResponse(w http.ResponseWriter, message string, statusCode int) {
-	w.Header().Set("Content-Type", "application/json")
-	w.WriteHeader(statusCode)
-	json.NewEncoder(w).Encode(map[string]interface{}{
-		"success": false,
-		"error":   message,
-	})
 }

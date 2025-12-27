@@ -56,8 +56,7 @@ func main() {
 	}
 	defer database.CloseDB()
 
-	// Public routes
-	http.HandleFunc("/", enableCORS(handleRoot))
+	// Public API routes (register BEFORE root route)
 	http.HandleFunc("/api/health", enableCORS(handleHealth))
 	http.HandleFunc("/api/auth/register", enableCORS(handlers.RegisterHandler))
 	http.HandleFunc("/api/auth/login", enableCORS(handlers.LoginHandler))
@@ -86,13 +85,16 @@ func main() {
 	http.HandleFunc("/api/pets/", enableCORS(middleware.AuthMiddleware(handlers.PetHandler)))
 	http.HandleFunc("/api/pets/user/", enableCORS(middleware.AuthMiddleware(handlers.UserPetsHandler)))
 
-	// Media
+	// Media - более специфичные роуты должны быть первыми
 	mediaHandler := handlers.NewMediaHandler(database.DB)
 	http.HandleFunc("/api/media/upload", enableCORS(middleware.AuthMiddleware(mediaHandler.UploadMedia)))
+	http.HandleFunc("/api/media/stats", enableCORS(middleware.AuthMiddleware(mediaHandler.GetMediaStats)))
 	http.HandleFunc("/api/media/user/", enableCORS(middleware.AuthMiddleware(mediaHandler.GetUserMedia)))
 	http.HandleFunc("/api/media/file/", enableCORS(mediaHandler.GetMediaFile)) // Public для отображения
-	http.HandleFunc("/api/media/stats", enableCORS(middleware.AuthMiddleware(mediaHandler.GetMediaStats)))
-	http.HandleFunc("/api/media/", enableCORS(middleware.AuthMiddleware(mediaHandler.DeleteMedia)))
+	http.HandleFunc("/api/media/delete/", enableCORS(middleware.AuthMiddleware(mediaHandler.DeleteMedia)))
+
+	// Root route MUST be registered LAST
+	http.HandleFunc("/", enableCORS(handleRoot))
 
 	port := ":8000"
 	fmt.Printf("Server starting on port %s\n", port)
@@ -100,6 +102,11 @@ func main() {
 }
 
 func handleRoot(w http.ResponseWriter, r *http.Request) {
+	// Только для точного пути "/"
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, `{"message": "Welcome to the API"}`)
 }
