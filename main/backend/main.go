@@ -87,7 +87,7 @@ func main() {
 	http.HandleFunc("/api/pets/user/", enableCORS(middleware.AuthMiddleware(handlers.UserPetsHandler)))
 
 	// Media
-	mediaHandler := handlers.NewMediaHandler(db)
+	mediaHandler := handlers.NewMediaHandler(database.DB)
 	http.HandleFunc("/api/media/upload", enableCORS(middleware.AuthMiddleware(mediaHandler.UploadMedia)))
 	http.HandleFunc("/api/media/user/", enableCORS(middleware.AuthMiddleware(mediaHandler.GetUserMedia)))
 	http.HandleFunc("/api/media/file/", enableCORS(mediaHandler.GetMediaFile)) // Public для отображения
