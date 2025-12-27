@@ -292,7 +292,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
               <button
                 onClick={() => {
-                  if (content.trim()) {
+                  if (content.trim() || photos.length > 0) {
                     setShowSaveDraftDialog(true);
                   } else {
                     setShowModal(false);
@@ -307,7 +307,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                 {/* Drafts Button */}
                 <button
                   onClick={() => {
-                    if (content.trim()) {
+                    if (content.trim() || photos.length > 0) {
                       setShowSaveDraftDialog(true);
                     } else {
                       setShowDrafts(true);
