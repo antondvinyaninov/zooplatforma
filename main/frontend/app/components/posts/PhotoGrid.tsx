@@ -44,9 +44,9 @@ export default function PhotoGrid({ photos, onClick }: PhotoGridProps) {
   useEffect(() => {
     const handleKeyDown = (e: KeyboardEvent) => {
       if (e.key === 'ArrowLeft') {
-        goToPrevious();
+        setCurrentIndex((prev) => (prev === 0 ? photos.length - 1 : prev - 1));
       } else if (e.key === 'ArrowRight') {
-        goToNext();
+        setCurrentIndex((prev) => (prev === photos.length - 1 ? 0 : prev + 1));
       }
     };
 
@@ -98,7 +98,7 @@ export default function PhotoGrid({ photos, onClick }: PhotoGridProps) {
     >
       {/* Счетчик фото */}
       {photos.length > 1 && (
-        <div className="absolute top-3 right-3 bg-black/60 text-white px-3 py-1 rounded-full text-sm font-medium">
+        <div className="absolute top-3 right-3 bg-black/60 text-white px-3 py-1 rounded-full text-sm font-medium z-10">
           {currentIndex + 1} / {photos.length}
         </div>
       )}
