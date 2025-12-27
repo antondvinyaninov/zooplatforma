@@ -321,7 +321,7 @@ export default function PostModal({ post, isOpen, onClose, onCountChange }: Post
                         className="relative rounded-lg overflow-hidden bg-gray-100"
                       >
                         <img
-                          src={attachment.url}
+                          src={attachment.url.startsWith('http') ? attachment.url : `http://localhost:8000${attachment.url}`}
                           alt={attachment.file_name || `Фото ${index + 1}`}
                           className={`w-full object-cover ${
                             post.attachments.length === 1 ? 'max-h-[600px]' : 'h-80'

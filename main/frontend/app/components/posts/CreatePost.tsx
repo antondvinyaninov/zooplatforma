@@ -17,6 +17,7 @@ import {
 import { GiPawPrint } from 'react-icons/gi';
 import { MdPets } from 'react-icons/md';
 import PollCreator, { PollData } from '../polls/PollCreator';
+import { useMediaUpload, UploadedMedia } from '@/hooks/useMediaUpload';
 
 interface CreatePostProps {
   onPostCreated?: () => void;
@@ -26,6 +27,7 @@ type ReplySettingType = 'anyone' | 'followers' | 'following' | 'mentions';
 
 export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const { user } = useAuth();
+  const { uploadMultiple, uploading } = useMediaUpload();
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -42,20 +44,20 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [drafts, setDrafts] = useState<any[]>([]);
   const [draftMenuOpen, setDraftMenuOpen] = useState<number | null>(null);
-  const [photos, setPhotos] = useState<string[]>([]); // URLs для превью
+  const [uploadedMedia, setUploadedMedia] = useState<UploadedMedia[]>([]); // Загруженные медиа
 
   const handleSubmit = async () => {
-    if (!content.trim() && !pollData && photos.length === 0) return;
+    if (!content.trim() && !pollData && uploadedMedia.length === 0) return;
 
     setIsSubmitting(true);
     try {
       const postData: any = {
         content,
         attached_pets: [],
-        attachments: photos.map((url, index) => ({
-          url,
+        attachments: uploadedMedia.map((media) => ({
+          url: media.url,
           type: 'image',
-          file_name: `photo_${index + 1}.jpg`,
+          file_name: media.file_name,
         })),
         tags: [],
       };
@@ -79,7 +81,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
       await apiClient.post('/api/posts', postData);
 
       setContent('');
-      setPhotos([]);
+      setUploadedMedia([]);
       setPollData(null);
       setShowPollCreator(false);
       setScheduledDate(null);
@@ -105,36 +107,37 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
   }, [showModal]);
 
   // Handle photo upload
-  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const files = e.target.files;
-    if (!files) return;
+    if (!files || files.length === 0) return;
 
-    // Limit to 10 photos
-    const remainingSlots = 10 - photos.length;
+    // Limit to 10 photos total
+    const remainingSlots = 10 - uploadedMedia.length;
+    if (remainingSlots <= 0) {
+      alert('Максимум 10 фото');
+      return;
+    }
+
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
 
-    filesToProcess.forEach((file) => {
-      // Check file size (max 5MB)
-      if (file.size > 5 * 1024 * 1024) {
-        alert('Файл слишком большой. Максимальный размер: 5MB');
-        return;
+    // Validate files
+    for (const file of filesToProcess) {
+      if (file.size > 10 * 1024 * 1024) {
+        alert(`Файл "${file.name}" слишком большой. Максимальный размер: 10MB`);
+        continue;
       }
 
-      // Check file type
       if (!file.type.startsWith('image/')) {
-        alert('Можно загружать только изображения');
-        return;
+        alert(`Файл "${file.name}" не является изображением`);
+        continue;
       }
+    }
 
-      // Read file as data URL
-      const reader = new FileReader();
-      reader.onload = (event) => {
-        if (event.target?.result) {
-          setPhotos((prev) => [...prev, event.target!.result as string]);
-        }
-      };
-      reader.readAsDataURL(file);
-    });
+    // Upload files
+    const uploaded = await uploadMultiple(filesToProcess, 'photo');
+    if (uploaded.length > 0) {
+      setUploadedMedia((prev) => [...prev, ...uploaded]);
+    }
 
     // Reset input
     e.target.value = '';
@@ -142,7 +145,8 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
 
   // Remove photo
   const removePhoto = (index: number) => {
-    setPhotos((prev) => prev.filter((_, i) => i !== index));
+    setUploadedMedia((prev) => prev.filter((_, i) => i !== index));
+    // TODO: Optionally delete from server
   };
 
   // Load drafts when drafts modal opens
@@ -163,22 +167,22 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
   };
 
   const saveDraft = async () => {
-    if (!content.trim()) return;
+    if (!content.trim() && uploadedMedia.length === 0) return;
 
     try {
       await apiClient.post('/api/posts', {
         content,
         attached_pets: [],
-        attachments: photos.map((url, index) => ({
-          url,
+        attachments: uploadedMedia.map((media) => ({
+          url: media.url,
           type: 'image',
-          file_name: `photo_${index + 1}.jpg`,
+          file_name: media.file_name,
         })),
         tags: [],
         status: 'draft',
       });
       setContent('');
-      setPhotos([]);
+      setUploadedMedia([]);
       setShowSaveDraftDialog(false);
       setShowModal(false);
       setShowDrafts(true); // Open drafts after saving
@@ -292,7 +296,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
             <div className="flex items-center justify-between px-4 py-3 border-b border-gray-200">
               <button
                 onClick={() => {
-                  if (content.trim() || photos.length > 0) {
+                  if (content.trim() || uploadedMedia.length > 0) {
                     setShowSaveDraftDialog(true);
                   } else {
                     setShowModal(false);
@@ -307,7 +311,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                 {/* Drafts Button */}
                 <button
                   onClick={() => {
-                    if (content.trim() || photos.length > 0) {
+                    if (content.trim() || uploadedMedia.length > 0) {
                       setShowSaveDraftDialog(true);
                     } else {
                       setShowDrafts(true);
@@ -408,14 +412,14 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
               </div>
 
               {/* Photos Preview */}
-              {photos.length > 0 && (
+              {uploadedMedia.length > 0 && (
                 <div className="mb-3 ml-12">
                   <div className="grid grid-cols-2 gap-2">
-                    {photos.map((photo, index) => (
-                      <div key={index} className="relative group rounded-lg overflow-hidden bg-gray-100">
+                    {uploadedMedia.map((media, index) => (
+                      <div key={media.id} className="relative group rounded-lg overflow-hidden bg-gray-100">
                         <img
-                          src={photo}
-                          alt={`Фото ${index + 1}`}
+                          src={`http://localhost:8000${media.url}`}
+                          alt={media.original_name}
                           className="w-full h-48 object-cover"
                         />
                         <button
@@ -427,8 +431,11 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                       </div>
                     ))}
                   </div>
-                  {photos.length >= 10 && (
+                  {uploadedMedia.length >= 10 && (
                     <p className="text-xs text-gray-500 mt-2">Максимум 10 фото</p>
+                  )}
+                  {uploading && (
+                    <p className="text-xs text-blue-600 mt-2">Загрузка...</p>
                   )}
                 </div>
               )}
@@ -679,7 +686,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                   setShowSaveDraftDialog(false);
                   setShowModal(false);
                   setContent('');
-                  setPhotos([]);
+                  setUploadedMedia([]);
                 }}
                 className="w-full py-3 text-[15px] text-red-500 font-semibold hover:bg-gray-50 transition-colors"
               >
