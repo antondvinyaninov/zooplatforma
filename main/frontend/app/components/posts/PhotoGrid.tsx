@@ -90,12 +90,12 @@ export default function PhotoGrid({ photos, onClick }: PhotoGridProps) {
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
     >
-      {/* Карусель */}
-      <div className="relative bg-gray-100">
+      {/* Карусель - квадратный контейнер */}
+      <div className="relative aspect-square bg-white dark:bg-gray-900 flex items-center justify-center">
         <img
           src={getPhotoUrl(photos[currentIndex].url)}
           alt={photos[currentIndex].file_name || `Фото ${currentIndex + 1}`}
-          className="w-full max-h-[600px] object-contain"
+          className="max-w-full max-h-full object-contain"
         />
 
         {/* Счетчик фото */}
