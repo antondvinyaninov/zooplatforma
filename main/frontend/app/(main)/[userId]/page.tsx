@@ -17,6 +17,7 @@ import {
 } from '@heroicons/react/24/outline';
 import Image from 'next/image';
 import PostComments from '../../components/shared/PostComments';
+import PostCard from '../../components/posts/PostCard';
 
 export default function UserProfilePage() {
   const [posts, setPosts] = useState<Post[]>([]);
@@ -230,7 +231,7 @@ export default function UserProfilePage() {
             </div>
 
             {/* Posts */}
-            <div className="p-6">
+            <div className="p-4 space-y-2.5">
               {loading ? (
                 <div className="flex justify-center py-8">
                   <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: '#1B76FF' }}></div>
@@ -240,51 +241,11 @@ export default function UserProfilePage() {
                   <p>Пока нет публикаций</p>
                 </div>
               ) : (
-                <div className="space-y-4">
+                <>
                   {posts.map((post) => (
-                    <div key={post.id} className="p-4 bg-gray-50 rounded-lg">
-                      <div className="flex items-start gap-3">
-                        <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0 overflow-hidden">
-                          {post.user?.avatar ? (
-                            <Image src={post.user.avatar} alt={post.user.name} width={40} height={40} className="object-cover" />
-                          ) : (
-                            <UserIcon className="w-5 h-5 text-gray-500" />
-                          )}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-2">
-                            <span className="font-semibold text-gray-900">{post.user?.name}</span>
-                            <span className="text-sm text-gray-500">• {formatDate(post.created_at)}</span>
-                          </div>
-                          <p className="text-sm text-gray-700 mb-3 whitespace-pre-wrap">
-                            {post.content}
-                          </p>
-                          <div className="flex items-center gap-4 text-sm text-gray-600">
-                            <button className="flex items-center gap-1 hover:text-red-500 transition-colors">
-                              <HeartIcon className="w-4 h-4" />
-                              <span>0</span>
-                            </button>
-                            <div className="flex items-center gap-1 text-gray-600">
-                              <ChatBubbleLeftIcon className="w-4 h-4" />
-                              <span>{post.comments_count || 0}</span>
-                            </div>
-                          </div>
-                        </div>
-                      </div>
-                      
-                      {/* Комментарии */}
-                      <PostComments 
-                        postId={post.id} 
-                        initialCount={post.comments_count}
-                        onCountChange={(count) => {
-                          setPosts(posts.map(p => 
-                            p.id === post.id ? { ...p, comments_count: count } : p
-                          ));
-                        }}
-                      />
-                    </div>
+                    <PostCard key={post.id} post={post} />
                   ))}
-                </div>
+                </>
               )}
             </div>
           </div>

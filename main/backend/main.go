@@ -69,6 +69,7 @@ func main() {
 	http.HandleFunc("/api/users", enableCORS(middleware.AuthMiddleware(handlers.UsersHandler)))
 	http.HandleFunc("/api/users/", enableCORS(middleware.AuthMiddleware(handlers.UserHandler)))
 	http.HandleFunc("/api/profile", enableCORS(middleware.AuthMiddleware(handlers.UpdateProfileHandler)))
+	http.HandleFunc("/api/posts/drafts", enableCORS(middleware.AuthMiddleware(handlers.DraftsHandler)))
 	http.HandleFunc("/api/posts", enableCORS(middleware.AuthMiddleware(handlers.PostsHandler)))
 	http.HandleFunc("/api/posts/", enableCORS(middleware.AuthMiddleware(handlers.PostHandler)))
 	http.HandleFunc("/api/posts/user/", enableCORS(middleware.AuthMiddleware(handlers.UserPostsHandler)))
@@ -76,6 +77,11 @@ func main() {
 	// Comments
 	http.HandleFunc("/api/comments/post/", enableCORS(middleware.AuthMiddleware(handlers.CommentsHandler)))
 	http.HandleFunc("/api/comments/", enableCORS(middleware.AuthMiddleware(handlers.DeleteCommentHandler)))
+
+	// Polls
+	http.HandleFunc("/api/polls/", enableCORS(middleware.AuthMiddleware(handlers.VoteHandler)))
+
+	// Pets
 	http.HandleFunc("/api/pets", enableCORS(middleware.AuthMiddleware(handlers.PetsHandler)))
 	http.HandleFunc("/api/pets/", enableCORS(middleware.AuthMiddleware(handlers.PetHandler)))
 	http.HandleFunc("/api/pets/user/", enableCORS(middleware.AuthMiddleware(handlers.UserPetsHandler)))
