@@ -8,7 +8,6 @@ import (
 	_ "image/jpeg"
 	_ "image/png"
 	"io"
-	"log"
 	"net/http"
 	"os"
 	"path/filepath"
@@ -36,23 +35,17 @@ func NewMediaHandler(db *sql.DB) *MediaHandler {
 
 // UploadMedia загружает медиа-файл
 func (h *MediaHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
-	log.Printf("📥 UploadMedia вызван: метод=%s, путь=%s", r.Method, r.URL.Path)
-
 	if r.Method != http.MethodPost {
-		log.Printf("❌ Неверный метод: %s", r.Method)
 		sendErrorResponse(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
 	// Получаем user_id из контекста
 	userID, ok := r.Context().Value("userID").(int)
-	log.Printf("🔑 userID из контекста: %v, ok=%v", userID, ok)
 	if !ok {
-		log.Printf("❌ Не удалось получить userID из контекста")
 		sendErrorResponse(w, "Unauthorized", http.StatusUnauthorized)
 		return
 	}
-	log.Printf("✅ Пользователь авторизован: userID=%d", userID)
 
 	// Ограничение размера
 	r.Body = http.MaxBytesReader(w, r.Body, MaxUploadSize)

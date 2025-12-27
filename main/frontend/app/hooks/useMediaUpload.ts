@@ -17,7 +17,6 @@ export function useMediaUpload() {
   const [progress, setProgress] = useState(0);
 
   const uploadFile = async (file: File, mediaType: string = 'photo'): Promise<UploadedMedia | null> => {
-    console.log('🔄 uploadFile начат для:', file.name);
     setUploading(true);
     setProgress(0);
 
@@ -25,8 +24,6 @@ export function useMediaUpload() {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('media_type', mediaType);
-      
-      console.log('📤 Отправка запроса на http://localhost:8000/api/media/upload');
 
       const response = await fetch('http://localhost:8000/api/media/upload', {
         method: 'POST',
@@ -34,21 +31,17 @@ export function useMediaUpload() {
         body: formData,
       });
 
-      console.log('📥 Ответ получен, статус:', response.status);
-
       if (!response.ok) {
         const error = await response.json();
-        console.error('❌ Ошибка от сервера:', error);
         throw new Error(error.error || 'Upload failed');
       }
 
       const result = await response.json();
-      console.log('✅ Результат загрузки:', result);
       setProgress(100);
       
       return result.data;
     } catch (error) {
-      console.error('❌ Upload error:', error);
+      console.error('Upload error:', error);
       alert(error instanceof Error ? error.message : 'Ошибка загрузки файла');
       return null;
     } finally {
@@ -58,21 +51,15 @@ export function useMediaUpload() {
   };
 
   const uploadMultiple = async (files: File[], mediaType: string = 'photo'): Promise<UploadedMedia[]> => {
-    console.log('📦 uploadMultiple начат для', files.length, 'файлов');
     const results: UploadedMedia[] = [];
     
     for (const file of files) {
-      console.log('⏳ Загрузка файла:', file.name);
       const result = await uploadFile(file, mediaType);
       if (result) {
-        console.log('✅ Файл загружен:', result);
         results.push(result);
-      } else {
-        console.log('❌ Файл не загружен:', file.name);
       }
     }
     
-    console.log('🎉 uploadMultiple завершен, загружено:', results.length);
     return results;
   };
 

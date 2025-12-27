@@ -108,32 +108,21 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
 
   // Handle photo upload
   const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
-    console.log('📸 handlePhotoUpload вызван');
     const files = e.target.files;
-    console.log('📁 Выбрано файлов:', files?.length);
-    
-    if (!files || files.length === 0) {
-      console.log('❌ Нет файлов');
-      return;
-    }
+    if (!files || files.length === 0) return;
 
     // Limit to 10 photos total
     const remainingSlots = 10 - uploadedMedia.length;
-    console.log('📊 Доступно слотов:', remainingSlots);
-    
     if (remainingSlots <= 0) {
       alert('Максимум 10 фото');
       return;
     }
 
     const filesToProcess = Array.from(files).slice(0, remainingSlots);
-    console.log('✅ Файлов к обработке:', filesToProcess.length);
 
     // Validate files
     const validFiles: File[] = [];
     for (const file of filesToProcess) {
-      console.log(`🔍 Проверка файла: ${file.name}, размер: ${file.size}, тип: ${file.type}`);
-      
       if (file.size > 10 * 1024 * 1024) {
         alert(`Файл "${file.name}" слишком большой. Максимальный размер: 10MB`);
         continue;
@@ -147,25 +136,15 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
       validFiles.push(file);
     }
 
-    console.log('✅ Валидных файлов:', validFiles.length);
-
     if (validFiles.length === 0) {
-      console.log('❌ Нет валидных файлов для загрузки');
       e.target.value = '';
       return;
     }
 
     // Upload files
-    console.log('🚀 Начинаем загрузку...');
     const uploaded = await uploadMultiple(validFiles, 'photo');
-    console.log('📦 Загружено файлов:', uploaded.length, uploaded);
-    
     if (uploaded.length > 0) {
-      setUploadedMedia((prev) => {
-        const newMedia = [...prev, ...uploaded];
-        console.log('💾 Обновляем uploadedMedia:', newMedia);
-        return newMedia;
-      });
+      setUploadedMedia((prev) => [...prev, ...uploaded]);
     }
 
     // Reset input
