@@ -17,7 +17,7 @@ import {
 import { GiPawPrint } from 'react-icons/gi';
 import { MdPets } from 'react-icons/md';
 import PollCreator, { PollData } from '../polls/PollCreator';
-import { useMediaUpload, UploadedMedia } from '../hooks/useMediaUpload';
+import { useMediaUpload, UploadedMedia } from '../../hooks/useMediaUpload';
 
 interface CreatePostProps {
   onPostCreated?: () => void;
