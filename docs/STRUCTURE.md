@@ -78,7 +78,14 @@ backend/
 - `GET /api/users` - Список пользователей (защищено)
 - `PUT /api/profile` - Обновление профиля (защищено)
 - `GET/POST/PUT/DELETE /api/posts` - CRUD постов (защищено)
+- `GET /api/posts/drafts` - Получить черновики (защищено)
+- `POST /api/posts/:id/like` - Лайк/анлайк поста (защищено)
+- `GET /api/posts/:id/like` - Статус лайка (защищено)
 - `GET/POST/DELETE /api/pets` - CRUD питомцев (защищено)
+- `GET/POST/PUT/DELETE /api/polls` - CRUD опросов (защищено)
+- `POST /api/polls/:id/vote` - Голосование (защищено)
+- `DELETE /api/polls/:id/vote` - Отмена голоса (защищено)
+- `GET/POST/DELETE /api/comments` - CRUD комментариев (защищено)
 
 **Особенности:**
 - CORS настроен для всех клиентов
@@ -109,10 +116,20 @@ database/
 **Таблицы:**
 - `users` - Пользователи платформы
   - id, name, email, password, bio, phone, location, avatar, cover_photo, created_at
-- `posts` - Публикации пользователей
-  - id, user_id, content, post_type, status, created_at
+- `posts` - Публикации пользователей (универсальная система в стиле Threads)
+  - id, author_id, author_type, content, attached_pets, attachments, tags, status, scheduled_at, created_at, updated_at, is_deleted
 - `pets` - Питомцы пользователей
   - id, user_id, name, species, photo, created_at
+- `likes` - Лайки постов
+  - id, user_id, post_id, created_at
+- `comments` - Комментарии к постам
+  - id, post_id, user_id, parent_id, reply_to_user_id, content, created_at, updated_at, is_deleted
+- `polls` - Опросы в постах
+  - id, post_id, question, multiple_choice, allow_vote_changes, anonymous_voting, expires_at, created_at
+- `poll_options` - Варианты ответов в опросах
+  - id, poll_id, option_text, display_order
+- `poll_votes` - Голоса в опросах
+  - id, poll_id, option_id, user_id, created_at
 - `admins` - Администраторы
   - id, user_id, role, permissions, created_at, created_by
 - `admin_logs` - Логи действий администраторов
@@ -319,19 +336,37 @@ petbase/backend/
 **Структура:**
 ```
 frontend/
-├── src/
-│   ├── app/             # Next.js App Router
-│   │   ├── layout.tsx   # Корневой layout
-│   │   └── page.tsx     # Главная страница
+├── app/
+│   ├── (main)/          # Основные страницы
+│   │   ├── layout.tsx   # Layout с Header и Sidebar
+│   │   ├── page.tsx     # Главная страница (лента)
+│   │   ├── org/         # Организации
+│   │   └── [userId]/    # Профили пользователей
 │   ├── components/
-│   │   ├── ui/          # Базовые UI компоненты
-│   │   │   └── Button.tsx
-│   │   ├── shared/      # Переиспользуемые бизнес-компоненты
-│   │   └── layout/      # Layout компоненты
-│   │       └── Header.tsx
-│   └── lib/
-│       └── api.ts       # API клиент для связи с backend
+│   │   ├── layout/      # Layout компоненты
+│   │   │   ├── Header.tsx
+│   │   │   ├── Sidebar.tsx
+│   │   │   └── RightPanel.tsx
+│   │   ├── posts/       # Компоненты постов
+│   │   │   ├── CreatePost.tsx    # Создание поста (модальное окно)
+│   │   │   ├── PostCard.tsx      # Карточка поста
+│   │   │   ├── PostModal.tsx     # Модальное окно поста
+│   │   │   ├── PostsFeed.tsx     # Лента постов
+│   │   │   └── FeedFilters.tsx   # Фильтры ленты
+│   │   ├── polls/       # Компоненты опросов
+│   │   │   ├── PollCreator.tsx   # Создание опроса
+│   │   │   └── PollDisplay.tsx   # Отображение опроса
+│   │   ├── shared/      # Общие компоненты
+│   │   │   └── PostComments.tsx  # Комментарии
+│   │   └── ui/          # Базовые UI компоненты
+│   ├── contexts/        # React контексты
+│   │   └── AuthContext.tsx
+│   ├── lib/
+│   │   └── api.ts       # API клиент
+│   ├── layout.tsx       # Корневой layout
+│   └── globals.css      # Глобальные стили
 ├── public/              # Статические файлы
+│   └── favicon.svg      # Логотип
 ├── .env.local           # Environment variables (игнорируется)
 ├── package.json         # npm зависимости
 ├── tsconfig.json        # TypeScript конфигурация
