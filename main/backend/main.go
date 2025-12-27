@@ -86,6 +86,14 @@ func main() {
 	http.HandleFunc("/api/pets/", enableCORS(middleware.AuthMiddleware(handlers.PetHandler)))
 	http.HandleFunc("/api/pets/user/", enableCORS(middleware.AuthMiddleware(handlers.UserPetsHandler)))
 
+	// Media
+	mediaHandler := handlers.NewMediaHandler(db)
+	http.HandleFunc("/api/media/upload", enableCORS(middleware.AuthMiddleware(mediaHandler.UploadMedia)))
+	http.HandleFunc("/api/media/user/", enableCORS(middleware.AuthMiddleware(mediaHandler.GetUserMedia)))
+	http.HandleFunc("/api/media/file/", enableCORS(mediaHandler.GetMediaFile)) // Public для отображения
+	http.HandleFunc("/api/media/stats", enableCORS(middleware.AuthMiddleware(mediaHandler.GetMediaStats)))
+	http.HandleFunc("/api/media/", enableCORS(middleware.AuthMiddleware(mediaHandler.DeleteMedia)))
+
 	port := ":8000"
 	fmt.Printf("Server starting on port %s\n", port)
 	log.Fatal(http.ListenAndServe(port, nil))

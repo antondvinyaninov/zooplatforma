@@ -45,3 +45,7 @@ yarn-error.log*
 # API Keys (sensitive data)
 API_KEYS.md
 docs/API_KEYS.md
+
+# Uploads (user media files)
+uploads/
+!uploads/.gitkeep

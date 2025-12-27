@@ -37,6 +37,26 @@ func createTables() error {
 		password TEXT NOT NULL,
 		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
 	);
+
+	CREATE TABLE IF NOT EXISTS user_media (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL,
+		file_name TEXT NOT NULL,
+		original_name TEXT NOT NULL,
+		file_path TEXT NOT NULL,
+		file_size INTEGER NOT NULL,
+		mime_type TEXT NOT NULL,
+		media_type TEXT NOT NULL,
+		width INTEGER,
+		height INTEGER,
+		duration INTEGER,
+		uploaded_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_user_media_user_id ON user_media(user_id);
+	CREATE INDEX IF NOT EXISTS idx_user_media_type ON user_media(media_type);
+	CREATE INDEX IF NOT EXISTS idx_user_media_uploaded ON user_media(uploaded_at);
 	`
 	_, err := DB.Exec(query)
 	if err != nil {
