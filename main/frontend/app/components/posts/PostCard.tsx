@@ -213,7 +213,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
 
       {/* Photos */}
       {post.attachments && post.attachments.length > 0 && (
-        <div className="px-4 pb-3">
+        <div className="pb-3">
           <PhotoGrid 
             photos={post.attachments.filter(a => a.type === 'image')} 
             onClick={handleOpenModal}

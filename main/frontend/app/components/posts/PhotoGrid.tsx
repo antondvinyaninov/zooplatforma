@@ -84,7 +84,7 @@ export default function PhotoGrid({ photos, onClick }: PhotoGridProps) {
   return (
     <div 
       ref={containerRef}
-      className="relative aspect-square rounded-lg overflow-hidden cursor-pointer group bg-white dark:bg-gray-900"
+      className="relative aspect-square overflow-hidden cursor-pointer group bg-white dark:bg-gray-900"
       onClick={onClick}
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
