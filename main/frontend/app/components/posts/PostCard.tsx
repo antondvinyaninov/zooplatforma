@@ -8,6 +8,7 @@ import { UserIcon } from '@heroicons/react/24/outline';
 import PostComments from '../shared/PostComments';
 import PostModal from './PostModal';
 import PollDisplay from '../polls/PollDisplay';
+import PhotoGrid from './PhotoGrid';
 
 interface User {
   id: number;
@@ -213,30 +214,10 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
       {/* Photos */}
       {post.attachments && post.attachments.length > 0 && (
         <div className="px-4 pb-3">
-          <div className={`grid gap-2 ${
-            post.attachments.length === 1 ? 'grid-cols-1' :
-            post.attachments.length === 2 ? 'grid-cols-2' :
-            post.attachments.length === 3 ? 'grid-cols-3' :
-            'grid-cols-2'
-          }`}>
-            {post.attachments.map((attachment, index) => (
-              attachment.type === 'image' && (
-                <div
-                  key={index}
-                  className="relative rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:opacity-95 transition-opacity"
-                  onClick={handleOpenModal}
-                >
-                  <img
-                    src={attachment.url.startsWith('http') ? attachment.url : `http://localhost:8000${attachment.url}`}
-                    alt={attachment.file_name || `Фото ${index + 1}`}
-                    className={`w-full object-cover ${
-                      post.attachments.length === 1 ? 'max-h-[500px]' : 'h-64'
-                    }`}
-                  />
-                </div>
-              )
-            ))}
-          </div>
+          <PhotoGrid 
+            photos={post.attachments.filter(a => a.type === 'image')} 
+            onClick={handleOpenModal}
+          />
         </div>
       )}
 
