@@ -210,6 +210,36 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
       {/* Content */}
       <div className="text-gray-900 px-4 pb-3 whitespace-pre-wrap">{post.content}</div>
 
+      {/* Photos */}
+      {post.attachments && post.attachments.length > 0 && (
+        <div className="px-4 pb-3">
+          <div className={`grid gap-2 ${
+            post.attachments.length === 1 ? 'grid-cols-1' :
+            post.attachments.length === 2 ? 'grid-cols-2' :
+            post.attachments.length === 3 ? 'grid-cols-3' :
+            'grid-cols-2'
+          }`}>
+            {post.attachments.map((attachment, index) => (
+              attachment.type === 'image' && (
+                <div
+                  key={index}
+                  className="relative rounded-lg overflow-hidden bg-gray-100 cursor-pointer hover:opacity-95 transition-opacity"
+                  onClick={handleOpenModal}
+                >
+                  <img
+                    src={attachment.url}
+                    alt={attachment.file_name || `Фото ${index + 1}`}
+                    className={`w-full object-cover ${
+                      post.attachments.length === 1 ? 'max-h-[500px]' : 'h-64'
+                    }`}
+                  />
+                </div>
+              )
+            ))}
+          </div>
+        </div>
+      )}
+
       {/* Poll */}
       {post.poll && (
         <div className="px-4 pb-3">

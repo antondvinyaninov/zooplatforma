@@ -42,16 +42,21 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const [currentMonth, setCurrentMonth] = useState(new Date());
   const [drafts, setDrafts] = useState<any[]>([]);
   const [draftMenuOpen, setDraftMenuOpen] = useState<number | null>(null);
+  const [photos, setPhotos] = useState<string[]>([]); // URLs для превью
 
   const handleSubmit = async () => {
-    if (!content.trim() && !pollData) return;
+    if (!content.trim() && !pollData && photos.length === 0) return;
 
     setIsSubmitting(true);
     try {
       const postData: any = {
         content,
         attached_pets: [],
-        attachments: [],
+        attachments: photos.map((url, index) => ({
+          url,
+          type: 'image',
+          file_name: `photo_${index + 1}.jpg`,
+        })),
         tags: [],
       };
 
@@ -74,6 +79,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
       await apiClient.post('/api/posts', postData);
 
       setContent('');
+      setPhotos([]);
       setPollData(null);
       setShowPollCreator(false);
       setScheduledDate(null);
@@ -97,6 +103,47 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
     window.addEventListener('keydown', handleEsc);
     return () => window.removeEventListener('keydown', handleEsc);
   }, [showModal]);
+
+  // Handle photo upload
+  const handlePhotoUpload = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    // Limit to 10 photos
+    const remainingSlots = 10 - photos.length;
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+
+    filesToProcess.forEach((file) => {
+      // Check file size (max 5MB)
+      if (file.size > 5 * 1024 * 1024) {
+        alert('Файл слишком большой. Максимальный размер: 5MB');
+        return;
+      }
+
+      // Check file type
+      if (!file.type.startsWith('image/')) {
+        alert('Можно загружать только изображения');
+        return;
+      }
+
+      // Read file as data URL
+      const reader = new FileReader();
+      reader.onload = (event) => {
+        if (event.target?.result) {
+          setPhotos((prev) => [...prev, event.target!.result as string]);
+        }
+      };
+      reader.readAsDataURL(file);
+    });
+
+    // Reset input
+    e.target.value = '';
+  };
+
+  // Remove photo
+  const removePhoto = (index: number) => {
+    setPhotos((prev) => prev.filter((_, i) => i !== index));
+  };
 
   // Load drafts when drafts modal opens
   useEffect(() => {
@@ -122,11 +169,16 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
       await apiClient.post('/api/posts', {
         content,
         attached_pets: [],
-        attachments: [],
+        attachments: photos.map((url, index) => ({
+          url,
+          type: 'image',
+          file_name: `photo_${index + 1}.jpg`,
+        })),
         tags: [],
         status: 'draft',
       });
       setContent('');
+      setPhotos([]);
       setShowSaveDraftDialog(false);
       setShowModal(false);
       setShowDrafts(true); // Open drafts after saving
@@ -318,12 +370,16 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
 
               {/* Attachment Icons */}
               <div className="flex items-center gap-0.5 mb-2 ml-12">
-                <button
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Добавить фото"
-                >
+                <label className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer" title="Добавить фото">
                   <PhotoIcon className="w-5 h-5 text-gray-400" strokeWidth={2} />
-                </button>
+                  <input
+                    type="file"
+                    accept="image/*"
+                    multiple
+                    onChange={handlePhotoUpload}
+                    className="hidden"
+                  />
+                </label>
                 <button
                   className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
                   title="Добавить видео"
@@ -350,6 +406,32 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                   <MapPinIcon className="w-5 h-5 text-gray-400" strokeWidth={2} />
                 </button>
               </div>
+
+              {/* Photos Preview */}
+              {photos.length > 0 && (
+                <div className="mb-3 ml-12">
+                  <div className="grid grid-cols-2 gap-2">
+                    {photos.map((photo, index) => (
+                      <div key={index} className="relative group rounded-lg overflow-hidden bg-gray-100">
+                        <img
+                          src={photo}
+                          alt={`Фото ${index + 1}`}
+                          className="w-full h-48 object-cover"
+                        />
+                        <button
+                          onClick={() => removePhoto(index)}
+                          className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full transition-colors"
+                        >
+                          <XMarkIcon className="w-4 h-4 text-white" strokeWidth={2} />
+                        </button>
+                      </div>
+                    ))}
+                  </div>
+                  {photos.length >= 10 && (
+                    <p className="text-xs text-gray-500 mt-2">Максимум 10 фото</p>
+                  )}
+                </div>
+              )}
 
               {/* Poll Creator */}
               {showPollCreator && !pollData && (
@@ -597,6 +679,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                   setShowSaveDraftDialog(false);
                   setShowModal(false);
                   setContent('');
+                  setPhotos([]);
                 }}
                 className="w-full py-3 text-[15px] text-red-500 font-semibold hover:bg-gray-50 transition-colors"
               >
