@@ -231,37 +231,31 @@ export default function EditProfilePage() {
         {/* Form */}
         <form onSubmit={handleSaveProfile} className="p-6 space-y-6">
           {/* Cover Photo Section */}
-          <div className="relative">
-            <div className="relative h-48 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg overflow-hidden">
-              {coverPreview ? (
+          {coverPreview ? (
+            <div className="relative">
+              <div className="relative h-48 bg-gradient-to-br from-blue-100 to-blue-200 rounded-lg overflow-hidden">
                 <img src={coverPreview} alt="Cover" className="w-full h-full object-cover" />
-              ) : (
-                <div className="absolute inset-0 flex items-center justify-center">
-                  <CameraIcon className="w-12 h-12 text-blue-300" />
-                </div>
-              )}
-              {isUploadingCover && (
-                <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
-                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
-                </div>
-              )}
-            </div>
-            <input
-              ref={coverInputRef}
-              type="file"
-              accept="image/*"
-              onChange={handleCoverChange}
-              className="hidden"
-            />
-            <button
-              type="button"
-              onClick={() => coverInputRef.current?.click()}
-              disabled={isUploadingCover}
-              className="absolute top-4 right-4 p-2 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors disabled:opacity-50"
-            >
-              <CameraIcon className="w-5 h-5 text-gray-600" />
-            </button>
-            {coverPreview && (
+                {isUploadingCover && (
+                  <div className="absolute inset-0 bg-black/50 flex items-center justify-center">
+                    <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-white"></div>
+                  </div>
+                )}
+              </div>
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleCoverChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => coverInputRef.current?.click()}
+                disabled={isUploadingCover}
+                className="absolute top-4 right-4 p-2 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors disabled:opacity-50"
+              >
+                <CameraIcon className="w-5 h-5 text-gray-600" />
+              </button>
               <button
                 type="button"
                 onClick={handleDeleteCover}
@@ -271,8 +265,29 @@ export default function EditProfilePage() {
               >
                 <XMarkIcon className="w-5 h-5 text-white" />
               </button>
-            )}
-          </div>
+            </div>
+          ) : (
+            <div className="relative">
+              <input
+                ref={coverInputRef}
+                type="file"
+                accept="image/*"
+                onChange={handleCoverChange}
+                className="hidden"
+              />
+              <button
+                type="button"
+                onClick={() => coverInputRef.current?.click()}
+                disabled={isUploadingCover}
+                className="w-full py-3 px-4 border-2 border-dashed border-gray-300 rounded-lg hover:border-gray-400 transition-colors disabled:opacity-50 flex items-center justify-center gap-2 text-gray-600"
+              >
+                <CameraIcon className="w-5 h-5" />
+                <span className="text-sm font-medium">
+                  {isUploadingCover ? 'Загрузка...' : 'Добавить обложку профиля'}
+                </span>
+              </button>
+            </div>
+          )}
 
           {/* Avatar Section */}
           <div className="flex items-center gap-6">

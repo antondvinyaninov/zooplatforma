@@ -147,37 +147,26 @@ export default function UserProfilePage() {
     <div>
       {/* Обложка профиля */}
       <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden mb-2.5">
-        {/* Cover Photo */}
-        <div className="relative h-48 bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400">
-          {profile.coverPhoto ? (
+        {/* Cover Photo - показываем только если есть */}
+        {profile.coverPhoto && (
+          <div className="relative h-48 bg-gradient-to-br from-blue-400 via-purple-400 to-pink-400">
             <img src={getMediaUrl(profile.coverPhoto) || ''} alt="Cover" className="w-full h-full object-cover" />
-          ) : (
-            <div className="absolute inset-0 flex items-center justify-center">
-              <div className="text-center">
-                <div className="text-6xl font-bold text-white/30 mb-2">
-                  {profile.name.charAt(0).toUpperCase()}
-                </div>
-                <div className="text-white/20 text-sm font-medium">
-                  {profile.name}
-                </div>
-              </div>
-            </div>
-          )}
-          {isOwnProfile && (
-            <button 
-              className="absolute top-4 right-4 p-2 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors"
-              title="Изменить обложку"
-            >
-              <CameraIcon className="w-5 h-5 text-gray-600" />
-            </button>
-          )}
-        </div>
+            {isOwnProfile && (
+              <button 
+                className="absolute top-4 right-4 p-2 bg-white rounded-lg shadow-md hover:bg-gray-50 transition-colors"
+                title="Изменить обложку"
+              >
+                <CameraIcon className="w-5 h-5 text-gray-600" />
+              </button>
+            )}
+          </div>
+        )}
 
         {/* Profile Info */}
         <div className="p-4 sm:p-6">
           <div className="flex flex-col sm:flex-row items-start gap-4 sm:gap-6">
             {/* Avatar */}
-            <div className="relative -mt-16 sm:-mt-20">
+            <div className={`relative ${profile.coverPhoto ? '-mt-16 sm:-mt-20' : ''}`}>
               <div className="w-24 h-24 sm:w-32 sm:h-32 rounded-full bg-gray-300 border-4 border-white shadow-lg flex items-center justify-center overflow-hidden">
                 {profile.avatar ? (
                   <img src={getMediaUrl(profile.avatar) || ''} alt={profile.name} className="w-full h-full object-cover" />
