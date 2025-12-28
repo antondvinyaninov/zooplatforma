@@ -3,6 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
+import { getMediaUrl } from '@/lib/utils';
 import {
   PhotoIcon,
   MapPinIcon,
@@ -429,7 +430,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
         {/* Avatar */}
         <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-semibold flex-shrink-0 overflow-hidden">
           {user?.avatar ? (
-            <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+            <img src={getMediaUrl(user.avatar) || ''} alt={user.name} className="w-full h-full object-cover" />
           ) : (
             <UserIcon className="w-6 h-6 text-gray-500" />
           )}
@@ -500,7 +501,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                 {/* Avatar */}
                 <div className="w-9 h-9 rounded-full bg-gray-300 flex items-center justify-center text-white font-semibold flex-shrink-0 text-[14px] overflow-hidden">
                   {user?.avatar ? (
-                    <img src={user.avatar} alt={user.name} className="w-full h-full object-cover" />
+                    <img src={getMediaUrl(user.avatar) || ''} alt={user.name} className="w-full h-full object-cover" />
                   ) : (
                     <UserIcon className="w-5 h-5 text-gray-500" />
                   )}

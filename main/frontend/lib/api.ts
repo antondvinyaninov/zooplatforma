@@ -145,6 +145,130 @@ export const usersApi = {
   // Обновление своего профиля
   updateProfile: (data: { name?: string; bio?: string; phone?: string; location?: string }) =>
     apiClient.put<User>('/api/profile', data),
+  
+  // Загрузка аватара
+  uploadAvatar: async (file: File): Promise<ApiResponse<{ avatar_url: string; message: string }>> => {
+    const formData = new FormData();
+    formData.append('avatar', file);
+    
+    try {
+      const response = await fetch(`${API_URL}/api/profile/avatar`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.error || 'Ошибка загрузки аватара',
+        };
+      }
+      
+      return {
+        success: true,
+        data: result.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  },
+  
+  // Загрузка обложки
+  uploadCover: async (file: File): Promise<ApiResponse<{ cover_url: string; message: string }>> => {
+    const formData = new FormData();
+    formData.append('cover', file);
+    
+    try {
+      const response = await fetch(`${API_URL}/api/profile/cover`, {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.error || 'Ошибка загрузки обложки',
+        };
+      }
+      
+      return {
+        success: true,
+        data: result.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  },
+  
+  // Удаление аватара
+  deleteAvatar: async (): Promise<ApiResponse<{ message: string }>> => {
+    try {
+      const response = await fetch(`${API_URL}/api/profile/avatar/delete`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.error || 'Ошибка удаления аватара',
+        };
+      }
+      
+      return {
+        success: true,
+        data: result.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  },
+  
+  // Удаление обложки
+  deleteCover: async (): Promise<ApiResponse<{ message: string }>> => {
+    try {
+      const response = await fetch(`${API_URL}/api/profile/cover/delete`, {
+        method: 'DELETE',
+        credentials: 'include',
+      });
+      
+      const result = await response.json();
+      
+      if (!response.ok) {
+        return {
+          success: false,
+          error: result.error || 'Ошибка удаления обложки',
+        };
+      }
+      
+      return {
+        success: true,
+        data: result.data,
+      };
+    } catch (error) {
+      return {
+        success: false,
+        error: error instanceof Error ? error.message : 'Unknown error',
+      };
+    }
+  },
 };
 
 // API методы для профиля

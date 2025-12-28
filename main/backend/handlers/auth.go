@@ -4,6 +4,7 @@ import (
 	"backend/middleware"
 	"backend/models"
 	"database"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"time"
@@ -125,15 +126,24 @@ func MeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user from database
+	// Get user from database - используем sql.NullString для nullable полей
 	var user models.User
+	var bio, phone, location, avatar, coverPhoto sql.NullString
+
 	err = database.DB.QueryRow("SELECT id, name, email, bio, phone, location, avatar, cover_photo, created_at FROM users WHERE id = ?", token.UserID).
-		Scan(&user.ID, &user.Name, &user.Email, &user.Bio, &user.Phone, &user.Location, &user.Avatar, &user.CoverPhoto, &user.CreatedAt)
+		Scan(&user.ID, &user.Name, &user.Email, &bio, &phone, &location, &avatar, &coverPhoto, &user.CreatedAt)
 
 	if err != nil {
 		sendError(w, "Пользователь не найден", http.StatusNotFound)
 		return
 	}
+
+	// Преобразуем NullString в обычные строки
+	user.Bio = bio.String
+	user.Phone = phone.String
+	user.Location = location.String
+	user.Avatar = avatar.String
+	user.CoverPhoto = coverPhoto.String
 
 	sendSuccess(w, models.UserResponse{
 		ID:         user.ID,

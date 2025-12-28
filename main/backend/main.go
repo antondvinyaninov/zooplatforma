@@ -68,6 +68,10 @@ func main() {
 	http.HandleFunc("/api/users", enableCORS(middleware.AuthMiddleware(handlers.UsersHandler)))
 	http.HandleFunc("/api/users/", enableCORS(middleware.AuthMiddleware(handlers.UserHandler)))
 	http.HandleFunc("/api/profile", enableCORS(middleware.AuthMiddleware(handlers.UpdateProfileHandler)))
+	http.HandleFunc("/api/profile/avatar", enableCORS(middleware.AuthMiddleware(handlers.UploadAvatarHandler)))
+	http.HandleFunc("/api/profile/avatar/delete", enableCORS(middleware.AuthMiddleware(handlers.DeleteAvatarHandler)))
+	http.HandleFunc("/api/profile/cover", enableCORS(middleware.AuthMiddleware(handlers.UploadCoverPhotoHandler)))
+	http.HandleFunc("/api/profile/cover/delete", enableCORS(middleware.AuthMiddleware(handlers.DeleteCoverPhotoHandler)))
 	http.HandleFunc("/api/posts/drafts", enableCORS(middleware.AuthMiddleware(handlers.DraftsHandler)))
 	http.HandleFunc("/api/posts", enableCORS(middleware.AuthMiddleware(handlers.PostsHandler)))
 	http.HandleFunc("/api/posts/", enableCORS(middleware.AuthMiddleware(handlers.PostHandler)))
@@ -98,6 +102,10 @@ func main() {
 	http.HandleFunc("/api/media/chunked/initiate", enableCORS(middleware.AuthMiddleware(chunkedHandler.InitiateUpload)))
 	http.HandleFunc("/api/media/chunked/upload", enableCORS(middleware.AuthMiddleware(chunkedHandler.UploadChunk)))
 	http.HandleFunc("/api/media/chunked/complete", enableCORS(middleware.AuthMiddleware(chunkedHandler.CompleteUpload)))
+
+	// Static files - serve uploads directory
+	fs := http.FileServer(http.Dir("."))
+	http.Handle("/uploads/", enableCORS(http.StripPrefix("/", fs).ServeHTTP))
 
 	// Root route MUST be registered LAST
 	http.HandleFunc("/", enableCORS(handleRoot))

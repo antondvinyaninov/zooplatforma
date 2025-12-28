@@ -3,6 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../contexts/AuthContext';
+import { getMediaUrl } from '@/lib/utils';
 import {
   UserIcon,
   Cog6ToothIcon,
@@ -63,8 +64,12 @@ export default function UserMenu() {
         onClick={() => setIsOpen(!isOpen)}
         className="flex items-center gap-2 p-1 hover:bg-gray-100 rounded-lg transition-colors"
       >
-        <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center">
-          <UserIcon className="w-5 h-5 text-gray-600" />
+        <div className="w-8 h-8 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+          {user?.avatar ? (
+            <img src={getMediaUrl(user.avatar) || ''} alt={user.name} className="w-full h-full object-cover" />
+          ) : (
+            <UserIcon className="w-5 h-5 text-gray-600" />
+          )}
         </div>
         <ChevronDownIcon
           className={`w-4 h-4 text-gray-600 transition-transform ${isOpen ? 'rotate-180' : ''}`}
@@ -77,8 +82,12 @@ export default function UserMenu() {
           {/* User Info */}
           <div className="p-4 border-b border-gray-200">
             <div className="flex items-center gap-3">
-              <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center">
-                <UserIcon className="w-6 h-6 text-gray-600" />
+              <div className="w-12 h-12 bg-gray-300 rounded-full flex items-center justify-center overflow-hidden">
+                {user?.avatar ? (
+                  <img src={getMediaUrl(user.avatar) || ''} alt={user.name} className="w-full h-full object-cover" />
+                ) : (
+                  <UserIcon className="w-6 h-6 text-gray-600" />
+                )}
               </div>
               <div className="flex-1">
                 <div className="font-semibold text-gray-900 flex items-center gap-2">

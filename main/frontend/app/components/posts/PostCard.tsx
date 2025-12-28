@@ -5,6 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { UserIcon } from '@heroicons/react/24/outline';
+import { getMediaUrl } from '@/lib/utils';
 import PostComments from '../shared/PostComments';
 import PostModal from './PostModal';
 import PollDisplay from '../polls/PollDisplay';
@@ -170,7 +171,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
           {/* Avatar */}
           <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-semibold overflow-hidden">
             {post.user?.avatar ? (
-              <img src={post.user.avatar} alt={post.user.name} className="w-full h-full object-cover" />
+              <img src={getMediaUrl(post.user.avatar) || ''} alt={post.user.name} className="w-full h-full object-cover" />
             ) : (
               <UserIcon className="w-6 h-6 text-gray-500" />
             )}

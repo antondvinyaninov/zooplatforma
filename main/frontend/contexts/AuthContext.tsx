@@ -9,6 +9,7 @@ interface AuthContextType {
   login: (email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   register: (name: string, email: string, password: string) => Promise<{ success: boolean; error?: string }>;
   logout: () => void;
+  refreshUser: () => Promise<void>;
   isAuthenticated: boolean;
   isLoading: boolean;
 }
@@ -21,7 +22,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const [isLoading, setIsLoading] = useState(true);
 
   useEffect(() => {
-    // Проверяем авторизацию при загрузке
+    // Проверяем авторизацию при загрузке (только на клиенте)
+    if (typeof window === 'undefined') {
+      setIsLoading(false);
+      return;
+    }
+
     const checkAuth = async () => {
       const response = await authApi.me();
       
@@ -68,6 +74,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setUser(null);
   };
 
+  const refreshUser = async () => {
+    const response = await authApi.me();
+    
+    if (response.success && response.data) {
+      setUser(response.data);
+    }
+  };
+
   return (
     <AuthContext.Provider
       value={{
@@ -76,6 +90,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         login,
         register,
         logout,
+        refreshUser,
         isAuthenticated: !!token,
         isLoading,
       }}
