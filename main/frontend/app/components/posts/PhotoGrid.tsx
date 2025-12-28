@@ -6,6 +6,8 @@ import { ChevronLeftIcon, ChevronRightIcon } from '@heroicons/react/24/outline';
 interface Photo {
   url: string;
   file_name?: string;
+  type?: string;
+  media_type?: string;
 }
 
 interface PhotoGridProps {
@@ -81,6 +83,9 @@ export default function PhotoGrid({ photos, onClick }: PhotoGridProps) {
     setTouchEnd(0);
   };
 
+  const currentPhoto = photos[currentIndex];
+  const isVideo = currentPhoto.type === 'video' || currentPhoto.media_type === 'video';
+
   return (
     <div 
       ref={containerRef}
@@ -89,16 +94,30 @@ export default function PhotoGrid({ photos, onClick }: PhotoGridProps) {
       onTouchStart={handleTouchStart}
       onTouchMove={handleTouchMove}
       onTouchEnd={handleTouchEnd}
-      style={{
-        backgroundImage: `url(${getPhotoUrl(photos[currentIndex].url)})`,
-        backgroundSize: 'contain',
-        backgroundPosition: 'center',
-        backgroundRepeat: 'no-repeat'
-      }}
     >
+      {/* Media Content */}
+      {isVideo ? (
+        <video
+          src={getPhotoUrl(currentPhoto.url)}
+          className="w-full h-full object-contain"
+          controls
+          onClick={(e) => e.stopPropagation()}
+        />
+      ) : (
+        <div
+          style={{
+            backgroundImage: `url(${getPhotoUrl(currentPhoto.url)})`,
+            backgroundSize: 'contain',
+            backgroundPosition: 'center',
+            backgroundRepeat: 'no-repeat',
+            width: '100%',
+            height: '100%'
+          }}
+        />
+      )}
       {/* Счетчик фото */}
       {photos.length > 1 && (
-        <div className="absolute top-3 right-3 bg-black/60 text-white px-3 py-1 rounded-full text-sm font-medium z-10">
+        <div className="absolute top-3 right-3 bg-black/60 text-white px-3 py-1 rounded-full text-sm font-medium z-20">
           {currentIndex + 1} / {photos.length}
         </div>
       )}

@@ -262,3 +262,117 @@ import CreatePost from '@/components/posts/CreatePost';
 - [ ] Используются цвета из палитры (#1B76FF, #FC2B2B)
 - [ ] Добавлена ссылка в `Sidebar.tsx` если нужно
 - [ ] Проверена адаптивность на разных экранах
+
+
+---
+
+## Медиа компоненты
+
+### Загрузка фото и видео
+
+```tsx
+import { useMediaUpload } from '@/hooks/useMediaUpload';
+
+function MyComponent() {
+  const { uploadFile, uploadMultiple, uploading } = useMediaUpload();
+  const [media, setMedia] = useState<UploadedMedia[]>([]);
+
+  const handlePhotoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const uploaded = await uploadMultiple(Array.from(files), 'photo');
+    setMedia(prev => [...prev, ...uploaded]);
+  };
+
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files) return;
+
+    const uploaded = await uploadMultiple(Array.from(files), 'video');
+    setMedia(prev => [...prev, ...uploaded]);
+  };
+
+  return (
+    <>
+      <label>
+        <PhotoIcon className="w-5 h-5" />
+        <input type="file" accept="image/*" multiple onChange={handlePhotoUpload} className="hidden" />
+      </label>
+      
+      <label>
+        <VideoCameraIcon className="w-5 h-5" />
+        <input type="file" accept="video/*" onChange={handleVideoUpload} className="hidden" />
+      </label>
+    </>
+  );
+}
+```
+
+### Лимиты загрузки
+
+- **Фото**: максимум 10MB на файл
+- **Видео**: максимум 100MB на файл
+- **Форматы фото**: JPEG, PNG, GIF, WebP
+- **Форматы видео**: MP4, WebM, QuickTime, MPEG
+
+### Отображение медиа
+
+```tsx
+{media.map((item) => (
+  <div key={item.id}>
+    {item.media_type === 'video' ? (
+      <video src={`http://localhost:8000${item.url}`} controls />
+    ) : (
+      <img src={`http://localhost:8000${item.url}`} alt={item.original_name} />
+    )}
+  </div>
+))}
+```
+
+### Карусель фото/видео (PhotoGrid)
+
+```tsx
+import PhotoGrid from '@/components/posts/PhotoGrid';
+
+<PhotoGrid 
+  photos={post.attachments.filter(a => 
+    a.type === 'image' || a.type === 'video' || 
+    a.media_type === 'image' || a.media_type === 'video'
+  )} 
+  onClick={() => openModal()}
+/>
+```
+
+**Особенности:**
+- Квадратный формат (1:1)
+- Навигация: стрелки, точки, клавиатура, свайпы
+- Счетчик медиа (1/5)
+- Поддержка видео с нативным плеером
+- Адаптивное отображение
+
+---
+
+## Best Practices
+
+### Медиа файлы
+
+1. **Всегда проверяйте размер** перед загрузкой
+2. **Показывайте прогресс** загрузки пользователю
+3. **Используйте превью** для больших файлов
+4. **Добавляйте индикаторы типа** (фото/видео)
+5. **Обрабатывайте ошибки** загрузки
+
+### Производительность
+
+1. **Ленивая загрузка** для видео (`loading="lazy"`)
+2. **Оптимизация изображений** на сервере
+3. **Кеширование** медиа файлов (Cache-Control: 1 год)
+4. **Превью** вместо полных файлов в списках
+
+### UX
+
+1. **Показывайте лимиты** (10 фото, 100MB видео)
+2. **Визуальная обратная связь** при загрузке
+3. **Возможность удаления** загруженных файлов
+4. **Превью перед публикацией**

@@ -211,11 +211,11 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
       {/* Content */}
       <div className="text-gray-900 px-4 pb-3 whitespace-pre-wrap">{post.content}</div>
 
-      {/* Photos */}
+      {/* Photos/Videos */}
       {post.attachments && post.attachments.length > 0 && (
         <div className="pb-3">
           <PhotoGrid 
-            photos={post.attachments.filter(a => a.type === 'image')} 
+            photos={post.attachments.filter(a => a.type === 'image' || a.type === 'video' || a.media_type === 'image' || a.media_type === 'video')} 
             onClick={handleOpenModal}
           />
         </div>

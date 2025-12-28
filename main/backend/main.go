@@ -93,6 +93,12 @@ func main() {
 	http.HandleFunc("/api/media/file/", enableCORS(mediaHandler.GetMediaFile)) // Public для отображения
 	http.HandleFunc("/api/media/delete/", enableCORS(middleware.AuthMiddleware(mediaHandler.DeleteMedia)))
 
+	// Chunked Upload
+	chunkedHandler := handlers.NewChunkedUploadHandler(database.DB)
+	http.HandleFunc("/api/media/chunked/initiate", enableCORS(middleware.AuthMiddleware(chunkedHandler.InitiateUpload)))
+	http.HandleFunc("/api/media/chunked/upload", enableCORS(middleware.AuthMiddleware(chunkedHandler.UploadChunk)))
+	http.HandleFunc("/api/media/chunked/complete", enableCORS(middleware.AuthMiddleware(chunkedHandler.CompleteUpload)))
+
 	// Root route MUST be registered LAST
 	http.HandleFunc("/", enableCORS(handleRoot))
 

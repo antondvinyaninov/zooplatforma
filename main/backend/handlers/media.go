@@ -10,6 +10,7 @@ import (
 	"io"
 	"net/http"
 	"os"
+	"os/exec"
 	"path/filepath"
 	"strconv"
 	"strings"
@@ -21,8 +22,10 @@ import (
 )
 
 const (
-	MaxUploadSize = 10 * 1024 * 1024 // 10MB
+	MaxPhotoSize  = 10 * 1024 * 1024  // 10MB для фото
+	MaxVideoSize  = 100 * 1024 * 1024 // 100MB для видео
 	UploadDir     = "uploads"
+	OptimizeVideo = true // Включить оптимизацию видео
 )
 
 type MediaHandler struct {
@@ -47,33 +50,56 @@ func (h *MediaHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Ограничение размера
-	r.Body = http.MaxBytesReader(w, r.Body, MaxUploadSize)
-	if err := r.ParseMultipartForm(MaxUploadSize); err != nil {
-		sendErrorResponse(w, "File too large. Max size: 10MB", http.StatusBadRequest)
+	fmt.Printf("📤 [UPLOAD] Начало загрузки для user_id=%d\n", userID)
+
+	// Получаем тип медиа из формы
+	if err := r.ParseMultipartForm(1024); err != nil {
+		fmt.Printf("❌ [UPLOAD] Ошибка парсинга формы: %v\n", err)
+		sendErrorResponse(w, "Failed to parse form", http.StatusBadRequest)
 		return
 	}
 
-	// Получаем файл
-	file, header, err := r.FormFile("file")
-	if err != nil {
-		sendErrorResponse(w, "Failed to read file", http.StatusBadRequest)
-		return
-	}
-	defer file.Close()
-
-	// Получаем тип медиа
 	mediaType := r.FormValue("media_type")
 	if mediaType == "" {
 		mediaType = "photo" // По умолчанию
 	}
 
+	fmt.Printf("📋 [UPLOAD] Тип медиа: %s\n", mediaType)
+
+	// Определяем максимальный размер в зависимости от типа
+	maxSize := int64(MaxPhotoSize)
+	maxSizeStr := "10MB"
+	if mediaType == "video" {
+		maxSize = int64(MaxVideoSize)
+		maxSizeStr = "100MB"
+	}
+
+	fmt.Printf("📏 [UPLOAD] Максимальный размер: %s (%d bytes)\n", maxSizeStr, maxSize)
+
+	// Ограничение размера
+	r.Body = http.MaxBytesReader(w, r.Body, maxSize)
+
+	// Получаем файл
+	file, header, err := r.FormFile("file")
+	if err != nil {
+		fmt.Printf("❌ [UPLOAD] Ошибка получения файла: %v\n", err)
+		sendErrorResponse(w, "Failed to read file or file too large. Max size: "+maxSizeStr, http.StatusBadRequest)
+		return
+	}
+	defer file.Close()
+
+	fmt.Printf("📁 [UPLOAD] Файл получен: %s, размер: %d bytes, MIME: %s\n",
+		header.Filename, header.Size, header.Header.Get("Content-Type"))
+
 	// Проверяем MIME type
 	mimeType := header.Header.Get("Content-Type")
 	if !isAllowedMimeType(mimeType, mediaType) {
+		fmt.Printf("❌ [UPLOAD] Недопустимый MIME тип: %s для типа %s\n", mimeType, mediaType)
 		sendErrorResponse(w, "Invalid file type", http.StatusBadRequest)
 		return
 	}
+
+	fmt.Printf("✅ [UPLOAD] MIME тип валиден: %s\n", mimeType)
 
 	// Генерируем уникальное имя файла
 	ext := filepath.Ext(header.Filename)
@@ -85,15 +111,21 @@ func (h *MediaHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 		strconv.Itoa(now.Year()), fmt.Sprintf("%02d", now.Month()), fileName)
 	fullPath := filepath.Join(UploadDir, relativePath)
 
+	fmt.Printf("📂 [UPLOAD] Путь сохранения: %s\n", fullPath)
+
 	// Создаем директории
 	if err := os.MkdirAll(filepath.Dir(fullPath), 0755); err != nil {
+		fmt.Printf("❌ [UPLOAD] Ошибка создания директории: %v\n", err)
 		sendErrorResponse(w, "Failed to create directory", http.StatusInternalServerError)
 		return
 	}
 
+	fmt.Printf("✅ [UPLOAD] Директория создана\n")
+
 	// Сохраняем файл
 	dst, err := os.Create(fullPath)
 	if err != nil {
+		fmt.Printf("❌ [UPLOAD] Ошибка создания файла: %v\n", err)
 		sendErrorResponse(w, "Failed to save file", http.StatusInternalServerError)
 		return
 	}
@@ -101,9 +133,29 @@ func (h *MediaHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 
 	fileSize, err := io.Copy(dst, file)
 	if err != nil {
+		fmt.Printf("❌ [UPLOAD] Ошибка копирования файла: %v\n", err)
 		os.Remove(fullPath) // Удаляем файл при ошибке
 		sendErrorResponse(w, "Failed to save file", http.StatusInternalServerError)
 		return
+	}
+
+	fmt.Printf("💾 [UPLOAD] Файл сохранен, размер: %d bytes\n", fileSize)
+
+	// Оптимизируем видео (если это видео)
+	if mediaType == "video" {
+		optimizedPath, err := optimizeVideo(fullPath)
+		if err != nil {
+			fmt.Printf("❌ [UPLOAD] Ошибка оптимизации видео: %v\n", err)
+			os.Remove(fullPath)
+			sendErrorResponse(w, "Failed to optimize video", http.StatusInternalServerError)
+			return
+		}
+		// Обновляем путь и размер файла
+		fullPath = optimizedPath
+		relativePath = strings.TrimPrefix(fullPath, UploadDir+string(filepath.Separator))
+		fileName = filepath.Base(fullPath)
+		fileInfo, _ := os.Stat(fullPath)
+		fileSize = fileInfo.Size()
 	}
 
 	// Получаем размеры изображения (если это фото)
@@ -124,14 +176,18 @@ func (h *MediaHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 		INSERT INTO user_media (user_id, file_name, original_name, file_path, file_size, mime_type, media_type, width, height)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
+	fmt.Printf("💾 [UPLOAD] Сохранение в БД: user_id=%d, file_name=%s, media_type=%s\n", userID, fileName, mediaType)
+
 	result, err := h.DB.Exec(query, userID, fileName, header.Filename, relativePath, fileSize, mimeType, mediaType, width, height)
 	if err != nil {
+		fmt.Printf("❌ [UPLOAD] Ошибка сохранения в БД: %v\n", err)
 		os.Remove(fullPath) // Удаляем файл при ошибке БД
 		sendErrorResponse(w, "Failed to save to database", http.StatusInternalServerError)
 		return
 	}
 
 	mediaID, _ := result.LastInsertId()
+	fmt.Printf("✅ [UPLOAD] Запись в БД создана, ID=%d\n", mediaID)
 
 	// Формируем ответ
 	media := models.UserMedia{
@@ -149,6 +205,7 @@ func (h *MediaHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 		URL:          "/api/media/file/" + strconv.Itoa(int(mediaID)),
 	}
 
+	fmt.Printf("🎉 [UPLOAD] Загрузка завершена успешно! ID=%d, URL=%s\n", mediaID, media.URL)
 	sendSuccessResponse(w, media)
 }
 
@@ -376,4 +433,93 @@ func isAllowedMimeType(mimeType, mediaType string) bool {
 		}
 	}
 	return false
+}
+
+// optimizeVideo оптимизирует видео с помощью FFmpeg (сохраняет разрешение, но сжимает)
+func optimizeVideo(inputPath string) (string, error) {
+	if !OptimizeVideo {
+		return inputPath, nil
+	}
+
+	// Проверяем наличие FFmpeg
+	if _, err := exec.LookPath("ffmpeg"); err != nil {
+		fmt.Printf("⚠️ [VIDEO] FFmpeg не найден, пропускаем оптимизацию\n")
+		return inputPath, nil
+	}
+
+	// Получаем информацию о файле
+	inputInfo, err := os.Stat(inputPath)
+	if err != nil {
+		return "", err
+	}
+	inputSize := inputInfo.Size()
+
+	fmt.Printf("🎬 [VIDEO] Начало оптимизации: %s (%.2f MB)\n", filepath.Base(inputPath), float64(inputSize)/(1024*1024))
+
+	// Получаем разрешение оригинального видео
+	probeCmd := exec.Command("ffprobe",
+		"-v", "error",
+		"-select_streams", "v:0",
+		"-show_entries", "stream=width,height",
+		"-of", "csv=p=0",
+		inputPath,
+	)
+	probeOutput, err := probeCmd.Output()
+	if err != nil {
+		fmt.Printf("⚠️ [VIDEO] Не удалось определить разрешение, используем оригинал\n")
+		return inputPath, nil
+	}
+
+	resolution := strings.TrimSpace(string(probeOutput))
+	fmt.Printf("📐 [VIDEO] Оригинальное разрешение: %s\n", resolution)
+
+	// Создаем временный файл для оптимизированного видео
+	outputPath := strings.TrimSuffix(inputPath, filepath.Ext(inputPath)) + "_optimized.mp4"
+
+	// FFmpeg команда (сохраняем разрешение, но агрессивно сжимаем)
+	args := []string{
+		"-i", inputPath,
+		"-c:v", "libx264",
+		"-preset", "medium", // Баланс скорость/качество
+		"-crf", "28", // Агрессивное сжатие (как в Telegram)
+		"-profile:v", "main", // Профиль для совместимости
+		"-level", "4.0", // Уровень для поддержки разных разрешений
+		"-pix_fmt", "yuv420p", // Формат пикселей
+		"-r", "30", // Максимум 30 FPS
+		"-c:a", "aac", // Кодек аудио
+		"-b:a", "64k", // Битрейт аудио
+		"-ar", "44100", // Частота дискретизации
+		"-ac", "2", // Стерео
+		"-movflags", "+faststart", // Оптимизация для веб
+		"-y",
+		outputPath,
+	}
+
+	fmt.Printf("⚙️ [VIDEO] FFmpeg команда: ffmpeg %s\n", strings.Join(args, " "))
+	fmt.Printf("⏳ [VIDEO] Обработка... (может занять время)\n")
+
+	// Запускаем FFmpeg
+	cmd := exec.Command("ffmpeg", args...)
+	output, err := cmd.CombinedOutput()
+	if err != nil {
+		fmt.Printf("❌ [VIDEO] Ошибка FFmpeg: %v\n%s\n", err, string(output))
+		return "", fmt.Errorf("FFmpeg error: %v", err)
+	}
+
+	// Проверяем результат
+	outputInfo, err := os.Stat(outputPath)
+	if err != nil {
+		return "", err
+	}
+	outputSize := outputInfo.Size()
+
+	// Вычисляем экономию
+	savings := float64(inputSize-outputSize) / float64(inputSize) * 100
+	fmt.Printf("✅ [VIDEO] Оптимизация завершена: %s (%.2f MB)\n", filepath.Base(outputPath), float64(outputSize)/(1024*1024))
+	fmt.Printf("📊 [VIDEO] Экономия: %.1f%% (%.2f MB)\n", savings, float64(inputSize-outputSize)/(1024*1024))
+
+	// Удаляем оригинал
+	os.Remove(inputPath)
+
+	return outputPath, nil
 }

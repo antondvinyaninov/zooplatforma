@@ -18,6 +18,7 @@ import { GiPawPrint } from 'react-icons/gi';
 import { MdPets } from 'react-icons/md';
 import PollCreator, { PollData } from '../polls/PollCreator';
 import { useMediaUpload, UploadedMedia } from '../../hooks/useMediaUpload';
+import { useChunkedUpload, ChunkedUploadProgress } from '../../hooks/useChunkedUpload';
 
 interface CreatePostProps {
   onPostCreated?: () => void;
@@ -27,7 +28,8 @@ type ReplySettingType = 'anyone' | 'followers' | 'following' | 'mentions';
 
 export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const { user } = useAuth();
-  const { uploadMultiple, uploading } = useMediaUpload();
+  const { uploadMultiple, uploading, optimizing } = useMediaUpload();
+  const { uploadFile: uploadChunked } = useChunkedUpload();
   const [content, setContent] = useState('');
   const [isSubmitting, setIsSubmitting] = useState(false);
   const [showModal, setShowModal] = useState(false);
@@ -45,6 +47,17 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const [drafts, setDrafts] = useState<any[]>([]);
   const [draftMenuOpen, setDraftMenuOpen] = useState<number | null>(null);
   const [uploadedMedia, setUploadedMedia] = useState<UploadedMedia[]>([]); // Загруженные медиа
+  const [uploadingFiles, setUploadingFiles] = useState<{
+    file: File;
+    preview: string;
+    status: 'uploading' | 'optimizing';
+    progress: number;
+    uploadedChunks?: number;
+    totalChunks?: number;
+  }[]>([]); // Файлы в процессе загрузки
+  const [showPetsModal, setShowPetsModal] = useState(false);
+  const [selectedPets, setSelectedPets] = useState<number[]>([]);
+  const [pets, setPets] = useState<any[]>([]); // Список питомцев пользователя
 
   const handleSubmit = async () => {
     if (!content.trim() && !pollData && uploadedMedia.length === 0) return;
@@ -53,10 +66,11 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
     try {
       const postData: any = {
         content,
-        attached_pets: [],
+        attached_pets: selectedPets,
         attachments: uploadedMedia.map((media) => ({
           url: media.url,
-          type: 'image',
+          type: media.media_type === 'video' ? 'video' : 'image',
+          media_type: media.media_type,
           file_name: media.file_name,
         })),
         tags: [],
@@ -86,6 +100,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
       setShowPollCreator(false);
       setScheduledDate(null);
       setScheduledTime('19:00');
+      setSelectedPets([]);
       setShowModal(false);
       onPostCreated?.();
     } catch (error) {
@@ -114,7 +129,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
     // Limit to 10 photos total
     const remainingSlots = 10 - uploadedMedia.length;
     if (remainingSlots <= 0) {
-      alert('Максимум 10 фото');
+      alert('Максимум 10 медиа файлов');
       return;
     }
 
@@ -151,6 +166,117 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
     e.target.value = '';
   };
 
+  // Handle video upload with chunked upload
+  const handleVideoUpload = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0) return;
+
+    // Limit to 10 media total
+    const remainingSlots = 10 - uploadedMedia.length - uploadingFiles.length;
+    if (remainingSlots <= 0) {
+      alert('Максимум 10 медиа файлов');
+      return;
+    }
+
+    const filesToProcess = Array.from(files).slice(0, remainingSlots);
+
+    // Validate files and create previews
+    const validFiles: {file: File, preview: string}[] = [];
+    for (const file of filesToProcess) {
+      if (file.size > 100 * 1024 * 1024) {
+        alert(`Файл "${file.name}" слишком большой. Максимальный размер: 100MB`);
+        continue;
+      }
+
+      if (!file.type.startsWith('video/')) {
+        alert(`Файл "${file.name}" не является видео`);
+        continue;
+      }
+      
+      // Создаем превью для видео
+      const preview = await createVideoThumbnail(file);
+      validFiles.push({file, preview});
+    }
+
+    if (validFiles.length === 0) {
+      e.target.value = '';
+      return;
+    }
+
+    console.log('🚀 Начинаем chunked загрузку видео...', validFiles.length);
+
+    // Добавляем файлы в состояние загрузки
+    setUploadingFiles(prev => [...prev, ...validFiles.map(vf => ({
+      ...vf,
+      status: 'uploading' as const,
+      progress: 0,
+      uploadedChunks: 0,
+      totalChunks: 0,
+    }))]);
+
+    // Upload files one by one with chunked upload
+    for (const {file, preview} of validFiles) {
+      try {
+        const result = await uploadChunked(file, 'video', (chunkProgress) => {
+          // Update progress for this file
+          setUploadingFiles(prev => prev.map(uf => 
+            uf.preview === preview ? {
+              ...uf,
+              status: chunkProgress.status === 'optimizing' ? 'optimizing' : 'uploading',
+              progress: chunkProgress.percentage,
+              uploadedChunks: chunkProgress.uploadedChunks,
+              totalChunks: chunkProgress.totalChunks,
+            } : uf
+          ));
+        });
+
+        if (result) {
+          setUploadedMedia(prev => [...prev, result]);
+          console.log('✅ Видео добавлено в состояние');
+        } else {
+          console.error('❌ Не удалось загрузить видео');
+        }
+      } catch (error) {
+        console.error('❌ Ошибка загрузки:', error);
+        alert(`Ошибка загрузки видео: ${error instanceof Error ? error.message : 'Неизвестная ошибка'}`);
+      }
+
+      // Remove from uploading state
+      setUploadingFiles(prev => prev.filter(uf => uf.preview !== preview));
+    }
+
+    // Reset input
+    e.target.value = '';
+  };
+
+  // Create video thumbnail
+  const createVideoThumbnail = (file: File): Promise<string> => {
+    return new Promise((resolve) => {
+      const video = document.createElement('video');
+      video.preload = 'metadata';
+      video.muted = true;
+      video.playsInline = true;
+
+      video.onloadeddata = () => {
+        video.currentTime = 0.1; // Get frame at 0.1 second
+      };
+
+      video.onseeked = () => {
+        const canvas = document.createElement('canvas');
+        canvas.width = video.videoWidth;
+        canvas.height = video.videoHeight;
+        const ctx = canvas.getContext('2d');
+        if (ctx) {
+          ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+          resolve(canvas.toDataURL('image/jpeg', 0.7));
+        }
+        URL.revokeObjectURL(video.src);
+      };
+
+      video.src = URL.createObjectURL(file);
+    });
+  };
+
   // Remove photo
   const removePhoto = (index: number) => {
     setUploadedMedia((prev) => prev.filter((_, i) => i !== index));
@@ -165,10 +291,35 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
     }
   }, [showDrafts]);
 
+  // Load pets when pets modal opens
+  useEffect(() => {
+    if (showPetsModal) {
+      loadPets();
+    }
+  }, [showPetsModal]);
+
+  const loadPets = async () => {
+    try {
+      const response = await apiClient.get('/api/pets');
+      setPets(Array.isArray(response.data) ? response.data : []);
+    } catch (error) {
+      console.error('Ошибка загрузки питомцев:', error);
+      setPets([]); // Пока пустой список
+    }
+  };
+
+  const togglePetSelection = (petId: number) => {
+    setSelectedPets(prev => 
+      prev.includes(petId) 
+        ? prev.filter(id => id !== petId)
+        : [...prev, petId]
+    );
+  };
+
   const loadDrafts = async () => {
     try {
       const response = await apiClient.get('/api/posts/drafts');
-      setDrafts(response.data || []);
+      setDrafts(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Ошибка загрузки черновиков:', error);
     }
@@ -392,17 +543,21 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                     className="hidden"
                   />
                 </label>
-                <button
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
-                  title="Добавить видео"
-                >
+                <label className="p-2 hover:bg-gray-100 rounded-lg transition-colors cursor-pointer" title="Добавить видео">
                   <VideoCameraIcon className="w-5 h-5 text-gray-400" strokeWidth={2} />
-                </button>
+                  <input
+                    type="file"
+                    accept="video/*"
+                    onChange={handleVideoUpload}
+                    className="hidden"
+                  />
+                </label>
                 <button
-                  className="p-2 hover:bg-gray-100 rounded-lg transition-colors"
+                  onClick={() => setShowPetsModal(true)}
+                  className={`p-2 hover:bg-gray-100 rounded-lg transition-colors ${selectedPets.length > 0 ? 'bg-blue-50' : ''}`}
                   title="Прикрепить карточку питомца"
                 >
-                  <MdPets className="w-5 h-5 text-gray-400" />
+                  <MdPets className={`w-5 h-5 ${selectedPets.length > 0 ? 'text-blue-600' : 'text-gray-400'}`} />
                 </button>
                 <button
                   onClick={() => setShowPollCreator(!showPollCreator)}
@@ -419,31 +574,104 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                 </button>
               </div>
 
-              {/* Photos Preview */}
-              {uploadedMedia.length > 0 && (
+              {/* Photos/Videos Preview */}
+              {(uploadedMedia.length > 0 || uploadingFiles.length > 0) && (
                 <div className="mb-3 ml-12 max-h-[400px] overflow-y-auto">
                   <div className="grid grid-cols-2 gap-2">
+                    {/* Uploading files with preview */}
+                    {uploadingFiles.map((item, index) => (
+                      <div key={`uploading-${index}`} className="relative group rounded-lg overflow-hidden bg-gray-100">
+                        <img
+                          src={item.preview}
+                          alt="Загрузка..."
+                          className="w-full h-48 object-cover opacity-60"
+                        />
+                        {/* Status indicator in top-right corner */}
+                        <div className="absolute top-2 right-2">
+                          {item.status === 'uploading' ? (
+                            <div className="relative">
+                              {/* Circular progress */}
+                              <svg className="w-12 h-12 transform -rotate-90">
+                                <circle
+                                  cx="24"
+                                  cy="24"
+                                  r="20"
+                                  stroke="rgba(255,255,255,0.3)"
+                                  strokeWidth="3"
+                                  fill="none"
+                                />
+                                <circle
+                                  cx="24"
+                                  cy="24"
+                                  r="20"
+                                  stroke="white"
+                                  strokeWidth="3"
+                                  fill="none"
+                                  strokeDasharray={`${2 * Math.PI * 20}`}
+                                  strokeDashoffset={`${2 * Math.PI * 20 * (1 - item.progress / 100)}`}
+                                  className="transition-all duration-300"
+                                />
+                              </svg>
+                              {/* Percentage text */}
+                              <div className="absolute inset-0 flex items-center justify-center">
+                                <span className="text-white text-xs font-bold drop-shadow-lg">
+                                  {item.progress}%
+                                </span>
+                              </div>
+                            </div>
+                          ) : (
+                            <div className="p-2 bg-black/80 rounded-full">
+                              <div className="animate-spin rounded-full h-8 w-8 border-3 border-blue-400 border-t-transparent"></div>
+                            </div>
+                          )}
+                        </div>
+                        {/* Status text at bottom */}
+                        <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/80 text-white text-xs rounded font-medium">
+                          {item.status === 'uploading' ? (
+                            item.totalChunks && item.totalChunks > 1 ? (
+                              `📤 Загрузка ${item.uploadedChunks}/${item.totalChunks} частей`
+                            ) : (
+                              '📤 Загрузка...'
+                            )
+                          ) : (
+                            '🎬 Оптимизация...'
+                          )}
+                        </div>
+                      </div>
+                    ))}
+                    
+                    {/* Uploaded media */}
                     {uploadedMedia.map((media, index) => (
                       <div key={media.id} className="relative group rounded-lg overflow-hidden bg-gray-100">
-                        <img
-                          src={`http://localhost:8000${media.url}`}
-                          alt={media.original_name}
-                          className="w-full h-48 object-cover"
-                        />
+                        {media.media_type === 'video' ? (
+                          <video
+                            src={`http://localhost:8000${media.url}`}
+                            className="w-full h-48 object-cover"
+                            controls
+                          />
+                        ) : (
+                          <img
+                            src={`http://localhost:8000${media.url}`}
+                            alt={media.original_name}
+                            className="w-full h-48 object-cover"
+                          />
+                        )}
                         <button
                           onClick={() => removePhoto(index)}
                           className="absolute top-2 right-2 p-1.5 bg-black/60 hover:bg-black/80 rounded-full transition-colors"
                         >
                           <XMarkIcon className="w-4 h-4 text-white" strokeWidth={2} />
                         </button>
+                        {media.media_type === 'video' && (
+                          <div className="absolute bottom-2 left-2 px-2 py-1 bg-black/60 text-white text-xs rounded">
+                            {media.optimizing ? '🎬 Оптимизация в фоне...' : 'Видео'}
+                          </div>
+                        )}
                       </div>
                     ))}
                   </div>
-                  {uploadedMedia.length >= 10 && (
-                    <p className="text-xs text-gray-500 mt-2">Максимум 10 фото</p>
-                  )}
-                  {uploading && (
-                    <p className="text-xs text-blue-600 mt-2">Загрузка...</p>
+                  {(uploadedMedia.length + uploadingFiles.length) >= 10 && (
+                    <p className="text-xs text-gray-500 mt-2">Максимум 10 медиа файлов</p>
                   )}
                 </div>
               )}
@@ -490,6 +718,37 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                     >
                       <XMarkIcon className="w-4 h-4 text-blue-700" strokeWidth={2} />
                     </button>
+                  </div>
+                </div>
+              )}
+
+              {/* Selected Pets Preview */}
+              {selectedPets.length > 0 && (
+                <div className="mb-3 ml-12">
+                  <div className="flex flex-wrap gap-2">
+                    {pets
+                      .filter(pet => selectedPets.includes(pet.id))
+                      .map((pet) => (
+                        <div
+                          key={pet.id}
+                          className="flex items-center gap-2 px-3 py-2 bg-blue-50 border border-blue-200 rounded-full"
+                        >
+                          <div className="w-6 h-6 rounded-full bg-gradient-to-br from-blue-400 to-cyan-400 flex items-center justify-center text-white text-[10px] font-semibold overflow-hidden">
+                            {pet.photo ? (
+                              <img src={pet.photo} alt={pet.name} className="w-full h-full object-cover" />
+                            ) : (
+                              pet.name[0]?.toUpperCase()
+                            )}
+                          </div>
+                          <span className="text-[13px] font-medium text-gray-900">{pet.name}</span>
+                          <button
+                            onClick={() => togglePetSelection(pet.id)}
+                            className="ml-1 hover:bg-blue-200 rounded-full p-0.5 transition-colors"
+                          >
+                            <XMarkIcon className="w-3.5 h-3.5 text-blue-700" strokeWidth={2} />
+                          </button>
+                        </div>
+                      ))}
                   </div>
                 </div>
               )}
@@ -827,6 +1086,108 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                 Готово
               </button>
             </div>
+          </div>
+        </div>
+      )}
+
+      {/* Pets Modal */}
+      {showPetsModal && (
+        <div 
+          className="fixed inset-0 z-[60] flex items-center justify-center bg-white/40 p-4 backdrop-blur-sm"
+          onClick={(e) => {
+            if (e.target === e.currentTarget) {
+              setShowPetsModal(false);
+            }
+          }}
+        >
+          <div className="bg-white rounded-2xl w-full max-w-[600px] shadow-2xl max-h-[80vh] flex flex-col">
+            <div className="flex items-center justify-between p-4 border-b border-gray-200">
+              <button
+                onClick={() => setShowPetsModal(false)}
+                className="p-1 hover:bg-gray-100 rounded-full transition-colors"
+              >
+                <XMarkIcon className="w-6 h-6 text-gray-600" strokeWidth={2} />
+              </button>
+              <h3 className="font-bold text-[16px]">Выбрать питомцев</h3>
+              <button
+                onClick={() => setShowPetsModal(false)}
+                className="px-4 py-1.5 bg-black text-white rounded-full text-[14px] font-semibold hover:bg-gray-800 transition-colors"
+              >
+                Готово
+              </button>
+            </div>
+            
+            <div className="flex-1 overflow-y-auto p-4">
+              {pets.length === 0 ? (
+                <div className="text-center py-12">
+                  <div className="w-20 h-20 mx-auto mb-4 rounded-full bg-gray-100 flex items-center justify-center">
+                    <MdPets className="w-10 h-10 text-gray-400" />
+                  </div>
+                  <h4 className="text-[16px] font-semibold text-gray-900 mb-2">
+                    У вас пока нет питомцев
+                  </h4>
+                  <p className="text-[14px] text-gray-500 mb-4">
+                    Добавьте своего первого питомца, чтобы прикреплять его к меткам
+                  </p>
+                  <button
+                    onClick={() => {
+                      setShowPetsModal(false);
+                      // TODO: Navigate to add pet page
+                    }}
+                    className="px-6 py-2 bg-black text-white rounded-full text-[14px] font-semibold hover:bg-gray-800 transition-colors"
+                  >
+                    Добавить питомца
+                  </button>
+                </div>
+              ) : (
+                <div className="space-y-2">
+                  {pets.map((pet) => (
+                    <button
+                      key={pet.id}
+                      onClick={() => togglePetSelection(pet.id)}
+                      className={`w-full flex items-center gap-3 p-3 rounded-lg border-2 transition-all ${
+                        selectedPets.includes(pet.id)
+                          ? 'border-blue-500 bg-blue-50'
+                          : 'border-gray-200 hover:border-gray-300 bg-white'
+                      }`}
+                    >
+                      {/* Pet Photo */}
+                      <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-cyan-400 flex items-center justify-center text-white font-semibold overflow-hidden flex-shrink-0">
+                        {pet.photo ? (
+                          <img src={pet.photo} alt={pet.name} className="w-full h-full object-cover" />
+                        ) : (
+                          pet.name[0]?.toUpperCase()
+                        )}
+                      </div>
+
+                      {/* Pet Info */}
+                      <div className="flex-1 text-left">
+                        <div className="font-semibold text-[15px] text-gray-900">{pet.name}</div>
+                        <div className="text-[13px] text-gray-600">{pet.species}</div>
+                      </div>
+
+                      {/* Checkmark */}
+                      {selectedPets.includes(pet.id) && (
+                        <div className="w-6 h-6 rounded-full bg-blue-500 flex items-center justify-center flex-shrink-0">
+                          <svg className="w-4 h-4 text-white" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                            <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={3} d="M5 13l4 4L19 7" />
+                          </svg>
+                        </div>
+                      )}
+                    </button>
+                  ))}
+                </div>
+              )}
+            </div>
+
+            {/* Selected Pets Count */}
+            {selectedPets.length > 0 && (
+              <div className="border-t border-gray-200 px-4 py-3 bg-gray-50">
+                <p className="text-[13px] text-gray-600 text-center">
+                  Выбрано: {selectedPets.length} {selectedPets.length === 1 ? 'питомец' : 'питомца'}
+                </p>
+              </div>
+            )}
           </div>
         </div>
       )}

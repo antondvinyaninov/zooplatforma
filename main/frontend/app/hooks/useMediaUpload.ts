@@ -10,44 +10,95 @@ export interface UploadedMedia {
   media_type: string;
   width?: number;
   height?: number;
+  optimizing?: boolean; // Indicates background optimization
 }
 
 export function useMediaUpload() {
   const [uploading, setUploading] = useState(false);
   const [progress, setProgress] = useState(0);
+  const [optimizing, setOptimizing] = useState(false);
 
   const uploadFile = async (file: File, mediaType: string = 'photo'): Promise<UploadedMedia | null> => {
     setUploading(true);
     setProgress(0);
+    setOptimizing(false);
 
-    try {
+    return new Promise((resolve) => {
       const formData = new FormData();
       formData.append('file', file);
       formData.append('media_type', mediaType);
 
-      const response = await fetch('http://localhost:8000/api/media/upload', {
-        method: 'POST',
-        credentials: 'include',
-        body: formData,
+      console.log(`⏳ Загрузка файла ${file.name}...`);
+
+      const xhr = new XMLHttpRequest();
+
+      // Track upload progress
+      xhr.upload.addEventListener('progress', (e) => {
+        if (e.lengthComputable) {
+          const percentComplete = Math.round((e.loaded / e.total) * 100);
+          setProgress(percentComplete);
+          console.log(`📊 Прогресс загрузки: ${percentComplete}%`);
+        }
       });
 
-      if (!response.ok) {
-        const error = await response.json();
-        throw new Error(error.error || 'Upload failed');
-      }
+      // Handle completion
+      xhr.addEventListener('load', () => {
+        if (xhr.status === 200) {
+          try {
+            const result = JSON.parse(xhr.responseText);
+            
+            if (!result.data) {
+              console.error('❌ Нет данных в ответе:', result);
+              alert('Ошибка: нет данных в ответе');
+              resolve(null);
+            } else {
+              console.log('✅ Файл успешно загружен:', result.data);
+              setProgress(100);
+              resolve(result.data);
+            }
+          } catch (error) {
+            console.error('❌ Ошибка парсинга ответа:', error);
+            alert('Ошибка обработки ответа сервера');
+            resolve(null);
+          }
+        } else {
+          try {
+            const error = JSON.parse(xhr.responseText);
+            console.error('❌ Ошибка загрузки:', error);
+            alert(error.error || 'Ошибка загрузки файла');
+          } catch {
+            alert('Ошибка загрузки файла');
+          }
+          resolve(null);
+        }
+        
+        setUploading(false);
+        setOptimizing(false);
+        setTimeout(() => setProgress(0), 1000);
+      });
 
-      const result = await response.json();
-      setProgress(100);
-      
-      return result.data;
-    } catch (error) {
-      console.error('Upload error:', error);
-      alert(error instanceof Error ? error.message : 'Ошибка загрузки файла');
-      return null;
-    } finally {
-      setUploading(false);
-      setTimeout(() => setProgress(0), 1000);
-    }
+      // Handle errors
+      xhr.addEventListener('error', () => {
+        console.error('❌ Ошибка сети при загрузке');
+        alert('Ошибка сети при загрузке файла');
+        setUploading(false);
+        setOptimizing(false);
+        setProgress(0);
+        resolve(null);
+      });
+
+      // Detect when upload is complete and optimization starts
+      xhr.upload.addEventListener('load', () => {
+        if (mediaType === 'video') {
+          setOptimizing(true);
+          console.log('🎬 Видео загружено, начинается оптимизация...');
+        }
+      });
+
+      xhr.open('POST', 'http://localhost:8000/api/media/upload');
+      xhr.withCredentials = true;
+      xhr.send(formData);
+    });
   };
 
   const uploadMultiple = async (files: File[], mediaType: string = 'photo'): Promise<UploadedMedia[]> => {
@@ -67,6 +118,7 @@ export function useMediaUpload() {
     uploadFile,
     uploadMultiple,
     uploading,
+    optimizing,
     progress,
   };
 }

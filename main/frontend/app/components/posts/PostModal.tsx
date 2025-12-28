@@ -6,6 +6,7 @@ import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import PostComments from '../shared/PostComments';
 import PollDisplay from '../polls/PollDisplay';
+import PhotoGrid from './PhotoGrid';
 import { commentsApi, Comment } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import Image from 'next/image';
@@ -305,32 +306,12 @@ export default function PostModal({ post, isOpen, onClose, onCountChange }: Post
             {/* Content */}
             <div className="text-gray-900 mb-4 whitespace-pre-wrap text-base">{post.content}</div>
 
-            {/* Photos */}
+            {/* Photos/Videos */}
             {post.attachments && post.attachments.length > 0 && (
               <div className="mb-4">
-                <div className={`grid gap-2 ${
-                  post.attachments.length === 1 ? 'grid-cols-1' :
-                  post.attachments.length === 2 ? 'grid-cols-2' :
-                  post.attachments.length === 3 ? 'grid-cols-3' :
-                  'grid-cols-2'
-                }`}>
-                  {post.attachments.map((attachment, index) => (
-                    attachment.type === 'image' && (
-                      <div
-                        key={index}
-                        className="relative rounded-lg overflow-hidden bg-gray-100"
-                      >
-                        <img
-                          src={attachment.url.startsWith('http') ? attachment.url : `http://localhost:8000${attachment.url}`}
-                          alt={attachment.file_name || `Фото ${index + 1}`}
-                          className={`w-full object-cover ${
-                            post.attachments.length === 1 ? 'max-h-[600px]' : 'h-80'
-                          }`}
-                        />
-                      </div>
-                    )
-                  ))}
-                </div>
+                <PhotoGrid 
+                  photos={post.attachments.filter(a => a.type === 'image' || a.type === 'video' || a.media_type === 'image' || a.media_type === 'video')}
+                />
               </div>
             )}
 
