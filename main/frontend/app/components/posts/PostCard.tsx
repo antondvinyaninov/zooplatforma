@@ -5,7 +5,7 @@ import { useRouter, useSearchParams } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
 import { UserIcon } from '@heroicons/react/24/outline';
-import { getMediaUrl } from '@/lib/utils';
+import { getMediaUrl, getFullName } from '@/lib/utils';
 import PostComments from '../shared/PostComments';
 import PostModal from './PostModal';
 import PollDisplay from '../polls/PollDisplay';
@@ -14,6 +14,7 @@ import PhotoGrid from './PhotoGrid';
 interface User {
   id: number;
   name: string;
+  last_name?: string;
   email: string;
   avatar?: string;
 }
@@ -179,7 +180,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
 
           {/* User Info */}
           <div>
-            <div className="font-semibold text-gray-900">{post.user?.name || 'Пользователь'}</div>
+            <div className="font-semibold text-gray-900">{getFullName(post.user?.name || 'Пользователь', post.user?.last_name)}</div>
             <div className="text-sm text-gray-500">{getTimeAgo(post.created_at)}</div>
           </div>
         </div>

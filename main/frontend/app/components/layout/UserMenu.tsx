@@ -3,7 +3,7 @@
 import { useState, useRef, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { useAuth } from '../../../contexts/AuthContext';
-import { getMediaUrl } from '@/lib/utils';
+import { getMediaUrl, getFullName } from '@/lib/utils';
 import {
   UserIcon,
   Cog6ToothIcon,
@@ -91,7 +91,7 @@ export default function UserMenu() {
               </div>
               <div className="flex-1">
                 <div className="font-semibold text-gray-900 flex items-center gap-2">
-                  {user?.name || 'Пользователь'}
+                  {getFullName(user?.name || 'Пользователь', user?.last_name)}
                   <span className="text-blue-500">✓</span>
                 </div>
                 <div className="text-sm text-gray-500">{user?.email}</div>

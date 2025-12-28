@@ -143,7 +143,18 @@ export const usersApi = {
   delete: (id: number) => apiClient.delete<{ message: string }>(`/api/users/${id}`),
   
   // Обновление своего профиля
-  updateProfile: (data: { name?: string; bio?: string; phone?: string; location?: string }) =>
+  updateProfile: (data: { 
+    name?: string; 
+    last_name?: string;
+    bio?: string; 
+    phone?: string; 
+    location?: string;
+    profile_visibility?: string;
+    show_phone?: string;
+    show_email?: string;
+    allow_messages?: string;
+    show_online?: string;
+  }) =>
     apiClient.put<User>('/api/profile', data),
   
   // Загрузка аватара
@@ -321,12 +332,18 @@ export const petsApi = {
 export interface User {
   id: number;
   name: string;
+  last_name?: string;
   email: string;
   bio?: string;
   phone?: string;
   location?: string;
   avatar?: string;
   cover_photo?: string;
+  profile_visibility?: string;
+  show_phone?: string;
+  show_email?: string;
+  allow_messages?: string;
+  show_online?: string;
   created_at?: string;
 }
 

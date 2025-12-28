@@ -89,6 +89,15 @@ func main() {
 	http.HandleFunc("/api/pets/", enableCORS(middleware.AuthMiddleware(handlers.PetHandler)))
 	http.HandleFunc("/api/pets/user/", enableCORS(middleware.AuthMiddleware(handlers.UserPetsHandler)))
 
+	// Friends
+	http.HandleFunc("/api/friends", enableCORS(middleware.AuthMiddleware(handlers.GetFriendsHandler)))
+	http.HandleFunc("/api/friends/requests", enableCORS(middleware.AuthMiddleware(handlers.GetFriendRequestsHandler)))
+	http.HandleFunc("/api/friends/send", enableCORS(middleware.AuthMiddleware(handlers.SendFriendRequestHandler)))
+	http.HandleFunc("/api/friends/accept", enableCORS(middleware.AuthMiddleware(handlers.AcceptFriendRequestHandler)))
+	http.HandleFunc("/api/friends/reject", enableCORS(middleware.AuthMiddleware(handlers.RejectFriendRequestHandler)))
+	http.HandleFunc("/api/friends/remove", enableCORS(middleware.AuthMiddleware(handlers.RemoveFriendHandler)))
+	http.HandleFunc("/api/friends/status", enableCORS(middleware.AuthMiddleware(handlers.GetFriendshipStatusHandler)))
+
 	// Media - более специфичные роуты должны быть первыми
 	mediaHandler := handlers.NewMediaHandler(database.DB)
 	http.HandleFunc("/api/media/upload", enableCORS(middleware.AuthMiddleware(mediaHandler.UploadMedia)))

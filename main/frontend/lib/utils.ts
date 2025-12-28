@@ -1,4 +1,4 @@
-// Утилиты для работы с медиа
+// Утилиты для работы с медиа и пользователями
 
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
 
@@ -17,4 +17,15 @@ export function getMediaUrl(url: string | null | undefined): string | null {
   
   // Добавляем базовый URL
   return `${API_URL}${url}`;
+}
+
+/**
+ * Получить полное имя пользователя
+ * @param name - имя пользователя
+ * @param lastName - фамилия пользователя (опционально)
+ * @returns полное имя (например, "Иван Петров" или просто "Иван")
+ */
+export function getFullName(name: string, lastName?: string | null): string {
+  if (!lastName) return name;
+  return `${name} ${lastName}`;
 }

@@ -1,28 +1,40 @@
 package models
 
 type User struct {
-	ID         int    `json:"id"`
-	Name       string `json:"name"`
-	Email      string `json:"email"`
-	Password   string `json:"-"`
-	Bio        string `json:"bio"`
-	Phone      string `json:"phone"`
-	Location   string `json:"location"`
-	Avatar     string `json:"avatar"`
-	CoverPhoto string `json:"cover_photo"`
-	CreatedAt  string `json:"created_at"`
+	ID                int    `json:"id"`
+	Name              string `json:"name"`
+	LastName          string `json:"last_name"`
+	Email             string `json:"email"`
+	Password          string `json:"-"`
+	Bio               string `json:"bio"`
+	Phone             string `json:"phone"`
+	Location          string `json:"location"`
+	Avatar            string `json:"avatar"`
+	CoverPhoto        string `json:"cover_photo"`
+	ProfileVisibility string `json:"profile_visibility"`
+	ShowPhone         string `json:"show_phone"`
+	ShowEmail         string `json:"show_email"`
+	AllowMessages     string `json:"allow_messages"`
+	ShowOnline        string `json:"show_online"`
+	CreatedAt         string `json:"created_at"`
 }
 
 type UserResponse struct {
-	ID         int    `json:"id"`
-	Name       string `json:"name"`
-	Email      string `json:"email"`
-	Bio        string `json:"bio"`
-	Phone      string `json:"phone"`
-	Location   string `json:"location"`
-	Avatar     string `json:"avatar"`
-	CoverPhoto string `json:"cover_photo"`
-	CreatedAt  string `json:"created_at"`
+	ID                int    `json:"id"`
+	Name              string `json:"name"`
+	LastName          string `json:"last_name"`
+	Email             string `json:"email"`
+	Bio               string `json:"bio"`
+	Phone             string `json:"phone"`
+	Location          string `json:"location"`
+	Avatar            string `json:"avatar"`
+	CoverPhoto        string `json:"cover_photo"`
+	ProfileVisibility string `json:"profile_visibility"`
+	ShowPhone         string `json:"show_phone"`
+	ShowEmail         string `json:"show_email"`
+	AllowMessages     string `json:"allow_messages"`
+	ShowOnline        string `json:"show_online"`
+	CreatedAt         string `json:"created_at"`
 }
 
 type CreateUserRequest struct {

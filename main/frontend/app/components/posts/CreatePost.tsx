@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useAuth } from '@/contexts/AuthContext';
 import { apiClient } from '@/lib/api';
-import { getMediaUrl } from '@/lib/utils';
+import { getMediaUrl, getFullName } from '@/lib/utils';
 import {
   PhotoIcon,
   MapPinIcon,
@@ -508,7 +508,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                 </div>
                 <div className="flex-1">
                   {/* Username */}
-                  <div className="font-semibold text-[15px] mb-1">{user?.name || 'Пользователь'}</div>
+                  <div className="font-semibold text-[15px] mb-1">{getFullName(user?.name || 'Пользователь', user?.last_name)}</div>
                   
                   {/* Text Input - no border, just placeholder */}
                   <textarea

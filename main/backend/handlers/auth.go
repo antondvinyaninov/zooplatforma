@@ -128,10 +128,15 @@ func MeHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Get user from database - используем sql.NullString для nullable полей
 	var user models.User
-	var bio, phone, location, avatar, coverPhoto sql.NullString
+	var lastName, bio, phone, location, avatar, coverPhoto sql.NullString
+	var profileVisibility, showPhone, showEmail, allowMessages, showOnline sql.NullString
 
-	err = database.DB.QueryRow("SELECT id, name, email, bio, phone, location, avatar, cover_photo, created_at FROM users WHERE id = ?", token.UserID).
-		Scan(&user.ID, &user.Name, &user.Email, &bio, &phone, &location, &avatar, &coverPhoto, &user.CreatedAt)
+	err = database.DB.QueryRow(`
+		SELECT id, name, last_name, email, bio, phone, location, avatar, cover_photo, 
+		       profile_visibility, show_phone, show_email, allow_messages, show_online, created_at 
+		FROM users WHERE id = ?`, token.UserID).
+		Scan(&user.ID, &user.Name, &lastName, &user.Email, &bio, &phone, &location, &avatar, &coverPhoto,
+			&profileVisibility, &showPhone, &showEmail, &allowMessages, &showOnline, &user.CreatedAt)
 
 	if err != nil {
 		sendError(w, "Пользователь не найден", http.StatusNotFound)
@@ -139,22 +144,51 @@ func MeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Преобразуем NullString в обычные строки
+	user.LastName = lastName.String
 	user.Bio = bio.String
 	user.Phone = phone.String
 	user.Location = location.String
 	user.Avatar = avatar.String
 	user.CoverPhoto = coverPhoto.String
+	user.ProfileVisibility = profileVisibility.String
+	user.ShowPhone = showPhone.String
+	user.ShowEmail = showEmail.String
+	user.AllowMessages = allowMessages.String
+	user.ShowOnline = showOnline.String
+
+	// Устанавливаем значения по умолчанию, если пусто
+	if user.ProfileVisibility == "" {
+		user.ProfileVisibility = "public"
+	}
+	if user.ShowPhone == "" {
+		user.ShowPhone = "nobody"
+	}
+	if user.ShowEmail == "" {
+		user.ShowEmail = "nobody"
+	}
+	if user.AllowMessages == "" {
+		user.AllowMessages = "everyone"
+	}
+	if user.ShowOnline == "" {
+		user.ShowOnline = "yes"
+	}
 
 	sendSuccess(w, models.UserResponse{
-		ID:         user.ID,
-		Name:       user.Name,
-		Email:      user.Email,
-		Bio:        user.Bio,
-		Phone:      user.Phone,
-		Location:   user.Location,
-		Avatar:     user.Avatar,
-		CoverPhoto: user.CoverPhoto,
-		CreatedAt:  user.CreatedAt,
+		ID:                user.ID,
+		Name:              user.Name,
+		LastName:          user.LastName,
+		Email:             user.Email,
+		Bio:               user.Bio,
+		Phone:             user.Phone,
+		Location:          user.Location,
+		Avatar:            user.Avatar,
+		CoverPhoto:        user.CoverPhoto,
+		ProfileVisibility: user.ProfileVisibility,
+		ShowPhone:         user.ShowPhone,
+		ShowEmail:         user.ShowEmail,
+		AllowMessages:     user.AllowMessages,
+		ShowOnline:        user.ShowOnline,
+		CreatedAt:         user.CreatedAt,
 	})
 }
 

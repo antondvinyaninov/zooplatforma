@@ -11,9 +11,12 @@ import { commentsApi, Comment } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
 import Image from 'next/image';
 
+import { getFullName } from '../../../lib/utils';
+
 interface User {
   id: number;
   name: string;
+  last_name?: string;
   email: string;
   avatar?: string;
 }
@@ -284,7 +287,7 @@ export default function PostModal({ post, isOpen, onClose, onCountChange }: Post
                 )}
               </div>
               <div>
-                <div className="font-semibold text-gray-900">{post.user?.name || 'Пользователь'}</div>
+                <div className="font-semibold text-gray-900">{getFullName(post.user?.name || 'Пользователь', post.user?.last_name)}</div>
                 <div className="text-sm text-gray-500">{getTimeAgo(post.created_at)}</div>
               </div>
             </div>
