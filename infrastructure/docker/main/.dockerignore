@@ -1,0 +1,30 @@
+# Node
+node_modules/
+npm-debug.log
+.next/
+out/
+
+# Git
+.git/
+.gitignore
+
+# IDE
+.vscode/
+.idea/
+
+# OS
+.DS_Store
+Thumbs.db
+
+# Env
+.env
+.env.local
+.env.*.local
+
+# Tests
+coverage/
+*.test.js
+
+# Logs
+logs/
+*.log

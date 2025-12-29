@@ -1,7 +1,7 @@
 version: '3.8'
 
 services:
-  # Main Backend
+  # Main Backend (Go)
   main-backend:
     build:
       context: ../main/backend
@@ -9,13 +9,16 @@ services:
     ports:
       - "8000:8000"
     environment:
-      - PORT=8000
-      - DB_PATH=/app/data/data.db
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_PATH=/app/database/data.db
     volumes:
-      - ../database:/app/data
+      - ../database:/app/database
+      - ../uploads:/app/uploads
+    depends_on:
+      - database
     restart: unless-stopped
 
-  # Main Frontend
+  # Main Frontend (Next.js)
   main-frontend:
     build:
       context: ../main/frontend
@@ -24,11 +27,12 @@ services:
       - "3000:3000"
     environment:
       - NEXT_PUBLIC_API_URL=http://localhost:8000
+      - NEXT_PUBLIC_PETBASE_API_URL=http://localhost:8100
     depends_on:
       - main-backend
     restart: unless-stopped
 
-  # Admin Backend
+  # Admin Backend (Go)
   admin-backend:
     build:
       context: ../admin/backend
@@ -36,13 +40,15 @@ services:
     ports:
       - "9000:9000"
     environment:
-      - PORT=9000
-      - DB_PATH=/app/data/data.db
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_PATH=/app/database/data.db
     volumes:
-      - ../database:/app/data
+      - ../database:/app/database
+    depends_on:
+      - database
     restart: unless-stopped
 
-  # Admin Frontend
+  # Admin Frontend (Next.js)
   admin-frontend:
     build:
       context: ../admin/frontend
@@ -55,6 +61,49 @@ services:
       - admin-backend
     restart: unless-stopped
 
+  # PetBase Backend (Go)
+  petbase-backend:
+    build:
+      context: ../petbase/backend
+      dockerfile: ../../infrastructure/docker/petbase/Dockerfile.backend
+    ports:
+      - "8100:8100"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_PATH=/app/database/data.db
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:4100
+    volumes:
+      - ../database:/app/database
+    depends_on:
+      - database
+    restart: unless-stopped
+
+  # PetBase Frontend (Next.js)
+  petbase-frontend:
+    build:
+      context: ../petbase/frontend
+      dockerfile: ../../infrastructure/docker/petbase/Dockerfile.frontend
+    ports:
+      - "4100:4100"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8100
+      - NEXT_PUBLIC_MAIN_SITE_URL=http://localhost:3000
+    depends_on:
+      - petbase-backend
+    restart: unless-stopped
+
+  # Database (SQLite - shared volume)
+  database:
+    image: alpine:latest
+    command: tail -f /dev/null
+    volumes:
+      - ../database:/app/database
+    restart: unless-stopped
+
+volumes:
+  database:
+  uploads:
+
 networks:
   default:
-    name: pet-platform
+    name: zooplatform-network

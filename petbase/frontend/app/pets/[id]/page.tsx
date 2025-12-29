@@ -64,10 +64,19 @@ interface Pet {
   shelter_name?: string;
 }
 
+interface User {
+  id: number;
+  name: string;
+  last_name: string;
+  email: string;
+  avatar?: string;
+}
+
 export default function PetDetailPage() {
   const router = useRouter();
   const params = useParams();
   const [pet, setPet] = useState<Pet | null>(null);
+  const [owner, setOwner] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeSection, setActiveSection] = useState<'info' | 'owner' | 'identification' | 'pedigree' | 'medical' | 'history'>('info');
 
@@ -92,6 +101,21 @@ export default function PetDetailPage() {
         
         if (result.success) {
           setPet(result.data);
+          
+          // Загружаем информацию о владельце, если есть user_id
+          if (result.data.user_id && result.data.user_id > 0) {
+            try {
+              const userResponse = await fetch(`http://localhost:8000/api/users/${result.data.user_id}`, {
+                credentials: 'include', // Отправляем cookies с JWT токеном
+              });
+              const userResult = await userResponse.json();
+              if (userResult.success) {
+                setOwner(userResult.data);
+              }
+            } catch (error) {
+              console.error('Error loading owner:', error);
+            }
+          }
         } else {
           console.error('Failed to load pet:', result.error);
         }
@@ -438,14 +462,54 @@ export default function PetDetailPage() {
                         <span className="font-semibold text-green-900 text-lg">Есть владелец</span>
                       </div>
                       <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
-                        <div>
-                          <div className="text-xs text-green-600">ID владельца в системе</div>
-                          <div className="text-sm font-medium text-green-900">#{pet.user_id}</div>
-                        </div>
+                        {owner ? (
+                          <>
+                            <div className="md:col-span-2">
+                              <div className="text-xs text-green-600 mb-2">Владелец в системе</div>
+                              <a 
+                                href={`http://localhost:3000/id${owner.id}`}
+                                target="_blank"
+                                rel="noopener noreferrer"
+                                className="flex items-center gap-3 p-3 bg-white rounded-lg hover:bg-green-50 transition-colors border border-green-200"
+                              >
+                                {owner.avatar ? (
+                                  <img 
+                                    src={`http://localhost:8000${owner.avatar}`} 
+                                    alt={owner.name}
+                                    className="w-12 h-12 rounded-full object-cover"
+                                  />
+                                ) : (
+                                  <div className="w-12 h-12 rounded-full bg-green-200 flex items-center justify-center">
+                                    <span className="text-green-700 text-xl font-bold">
+                                      {owner.name.charAt(0).toUpperCase()}
+                                    </span>
+                                  </div>
+                                )}
+                                <div className="flex-1">
+                                  <div className="font-semibold text-green-900 text-lg">
+                                    {owner.name}{owner.last_name ? ` ${owner.last_name}` : ''}
+                                  </div>
+                                  <div className="text-sm text-green-600">
+                                    ID: #{owner.id} • {owner.email}
+                                  </div>
+                                </div>
+                                <svg className="w-5 h-5 text-green-600" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                                  <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M10 6H6a2 2 0 00-2 2v10a2 2 0 002 2h10a2 2 0 002-2v-4M14 4h6m0 0v6m0-6L10 14" />
+                                </svg>
+                              </a>
+                            </div>
+                          </>
+                        ) : (
+                          <div className="md:col-span-2">
+                            <div className="text-xs text-green-600">ID владельца в системе</div>
+                            <div className="text-sm font-medium text-green-900">#{pet.user_id}</div>
+                            <div className="text-xs text-gray-500 mt-1">Загрузка информации о владельце...</div>
+                          </div>
+                        )}
 
                         {pet.owner_name && (
                           <div>
-                            <div className="text-xs text-green-600">ФИО владельца</div>
+                            <div className="text-xs text-green-600">ФИО владельца (из паспорта)</div>
                             <div className="text-sm font-medium text-green-900">{pet.owner_name}</div>
                           </div>
                         )}

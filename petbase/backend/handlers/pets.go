@@ -3,6 +3,7 @@ package handlers
 import (
 	"database"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -439,7 +440,7 @@ func createPet(w http.ResponseWriter, r *http.Request) {
 			blood_type, allergies, chronic_diseases, current_medications,
 			pedigree_number, registration_org,
 			curator_id, curator_name, curator_phone, location, foster_address, shelter_name
-		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
+		) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)
 	`
 
 	result, err := database.DB.Exec(
@@ -455,6 +456,11 @@ func createPet(w http.ResponseWriter, r *http.Request) {
 	)
 
 	if err != nil {
+		// Логируем детали для отладки
+		log.Printf("Failed to create pet. Error: %v", err)
+		log.Printf("Query: %s", query)
+		log.Printf("Values count: UserID=%v, Name=%v, Species=%v, Breed=%v, Gender=%v, BirthDate=%v",
+			req.UserID, req.Name, req.Species, req.Breed, req.Gender, req.BirthDate)
 		sendError(w, "Failed to create pet: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

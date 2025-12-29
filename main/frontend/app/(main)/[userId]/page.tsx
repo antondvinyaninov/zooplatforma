@@ -21,6 +21,7 @@ import PostComments from '../../components/shared/PostComments';
 import PostCard from '../../components/posts/PostCard';
 import MediaGallery from '../../components/profile/MediaGallery';
 import MediaStats from '../../components/profile/MediaStats';
+import AddPetModal from '../../components/profile/AddPetModal';
 
 type TabType = 'posts' | 'media';
 
@@ -30,6 +31,7 @@ export default function UserProfilePage() {
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
   const [activeTab, setActiveTab] = useState<TabType>('posts');
+  const [isAddPetModalOpen, setIsAddPetModalOpen] = useState(false);
   const { user: currentUser, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
@@ -96,6 +98,15 @@ export default function UserProfilePage() {
 
   const handleEditClick = () => {
     router.push('/profile/edit');
+  };
+
+  const handleAddPet = () => {
+    setIsAddPetModalOpen(true);
+  };
+
+  const handlePetAdded = () => {
+    // Перезагрузить список питомцев
+    loadUserProfile();
   };
 
   const formatDate = (dateString: string) => {
@@ -326,7 +337,11 @@ export default function UserProfilePage() {
             <div className="flex items-center justify-between mb-4">
               <h2 className="text-lg font-semibold text-gray-900">Питомцы</h2>
               {isOwnProfile && (
-                <button className="text-sm font-medium" style={{ color: '#1B76FF' }}>
+                <button 
+                  onClick={handleAddPet}
+                  className="text-sm font-medium" 
+                  style={{ color: '#1B76FF' }}
+                >
                   Добавить
                 </button>
               )}
@@ -361,6 +376,13 @@ export default function UserProfilePage() {
           {isOwnProfile && <MediaStats />}
         </div>
       </div>
+
+      {/* Модальное окно добавления питомца */}
+      <AddPetModal
+        isOpen={isAddPetModalOpen}
+        onClose={() => setIsAddPetModalOpen(false)}
+        onSuccess={handlePetAdded}
+      />
     </div>
   );
 }

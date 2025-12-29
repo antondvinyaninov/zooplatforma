@@ -300,12 +300,14 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
   }, [showPetsModal]);
 
   const loadPets = async () => {
+    if (!user) return;
+    
     try {
-      const response = await apiClient.get('/api/pets');
+      const response = await apiClient.get(`/api/pets/user/${user.id}`);
       setPets(Array.isArray(response.data) ? response.data : []);
     } catch (error) {
       console.error('Ошибка загрузки питомцев:', error);
-      setPets([]); // Пока пустой список
+      setPets([]);
     }
   };
 
