@@ -68,7 +68,7 @@ interface Post {
   user?: User;
   pets?: Pet[];
   poll?: Poll;
-  comments_count: number;
+  comments_count?: number;
 }
 
 interface PostCardProps {
@@ -82,7 +82,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
   const [showMenu, setShowMenu] = useState(false);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
-  const [commentsCount, setCommentsCount] = useState(post.comments_count);
+  const [commentsCount, setCommentsCount] = useState(post.comments_count || 0);
   const [showModal, setShowModal] = useState(false);
 
   // Проверяем, открыт ли этот пост через URL
@@ -236,6 +236,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
           {post.pets.map((pet) => (
             <div
               key={pet.id}
+              onClick={() => router.push(`/pets/${pet.id}`)}
               className="flex items-center gap-3 p-3 bg-gray-50 rounded-lg border border-gray-200 hover:border-gray-300 transition-colors cursor-pointer"
             >
               {/* Pet Photo */}

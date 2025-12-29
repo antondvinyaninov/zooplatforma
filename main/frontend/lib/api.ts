@@ -299,6 +299,8 @@ export const postsApi = {
   
   getUserPosts: (userId: number) => apiClient.get<Post[]>(`/api/posts/user/${userId}`),
   
+  getPetPosts: (petId: number) => apiClient.get<Post[]>(`/api/posts/pet/${petId}`),
+  
   create: (data: { content: string; post_type?: string }) =>
     apiClient.post<Post>('/api/posts', data),
   
@@ -349,12 +351,63 @@ export interface User {
 
 export interface Post {
   id: number;
-  user_id: number;
+  author_id: number;
+  author_type: string;
   content: string;
-  post_type: string;
+  attached_pets: number[];
+  attachments: Attachment[];
+  tags: string[];
+  status: string;
+  scheduled_at?: string;
   created_at: string;
-  comments_count?: number;
+  updated_at: string;
+  is_deleted?: boolean;
   user?: User;
+  pets?: Pet[];
+  poll?: Poll;
+  comments_count?: number;
+}
+
+export interface Attachment {
+  url: string;
+  type: string;
+  file_name?: string;
+  size?: number;
+}
+
+export interface Poll {
+  id: number;
+  post_id: number;
+  question: string;
+  options: PollOption[];
+  multiple_choice: boolean;
+  allow_vote_changes: boolean;
+  anonymous_voting: boolean;
+  end_date?: string;
+  expires_at?: string;
+  created_at: string;
+  total_votes: number;
+  total_voters: number;
+  user_voted: boolean;
+  user_votes?: number[];
+  is_expired: boolean;
+  voters?: PollVoter[];
+}
+
+export interface PollOption {
+  id: number;
+  poll_id: number;
+  option_text: string;
+  votes_count: number;
+  percentage: number;
+  user_voted: boolean;
+}
+
+export interface PollVoter {
+  user_id: number;
+  user_name: string;
+  user_avatar?: string;
+  voted_at: string;
 }
 
 export interface Comment {
@@ -374,7 +427,14 @@ export interface Pet {
   id: number;
   user_id: number;
   name: string;
-  species?: string;
+  species: string;
+  breed?: string;
+  gender?: string;
+  birth_date?: string;
+  color?: string;
   photo?: string;
+  is_sterilized?: boolean;
+  is_vaccinated?: boolean;
+  chip_number?: string;
   created_at: string;
 }

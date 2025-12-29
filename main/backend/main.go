@@ -76,6 +76,7 @@ func main() {
 	http.HandleFunc("/api/posts", enableCORS(middleware.AuthMiddleware(handlers.PostsHandler)))
 	http.HandleFunc("/api/posts/", enableCORS(middleware.AuthMiddleware(handlers.PostHandler)))
 	http.HandleFunc("/api/posts/user/", enableCORS(middleware.AuthMiddleware(handlers.UserPostsHandler)))
+	http.HandleFunc("/api/posts/pet/", enableCORS(middleware.AuthMiddleware(handlers.PetPostsHandler)))
 
 	// Comments
 	http.HandleFunc("/api/comments/post/", enableCORS(middleware.AuthMiddleware(handlers.CommentsHandler)))
@@ -88,6 +89,12 @@ func main() {
 	http.HandleFunc("/api/pets", enableCORS(middleware.AuthMiddleware(handlers.PetsHandler)))
 	http.HandleFunc("/api/pets/", enableCORS(middleware.AuthMiddleware(handlers.PetHandler)))
 	http.HandleFunc("/api/pets/user/", enableCORS(middleware.AuthMiddleware(handlers.UserPetsHandler)))
+
+	// Pet Announcements
+	http.HandleFunc("/api/announcements", enableCORS(middleware.AuthMiddleware(handlers.AnnouncementsHandler)))
+	http.HandleFunc("/api/announcements/", enableCORS(middleware.AuthMiddleware(handlers.AnnouncementHandler)))
+	http.HandleFunc("/api/announcements/posts/", enableCORS(middleware.AuthMiddleware(handlers.AnnouncementPostsHandler)))
+	http.HandleFunc("/api/announcements/donations/", enableCORS(middleware.AuthMiddleware(handlers.AnnouncementDonationsHandler)))
 
 	// Friends
 	http.HandleFunc("/api/friends", enableCORS(middleware.AuthMiddleware(handlers.GetFriendsHandler)))

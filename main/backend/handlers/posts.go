@@ -85,6 +85,23 @@ func UserPostsHandler(w http.ResponseWriter, r *http.Request) {
 	getUserPosts(w, r, userID)
 }
 
+func PetPostsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Извлекаем ID питомца из URL
+	path := strings.TrimPrefix(r.URL.Path, "/api/posts/pet/")
+	petID, err := strconv.Atoi(path)
+	if err != nil {
+		sendErrorResponse(w, "Неверный ID питомца", http.StatusBadRequest)
+		return
+	}
+
+	getPetPosts(w, r, petID)
+}
+
 // getAllPosts получает все посты для Feed
 func getAllPosts(w http.ResponseWriter, r *http.Request) {
 	// Получаем userID из контекста (может быть 0 для неавторизованных)
@@ -200,6 +217,50 @@ func getUserPosts(w http.ResponseWriter, r *http.Request, userID int) {
 	`
 
 	rows, err := database.DB.Query(query, userID)
+	if err != nil {
+		sendErrorResponse(w, "Ошибка получения постов: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var posts []models.Post
+	for rows.Next() {
+		post, err := scanPost(rows)
+		if err != nil {
+			sendErrorResponse(w, "Ошибка чтения данных: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		posts = append(posts, post)
+	}
+
+	if posts == nil {
+		posts = []models.Post{}
+	}
+
+	// Загружаем опросы для всех постов
+	posts = loadPollsForPosts(posts, currentUserID)
+
+	sendSuccessResponse(w, posts)
+}
+
+// getPetPosts получает посты, в которых упоминается питомец
+func getPetPosts(w http.ResponseWriter, r *http.Request, petID int) {
+	// Получаем текущего пользователя из контекста
+	currentUserID, _ := r.Context().Value("userID").(int)
+
+	query := `
+		SELECT p.id, p.author_id, p.author_type, p.content, p.attached_pets, 
+		       p.attachments, p.tags, p.status, p.scheduled_at, p.created_at, p.updated_at,
+		       u.name, u.email, u.avatar,
+		       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count
+		FROM posts p
+		LEFT JOIN users u ON p.author_id = u.id AND p.author_type = 'user'
+		INNER JOIN post_pets pp ON p.id = pp.post_id
+		WHERE pp.pet_id = ? AND p.is_deleted = 0 AND p.status = 'published'
+		ORDER BY p.created_at DESC
+	`
+
+	rows, err := database.DB.Query(query, petID)
 	if err != nil {
 		sendErrorResponse(w, "Ошибка получения постов: "+err.Error(), http.StatusInternalServerError)
 		return
