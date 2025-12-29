@@ -17,7 +17,7 @@ const tabs: AdminTab[] = [
   { id: 'stats', label: 'Статистика', icon: <ChartBarIcon className="w-5 h-5" /> },
   { id: 'species', label: 'Виды', icon: <Square3Stack3DIcon className="w-5 h-5" /> },
   { id: 'breeds', label: 'Породы', icon: <RectangleStackIcon className="w-5 h-5" /> },
-  { id: 'cards', label: 'Карточки', icon: <DocumentTextIcon className="w-5 h-5" /> },
+  { id: 'pets', label: 'Питомцы', icon: <Square3Stack3DIcon className="w-5 h-5" /> },
 ];
 
 interface Species {
@@ -64,6 +64,33 @@ interface PetCard {
   updated_at: string;
 }
 
+interface Pet {
+  id: number;
+  user_id: number;
+  name: string;
+  species: string;
+  breed?: string;
+  gender?: string;
+  birth_date?: string;
+  color?: string;
+  size?: string;
+  weight?: number;
+  chip_number?: string;
+  passport_number?: string;
+  is_sterilized: boolean;
+  is_vaccinated: boolean;
+  health_notes?: string;
+  character_traits?: string;
+  special_needs?: string;
+  status: string;
+  status_updated_at?: string;
+  photo?: string;
+  photos?: string;
+  story?: string;
+  created_at: string;
+  updated_at: string;
+}
+
 export default function PetBaseDashboard() {
   const router = useRouter();
   const [activeTab, setActiveTab] = useState('stats');
@@ -71,6 +98,7 @@ export default function PetBaseDashboard() {
   const [species, setSpecies] = useState<Species[]>([]);
   const [breeds, setBreeds] = useState<Breed[]>([]);
   const [cards, setCards] = useState<PetCard[]>([]);
+  const [pets, setPets] = useState<Pet[]>([]);
   const [loading, setLoading] = useState(true);
   const [adminUser, setAdminUser] = useState<{ email: string; role: string } | null>(null);
 
@@ -111,21 +139,27 @@ export default function PetBaseDashboard() {
       if (result.success) {
         setBreeds(result.data || []);
       }
-    } else if (activeTab === 'cards') {
-      const result = await petbaseApi.getCards();
+    } else if (activeTab === 'pets') {
+      // Загружаем питомцев
+      // Временно для разработки: используем X-User-ID заголовок
+      // TODO: Заменить на JWT токен после внедрения полной аутентификации
+      const response = await fetch('http://localhost:8100/api/pets', {
+        headers: {
+          'X-User-ID': '1', // Временно: ID администратора
+        },
+      });
+      const result = await response.json();
       if (result.success) {
-        setCards(result.data || []);
+        setPets(result.data || []);
       }
     } else if (activeTab === 'stats') {
       // Загружаем все для статистики
-      const [speciesResult, breedsResult, cardsResult] = await Promise.all([
+      const [speciesResult, breedsResult] = await Promise.all([
         petbaseApi.getSpecies(),
         petbaseApi.getBreeds(),
-        petbaseApi.getCards(),
       ]);
       if (speciesResult.success) setSpecies(speciesResult.data || []);
       if (breedsResult.success) setBreeds(breedsResult.data || []);
-      if (cardsResult.success) setCards(cardsResult.data || []);
     }
 
     setLoading(false);
@@ -352,66 +386,142 @@ export default function PetBaseDashboard() {
           </TableWidget>
         </div>
       )}
-
-      {activeTab === 'cards' && (
+      {activeTab === 'pets' && (
         <div className="space-y-8">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Карточки животных</h2>
-            <p className="text-gray-600">Подробные карточки с информацией</p>
+            <h2 className="text-3xl font-bold text-gray-900 mb-2">Питомцы пользователей</h2>
+            <p className="text-gray-600">Реальные карточки питомцев из PetID реестра</p>
           </div>
 
           <TableWidget
-            title={`Карточки (${cards.length})`}
+            title={`Питомцев (${pets.length})`}
             actions={
               <button className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors">
-                Добавить карточку
+                Добавить питомца
               </button>
             }
           >
             {loading ? (
               <div className="text-center py-12 text-gray-400">Загрузка...</div>
-            ) : cards.length === 0 ? (
+            ) : pets.length === 0 ? (
               <div className="text-center py-12 text-gray-400">
-                <DocumentTextIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
-                <p>Карточки не найдены</p>
-                <p className="text-sm mt-2">Добавьте первую карточку, чтобы начать работу</p>
+                <Square3Stack3DIcon className="w-12 h-12 mx-auto mb-3 opacity-50" />
+                <p>Питомцы не найдены</p>
+                <p className="text-sm mt-2">Добавьте первого питомца, чтобы начать работу</p>
               </div>
             ) : (
               <div className="overflow-x-auto p-6">
-                <table className="w-full min-w-[900px]">
+                <table className="w-full min-w-[1000px]">
                   <thead>
                     <tr className="border-b border-gray-100">
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Заголовок</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Фото</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Имя</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Вид</th>
                       <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Порода</th>
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Описание</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Пол</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Возраст</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Чип</th>
                       <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Статус</th>
-                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Дата создания</th>
+                      <th className="text-left py-3 px-4 text-sm font-semibold text-gray-700">Владелец</th>
                     </tr>
                   </thead>
                   <tbody>
-                    {cards.map((card) => (
-                      <tr key={card.id} className="border-b border-gray-50 hover:bg-gray-50 transition-colors">
-                        <td className="py-3 px-4 text-sm font-medium text-gray-900">{card.title}</td>
-                        <td className="py-3 px-4 text-sm text-gray-600">{card.breed_name}</td>
-                        <td className="py-3 px-4 text-sm text-gray-600 max-w-md truncate">
-                          {card.description}
-                        </td>
-                        <td className="py-3 px-4">
-                          <span
-                            className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
-                              card.is_published
-                                ? 'bg-green-100 text-green-700'
-                                : 'bg-gray-100 text-gray-600'
-                            }`}
-                          >
-                            {card.is_published ? 'Опубликовано' : 'Черновик'}
-                          </span>
-                        </td>
-                        <td className="py-3 px-4 text-sm text-gray-600">
-                          {new Date(card.created_at).toLocaleDateString('ru-RU')}
-                        </td>
-                      </tr>
-                    ))}
+                    {pets.map((pet) => {
+                      // Вычисляем возраст
+                      let age = '-';
+                      if (pet.birth_date) {
+                        const birthDate = new Date(pet.birth_date);
+                        const today = new Date();
+                        const years = today.getFullYear() - birthDate.getFullYear();
+                        const months = today.getMonth() - birthDate.getMonth();
+                        if (years > 0) {
+                          age = `${years} ${years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}`;
+                        } else if (months > 0) {
+                          age = `${months} ${months === 1 ? 'месяц' : months < 5 ? 'месяца' : 'месяцев'}`;
+                        } else {
+                          age = 'Новорождённый';
+                        }
+                      }
+
+                      // Статус на русском
+                      const statusMap: Record<string, string> = {
+                        home: 'Дома',
+                        looking_for_home: 'Ищет дом',
+                        lost: 'Потерялся',
+                        found: 'Найден',
+                        deceased: 'Умер',
+                      };
+
+                      // Цвет статуса
+                      const statusColorMap: Record<string, string> = {
+                        home: 'bg-green-100 text-green-700',
+                        looking_for_home: 'bg-orange-100 text-orange-700',
+                        lost: 'bg-red-100 text-red-700',
+                        found: 'bg-blue-100 text-blue-700',
+                        deceased: 'bg-gray-100 text-gray-700',
+                      };
+
+                      return (
+                        <tr 
+                          key={pet.id} 
+                          onClick={() => router.push(`/pets/${pet.id}`)}
+                          className="border-b border-gray-50 hover:bg-blue-50 transition-colors cursor-pointer"
+                        >
+                          <td className="py-3 px-4">
+                            {pet.photo ? (
+                              <img
+                                src={pet.photo}
+                                alt={pet.name}
+                                className="w-12 h-12 rounded-full object-cover"
+                              />
+                            ) : (
+                              <div className="w-12 h-12 rounded-full bg-gray-200 flex items-center justify-center text-gray-500 text-xl">
+                                🐾
+                              </div>
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <div className="font-medium text-gray-900">{pet.name}</div>
+                            <div className="text-xs text-gray-500">ID: {pet.id}</div>
+                          </td>
+                          <td className="py-3 px-4 text-sm text-gray-600">
+                            {pet.species === 'dog' && '🐕 Собака'}
+                            {pet.species === 'cat' && '🐈 Кошка'}
+                            {pet.species === 'bird' && '🐦 Птица'}
+                            {pet.species === 'other' && '🐾 Другое'}
+                            {!pet.species && '-'}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-gray-600">{pet.breed || '-'}</td>
+                          <td className="py-3 px-4 text-sm text-gray-600">
+                            {pet.gender === 'male' && '♂️ Самец'}
+                            {pet.gender === 'female' && '♀️ Самка'}
+                            {!pet.gender && '-'}
+                          </td>
+                          <td className="py-3 px-4 text-sm text-gray-600">{age}</td>
+                          <td className="py-3 px-4 text-sm text-gray-600">
+                            {pet.chip_number ? (
+                              <span className="font-mono text-xs bg-gray-100 px-2 py-1 rounded">
+                                {pet.chip_number}
+                              </span>
+                            ) : (
+                              '-'
+                            )}
+                          </td>
+                          <td className="py-3 px-4">
+                            <span
+                              className={`inline-flex px-2 py-1 text-xs font-medium rounded-full ${
+                                statusColorMap[pet.status] || 'bg-gray-100 text-gray-600'
+                              }`}
+                            >
+                              {statusMap[pet.status] || pet.status}
+                            </span>
+                          </td>
+                          <td className="py-3 px-4 text-sm text-gray-600">
+                            User #{pet.user_id}
+                          </td>
+                        </tr>
+                      );
+                    })}
                   </tbody>
                 </table>
               </div>

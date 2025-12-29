@@ -51,7 +51,7 @@ func BreedsBySpeciesHandler(w http.ResponseWriter, r *http.Request) {
 	getBreedsBySpecies(w, r, speciesID)
 }
 
-func getBreeds(w http.ResponseWriter, r *http.Request) {
+func getBreeds(w http.ResponseWriter, _ *http.Request) {
 	query := `
 		SELECT b.id, b.species_id, s.name as species_name, b.name, b.name_en, 
 		       b.description, b.origin, b.size, b.weight_min, b.weight_max,
@@ -89,7 +89,7 @@ func getBreeds(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func getBreedsBySpecies(w http.ResponseWriter, r *http.Request, speciesID int) {
+func getBreedsBySpecies(w http.ResponseWriter, _ *http.Request, speciesID int) {
 	query := `
 		SELECT b.id, b.species_id, s.name as species_name, b.name, b.name_en, 
 		       b.description, b.origin, b.size, b.weight_min, b.weight_max,
@@ -128,7 +128,7 @@ func getBreedsBySpecies(w http.ResponseWriter, r *http.Request, speciesID int) {
 	})
 }
 
-func getBreedDetail(w http.ResponseWriter, r *http.Request, id int) {
+func getBreedDetail(w http.ResponseWriter, _ *http.Request, id int) {
 	query := `
 		SELECT b.id, b.species_id, s.name as species_name, b.name, b.name_en, 
 		       b.description, b.origin, b.size, b.weight_min, b.weight_max,
@@ -217,7 +217,7 @@ func updateBreed(w http.ResponseWriter, r *http.Request, id int) {
 	})
 }
 
-func deleteBreed(w http.ResponseWriter, r *http.Request, id int) {
+func deleteBreed(w http.ResponseWriter, _ *http.Request, id int) {
 	_, err := database.DB.Exec("DELETE FROM breeds WHERE id = ?", id)
 	if err != nil {
 		sendError(w, err.Error(), http.StatusInternalServerError)

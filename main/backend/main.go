@@ -112,8 +112,8 @@ func main() {
 	http.HandleFunc("/api/media/chunked/upload", enableCORS(middleware.AuthMiddleware(chunkedHandler.UploadChunk)))
 	http.HandleFunc("/api/media/chunked/complete", enableCORS(middleware.AuthMiddleware(chunkedHandler.CompleteUpload)))
 
-	// Static files - serve uploads directory
-	fs := http.FileServer(http.Dir("."))
+	// Static files - serve uploads directory from project root
+	fs := http.FileServer(http.Dir("../.."))
 	http.Handle("/uploads/", enableCORS(http.StripPrefix("/", fs).ServeHTTP))
 
 	// Root route MUST be registered LAST

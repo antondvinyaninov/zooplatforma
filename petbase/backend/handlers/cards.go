@@ -51,7 +51,7 @@ func CardsByBreedHandler(w http.ResponseWriter, r *http.Request) {
 	getCardsByBreed(w, r, breedID)
 }
 
-func getCards(w http.ResponseWriter, r *http.Request) {
+func getCards(w http.ResponseWriter, _ *http.Request) {
 	query := `
 		SELECT c.id, c.breed_id, b.name as breed_name, c.title, c.description,
 		       c.characteristics, c.care_tips, c.health_info, c.nutrition,
@@ -87,7 +87,7 @@ func getCards(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func getCardsByBreed(w http.ResponseWriter, r *http.Request, breedID int) {
+func getCardsByBreed(w http.ResponseWriter, _ *http.Request, breedID int) {
 	query := `
 		SELECT c.id, c.breed_id, b.name as breed_name, c.title, c.description,
 		       c.characteristics, c.care_tips, c.health_info, c.nutrition,
@@ -124,7 +124,7 @@ func getCardsByBreed(w http.ResponseWriter, r *http.Request, breedID int) {
 	})
 }
 
-func getCardDetail(w http.ResponseWriter, r *http.Request, id int) {
+func getCardDetail(w http.ResponseWriter, _ *http.Request, id int) {
 	query := `
 		SELECT c.id, c.breed_id, b.name as breed_name, c.title, c.description,
 		       c.characteristics, c.care_tips, c.health_info, c.nutrition,
@@ -208,7 +208,7 @@ func updateCard(w http.ResponseWriter, r *http.Request, id int) {
 	})
 }
 
-func deleteCard(w http.ResponseWriter, r *http.Request, id int) {
+func deleteCard(w http.ResponseWriter, _ *http.Request, id int) {
 	_, err := database.DB.Exec("DELETE FROM pet_cards WHERE id = ?", id)
 	if err != nil {
 		sendError(w, err.Error(), http.StatusInternalServerError)

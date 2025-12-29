@@ -5,7 +5,10 @@ import (
 	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"petbase/handlers"
+	"petbase/middleware"
+	"strings"
 
 	"github.com/joho/godotenv"
 )
@@ -13,13 +16,36 @@ import (
 func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if origin == "" {
-			origin = "http://localhost:4100"
+
+		// Получаем разрешённые origins из переменной окружения
+		allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
+		allowedOrigins := map[string]bool{
+			"http://localhost:3000": true, // Основной сайт (development)
+			"http://localhost:4100": true, // ЗооБаза Frontend (development)
 		}
 
-		w.Header().Set("Access-Control-Allow-Origin", origin)
+		// Добавляем origins из .env
+		if allowedOriginsEnv != "" {
+			for _, o := range strings.Split(allowedOriginsEnv, ",") {
+				allowedOrigins[strings.TrimSpace(o)] = true
+			}
+		}
+
+		// Проверяем, разрешён ли origin
+		if allowedOrigins[origin] {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		} else if origin == "" {
+			// Если origin не указан, используем дефолтный
+			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4100")
+		} else {
+			// Origin не разрешён
+			log.Printf("⚠️ Blocked request from unauthorized origin: %s", origin)
+			http.Error(w, "Forbidden origin", http.StatusForbidden)
+			return
+		}
+
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-ID")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		if r.Method == "OPTIONS" {
@@ -52,23 +78,41 @@ func main() {
 	http.HandleFunc("/", enableCORS(handleRoot))
 	http.HandleFunc("/api/health", enableCORS(handleHealth))
 
-	// Species routes
+	// Публичные endpoints (без аутентификации)
 	http.HandleFunc("/api/species", enableCORS(handlers.SpeciesHandler))
 	http.HandleFunc("/api/species/", enableCORS(handlers.SpeciesDetailHandler))
-
-	// Breeds routes
 	http.HandleFunc("/api/breeds", enableCORS(handlers.BreedsHandler))
 	http.HandleFunc("/api/breeds/", enableCORS(handlers.BreedDetailHandler))
 	http.HandleFunc("/api/breeds/species/", enableCORS(handlers.BreedsBySpeciesHandler))
-
-	// Cards routes
 	http.HandleFunc("/api/cards", enableCORS(handlers.CardsHandler))
 	http.HandleFunc("/api/cards/breed/", enableCORS(handlers.CardsByBreedHandler))
 	http.HandleFunc("/api/cards/", enableCORS(handlers.CardDetailHandler))
 
+	// Защищённые endpoints (требуют аутентификации)
+	// Pets routes - реальные питомцы пользователей
+	http.HandleFunc("/api/pets", enableCORS(middleware.RequireAuth(handlers.PetsHandler)))
+	http.HandleFunc("/api/pets/", enableCORS(middleware.RequireAuth(handlers.PetDetailHandler)))
+
 	port := ":8100"
 	fmt.Printf("🐾 ЗооБаза API starting on port %s\n", port)
+	fmt.Printf("🔒 JWT Authentication: %s\n", getAuthStatus())
+	fmt.Printf("🌐 CORS: %s\n", getAllowedOrigins())
 	log.Fatal(http.ListenAndServe(port, nil))
+}
+
+func getAuthStatus() string {
+	if os.Getenv("JWT_SECRET") != "" {
+		return "Enabled (production mode)"
+	}
+	return "Enabled (development mode - using default secret)"
+}
+
+func getAllowedOrigins() string {
+	origins := os.Getenv("ALLOWED_ORIGINS")
+	if origins != "" {
+		return origins
+	}
+	return "localhost:3000, localhost:4100"
 }
 
 func handleRoot(w http.ResponseWriter, r *http.Request) {

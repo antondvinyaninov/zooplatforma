@@ -16,7 +16,7 @@ import (
 
 const (
 	ChunkSize     = 5 * 1024 * 1024 // 5MB chunks
-	TempUploadDir = "uploads/temp"
+	TempUploadDir = "../../uploads/temp"
 	MaxChunkAge   = 24 * time.Hour // Cleanup old chunks after 24h
 )
 

@@ -41,7 +41,7 @@ func SpeciesDetailHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getSpecies(w http.ResponseWriter, r *http.Request) {
+func getSpecies(w http.ResponseWriter, _ *http.Request) {
 	rows, err := database.DB.Query("SELECT id, name, name_en, description, icon, created_at FROM species ORDER BY name")
 	if err != nil {
 		sendError(w, err.Error(), http.StatusInternalServerError)
@@ -65,7 +65,7 @@ func getSpecies(w http.ResponseWriter, r *http.Request) {
 	})
 }
 
-func getSpeciesDetail(w http.ResponseWriter, r *http.Request, id int) {
+func getSpeciesDetail(w http.ResponseWriter, _ *http.Request, id int) {
 	var s models.Species
 	err := database.DB.QueryRow(
 		"SELECT id, name, name_en, description, icon, created_at FROM species WHERE id = ?",
@@ -139,7 +139,7 @@ func updateSpecies(w http.ResponseWriter, r *http.Request, id int) {
 	})
 }
 
-func deleteSpecies(w http.ResponseWriter, r *http.Request, id int) {
+func deleteSpecies(w http.ResponseWriter, _ *http.Request, id int) {
 	_, err := database.DB.Exec("DELETE FROM species WHERE id = ?", id)
 	if err != nil {
 		sendError(w, err.Error(), http.StatusInternalServerError)
@@ -154,6 +154,14 @@ func deleteSpecies(w http.ResponseWriter, r *http.Request, id int) {
 func sendJSON(w http.ResponseWriter, data interface{}) {
 	w.Header().Set("Content-Type", "application/json")
 	json.NewEncoder(w).Encode(data)
+}
+
+func sendSuccess(w http.ResponseWriter, data interface{}) {
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"data":    data,
+	})
 }
 
 func sendError(w http.ResponseWriter, message string, status int) {
