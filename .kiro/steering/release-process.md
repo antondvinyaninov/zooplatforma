@@ -61,6 +61,7 @@ inclusion: always
 - Добавьте новые микросервисы в схему
 
 #### Другие файлы в docs/
+- **docs/API_ENDPOINTS.md** - обновите при добавлении/изменении API endpoints
 - **docs/API_KEYS.md** - обновите при изменении API ключей или добавлении новых сервисов
 - **docs/CHANGELOG.md** - основной файл релиза (см. пункт 1)
 - Любые другие файлы документации, которые могли измениться
@@ -116,6 +117,7 @@ git tag -a vX.Y.Z -m "Release vX.Y.Z: Краткое описание"
 - [ ] docs/PERFORMANCE.md проверен
 - [ ] docs/TEMPLATES.md проверен
 - [ ] docs/SSO_ARCHITECTURE.md и SSO_FLOW.md проверены
+- [ ] docs/API_ENDPOINTS.md обновлён (новые/изменённые endpoints)
 - [ ] docs/API_KEYS.md проверен
 - [ ] README.md обновлён (структура и порты)
 - [ ] Все новые микросервисы имеют README.md
