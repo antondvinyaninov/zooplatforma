@@ -19,6 +19,7 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 		allowedOrigins := []string{
 			"http://localhost:4000", // Admin панель
 			"http://localhost:4100", // PetBase (ЗооБаза)
+			"http://localhost:5100", // Shelter (Кабинет приюта)
 			"https://sadmin.zooplatforma.ru",
 		}
 
