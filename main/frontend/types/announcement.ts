@@ -13,6 +13,13 @@ export interface PetDetail {
   color?: string;
   photo?: string;
   photos?: string; // JSON массив
+  status?: string;
+  region?: string;
+  city?: string;
+  urgent?: boolean;
+  contact_name?: string;
+  contact_phone?: string;
+  organization_id?: number;
   created_at: string;
 }
 

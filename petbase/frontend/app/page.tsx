@@ -205,61 +205,108 @@ export default function PetBaseDashboard() {
       {activeTab === 'stats' && (
         <div className="space-y-8">
           <div>
-            <h2 className="text-3xl font-bold text-gray-900 mb-2">Статистика ЗооБазы</h2>
-            <p className="text-gray-600">Общая информация о справочнике</p>
+            <h2 className="text-4xl font-bold text-gray-900 mb-2">Статистика ЗооБазы</h2>
+            <p className="text-base text-gray-600">Общая информация о справочнике</p>
           </div>
 
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-4 gap-6">
-            <StatsWidget
-              title="Видов животных"
-              value={species.length}
-              icon={<Square3Stack3DIcon className="w-6 h-6" />}
-              color="blue"
-            />
-            <StatsWidget
-              title="Пород"
-              value={breeds.length}
-              icon={<RectangleStackIcon className="w-6 h-6" />}
-              color="green"
-            />
-            <StatsWidget
-              title="Карточек"
-              value={cards.length}
-              icon={<DocumentTextIcon className="w-6 h-6" />}
-              color="orange"
-            />
-            <StatsWidget
-              title="Опубликовано"
-              value={cards.filter((c) => c.is_published).length}
-              icon={<ChartBarIcon className="w-6 h-6" />}
-              color="purple"
-            />
+            <div className="bg-gradient-to-br from-blue-500 to-blue-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 cursor-pointer">
+              <div className="flex items-center justify-between mb-4">
+                <Square3Stack3DIcon className="w-8 h-8 opacity-80" />
+                <div className="text-5xl font-bold">{species.length}</div>
+              </div>
+              <div className="text-base font-medium opacity-90">Видов животных</div>
+            </div>
+            
+            <div className="bg-gradient-to-br from-green-500 to-green-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 cursor-pointer">
+              <div className="flex items-center justify-between mb-4">
+                <RectangleStackIcon className="w-8 h-8 opacity-80" />
+                <div className="text-5xl font-bold">{breeds.length}</div>
+              </div>
+              <div className="text-base font-medium opacity-90">Пород</div>
+            </div>
+            
+            <div className="bg-gradient-to-br from-orange-500 to-orange-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 cursor-pointer">
+              <div className="flex items-center justify-between mb-4">
+                <DocumentTextIcon className="w-8 h-8 opacity-80" />
+                <div className="text-5xl font-bold">{pets.length}</div>
+              </div>
+              <div className="text-base font-medium opacity-90">Питомцев</div>
+            </div>
+            
+            <div className="bg-gradient-to-br from-purple-500 to-purple-600 rounded-2xl p-6 text-white shadow-lg hover:shadow-xl transition-all hover:scale-105 cursor-pointer">
+              <div className="flex items-center justify-between mb-4">
+                <ChartBarIcon className="w-8 h-8 opacity-80" />
+                <div className="text-5xl font-bold">{cards.filter((c) => c.is_published).length}</div>
+              </div>
+              <div className="text-base font-medium opacity-90">Опубликовано</div>
+            </div>
           </div>
 
-          <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100">
-            <h3 className="text-xl font-bold text-gray-900 mb-4">О ЗооБазе</h3>
-            <div className="space-y-4 text-gray-600">
-              <p>
-                ЗооБаза - это централизованный справочник домашних животных, который содержит
-                подробную информацию о видах, породах и особенностях содержания.
-              </p>
-              <p>
-                Данные из ЗооБазы используются другими сервисами платформы для автозаполнения
-                информации о питомцах пользователей и предоставления справочной информации.
-              </p>
-              <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mt-6">
-                <div className="p-4 bg-blue-50 rounded-lg">
-                  <div className="text-2xl font-bold text-blue-600 mb-1">API</div>
-                  <div className="text-sm text-gray-600">Доступ через REST API</div>
+          <div className="grid grid-cols-1 lg:grid-cols-2 gap-6">
+            <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+              <h3 className="text-2xl font-bold text-gray-900 mb-4">О ЗооБазе</h3>
+              <div className="space-y-4 text-gray-600 text-base leading-relaxed">
+                <p>
+                  ЗооБаза - это централизованный справочник домашних животных, который содержит
+                  подробную информацию о видах, породах и особенностях содержания.
+                </p>
+                <p>
+                  Данные из ЗооБазы используются другими сервисами платформы для автозаполнения
+                  информации о питомцах пользователей и предоставления справочной информации.
+                </p>
+              </div>
+            </div>
+
+            <div className="bg-white rounded-2xl p-8 shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
+              <h3 className="text-2xl font-bold text-gray-900 mb-6">Возможности</h3>
+              <div className="space-y-4">
+                <div className="flex items-start space-x-4">
+                  <div className="w-12 h-12 bg-blue-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">🔌</span>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-900 mb-1 text-base">REST API</div>
+                    <div className="text-sm text-gray-600">Доступ к данным через API</div>
+                  </div>
                 </div>
-                <div className="p-4 bg-green-50 rounded-lg">
-                  <div className="text-2xl font-bold text-green-600 mb-1">Поиск</div>
-                  <div className="text-sm text-gray-600">Быстрый поиск по базе</div>
+                
+                <div className="flex items-start space-x-4">
+                  <div className="w-12 h-12 bg-green-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">🔍</span>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-900 mb-1 text-base">Быстрый поиск</div>
+                    <div className="text-sm text-gray-600">Поиск по видам и породам</div>
+                  </div>
                 </div>
-                <div className="p-4 bg-purple-50 rounded-lg">
-                  <div className="text-2xl font-bold text-purple-600 mb-1">Фото</div>
-                  <div className="text-sm text-gray-600">Галерея изображений</div>
+                
+                <div className="flex items-start space-x-4">
+                  <div className="w-12 h-12 bg-purple-100 rounded-xl flex items-center justify-center flex-shrink-0">
+                    <span className="text-2xl">📸</span>
+                  </div>
+                  <div>
+                    <div className="font-semibold text-gray-900 mb-1 text-base">Галерея</div>
+                    <div className="text-sm text-gray-600">Фотографии и изображения</div>
+                  </div>
                 </div>
+              </div>
+            </div>
+          </div>
+
+          <div className="bg-gradient-to-br from-indigo-500 to-purple-600 rounded-2xl p-8 text-white shadow-lg">
+            <div className="flex items-center justify-between">
+              <div>
+                <h3 className="text-3xl font-bold mb-2">Подписка на API</h3>
+                <p className="text-indigo-100 mb-4 text-base">
+                  Для создания ключей и использования API требуется подписка
+                </p>
+                <button className="px-6 py-3 bg-white text-indigo-600 font-semibold rounded-xl hover:bg-indigo-50 transition-colors shadow-md text-base">
+                  Купить подписку
+                </button>
+              </div>
+              <div className="hidden md:block text-8xl opacity-20">
+                🔑
               </div>
             </div>
           </div>

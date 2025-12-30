@@ -10,6 +10,86 @@ import (
 	"time"
 )
 
+// CatalogHandler - публичный endpoint для каталога питомцев (без авторизации)
+// Возвращает только питомцев со статусами: looking_for_home, lost, found, needs_help
+func CatalogHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("📋 CatalogHandler called: %s %s", r.Method, r.URL.Path)
+
+	if r.Method != http.MethodGet {
+		log.Printf("❌ Method not allowed: %s", r.Method)
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	query := `
+		SELECT 
+			id, user_id, name, species, breed, gender, birth_date, color, size, weight,
+			chip_number, tattoo_number, ear_tag_number, passport_number,
+			is_sterilized, sterilization_date, is_vaccinated,
+			health_notes, character_traits, special_needs,
+			status, status_updated_at, photo, photos, story,
+			created_at, updated_at,
+			distinctive_marks, owner_name, owner_address, owner_phone, owner_email,
+			blood_type, allergies, chronic_diseases, current_medications,
+			pedigree_number, registration_org,
+			curator_id, curator_name, curator_phone, location, foster_address, shelter_name
+		FROM pets
+		WHERE status IN ('looking_for_home', 'lost', 'found', 'needs_help')
+		ORDER BY created_at DESC
+	`
+
+	log.Printf("🔍 Executing catalog query...")
+	rows, err := database.DB.Query(query)
+	if err != nil {
+		log.Printf("❌ Error querying catalog pets: %v", err)
+		http.Error(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var pets []Pet
+	for rows.Next() {
+		var pet Pet
+		var sterilizationDate, statusUpdatedAt *string
+
+		err := rows.Scan(
+			&pet.ID, &pet.UserID, &pet.Name, &pet.Species, &pet.Breed, &pet.Gender,
+			&pet.BirthDate, &pet.Color, &pet.Size, &pet.Weight,
+			&pet.ChipNumber, &pet.TattooNumber, &pet.EarTagNumber, &pet.PassportNumber,
+			&pet.IsSterilized, &sterilizationDate, &pet.IsVaccinated,
+			&pet.HealthNotes, &pet.CharacterTraits, &pet.SpecialNeeds,
+			&pet.Status, &statusUpdatedAt, &pet.Photo, &pet.Photos, &pet.Story,
+			&pet.CreatedAt, &pet.UpdatedAt,
+			&pet.DistinctiveMarks, &pet.OwnerName, &pet.OwnerAddress, &pet.OwnerPhone, &pet.OwnerEmail,
+			&pet.BloodType, &pet.Allergies, &pet.ChronicDiseases, &pet.CurrentMedications,
+			&pet.PedigreeNumber, &pet.RegistrationOrg,
+			&pet.CuratorID, &pet.CuratorName, &pet.CuratorPhone, &pet.Location, &pet.FosterAddress, &pet.ShelterName,
+		)
+		if err != nil {
+			log.Printf("❌ Error scanning catalog pet: %v", err)
+			continue
+		}
+
+		pet.SterilizationDate = sterilizationDate
+		pet.StatusUpdatedAt = statusUpdatedAt
+
+		log.Printf("✅ Found pet: ID=%d, Name=%s, Status=%s", pet.ID, pet.Name, pet.Status)
+		pets = append(pets, pet)
+	}
+
+	if pets == nil {
+		pets = []Pet{}
+	}
+
+	log.Printf("📦 Returning %d pets for catalog", len(pets))
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(map[string]interface{}{
+		"success": true,
+		"data":    pets,
+	})
+}
+
 // Pet представляет полную карточку питомца
 type Pet struct {
 	ID                int       `json:"id"`
@@ -58,6 +138,30 @@ type Pet struct {
 	Location      string `json:"location,omitempty"`
 	FosterAddress string `json:"foster_address,omitempty"`
 	ShelterName   string `json:"shelter_name,omitempty"`
+	// Экстренные контакты и страховка (миграция 016)
+	EmergencyContactName     string  `json:"emergency_contact_name,omitempty"`
+	EmergencyContactPhone    string  `json:"emergency_contact_phone,omitempty"`
+	EmergencyContactRelation string  `json:"emergency_contact_relation,omitempty"`
+	VetClinicName            string  `json:"vet_clinic_name,omitempty"`
+	VetClinicPhone           string  `json:"vet_clinic_phone,omitempty"`
+	VetClinicAddress         string  `json:"vet_clinic_address,omitempty"`
+	InsuranceCompany         string  `json:"insurance_company,omitempty"`
+	InsurancePolicyNumber    string  `json:"insurance_policy_number,omitempty"`
+	InsuranceExpiryDate      *string `json:"insurance_expiry_date,omitempty"`
+	// Карточки породы (миграция 017-018)
+	CardTitle           string `json:"card_title,omitempty"`
+	CardDescription     string `json:"card_description,omitempty"`
+	CardCharacteristics string `json:"card_characteristics,omitempty"`
+	CardCareTips        string `json:"card_care_tips,omitempty"`
+	CardHealthInfo      string `json:"card_health_info,omitempty"`
+	CardNutrition       string `json:"card_nutrition,omitempty"`
+	CardPhotos          string `json:"card_photos,omitempty"`
+	CardIsPublished     bool   `json:"card_is_published"`
+	// Поля для каталога (миграция 020)
+	Region         string `json:"region,omitempty"`
+	Urgent         bool   `json:"urgent"`
+	ContactName    string `json:"contact_name,omitempty"`
+	OrganizationID *int   `json:"organization_id,omitempty"`
 }
 
 // PetSummary представляет краткую информацию о питомце (для постов)
@@ -111,6 +215,10 @@ type CreatePetRequest struct {
 	Location           string  `json:"location,omitempty"`
 	FosterAddress      string  `json:"foster_address,omitempty"`
 	ShelterName        string  `json:"shelter_name,omitempty"`
+	Region             string  `json:"region,omitempty"`
+	Urgent             bool    `json:"urgent"`
+	ContactName        string  `json:"contact_name,omitempty"`
+	OrganizationID     *int    `json:"organization_id,omitempty"`
 }
 
 // PetsHandler обрабатывает /api/pets

@@ -148,8 +148,8 @@ export default function AdminLayout({
         {/* Sidebar */}
         <aside
           className={`
-            w-[200px] bg-gray-100 border-r border-gray-200 flex-shrink-0 p-3 transition-all duration-300 relative flex flex-col
-            ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-[200px]'}
+            w-[240px] bg-white border-r border-gray-200 flex-shrink-0 p-3 transition-all duration-300 relative flex flex-col
+            ${sidebarCollapsed ? 'lg:w-16' : 'lg:w-[240px]'}
             max-lg:fixed max-lg:left-0 max-lg:top-[54px] max-lg:h-[calc(100vh-54px)] max-lg:z-50
             ${mobileMenuOpen ? 'max-lg:translate-x-0' : 'max-lg:-translate-x-full'}
           `}
@@ -161,7 +161,7 @@ export default function AdminLayout({
                   key={tab.id}
                   className={`
                     w-full px-3 py-2.5 border-none bg-none cursor-pointer flex items-center gap-3 transition-colors rounded-lg text-left whitespace-nowrap
-                    ${activeTab === tab.id ? 'bg-white shadow-sm' : 'hover:bg-white/50'}
+                    ${activeTab === tab.id ? 'bg-gray-100 shadow-sm' : 'hover:bg-gray-50'}
                     ${sidebarCollapsed ? 'lg:justify-center lg:px-2.5' : ''}
                   `}
                   onClick={() => {
@@ -174,7 +174,7 @@ export default function AdminLayout({
                     {tab.icon}
                   </div>
                   {!sidebarCollapsed && (
-                    <span className={`text-sm ${activeTab === tab.id ? 'text-blue-600 font-medium' : 'text-gray-900'}`}>
+                    <span className={`text-base ${activeTab === tab.id ? 'text-blue-600 font-medium' : 'text-gray-900'}`}>
                       {tab.label}
                     </span>
                   )}
@@ -188,7 +188,7 @@ export default function AdminLayout({
           )}
 
           <button
-            className="mt-auto p-2.5 px-3 border-none bg-none cursor-pointer flex items-center gap-3 transition-colors rounded-lg text-gray-600 border-t border-gray-300 -mx-3 -mb-3 pt-4 hover:bg-white/50"
+            className="mt-auto p-2.5 px-3 border-none bg-none cursor-pointer flex items-center gap-3 transition-colors rounded-lg text-gray-600 border-t border-gray-300 -mx-3 -mb-3 pt-4 hover:bg-gray-50"
             onClick={() => setSidebarCollapsed(!sidebarCollapsed)}
             title={sidebarCollapsed ? 'Развернуть меню' : 'Свернуть меню'}
           >
@@ -197,13 +197,13 @@ export default function AdminLayout({
                 sidebarCollapsed ? 'rotate-180' : ''
               }`}
             />
-            {!sidebarCollapsed && <span className="text-sm">Свернуть</span>}
+            {!sidebarCollapsed && <span className="text-base">Свернуть</span>}
           </button>
         </aside>
 
         {/* Main content */}
         <main className="flex-1 min-w-0 overflow-y-auto overflow-x-hidden bg-gray-50 p-8 max-md:p-4 max-sm:p-3">
-          <div className="w-full max-w-[1400px] mx-auto">{children}</div>
+          <div className="w-full max-w-[1600px] mx-auto">{children}</div>
         </main>
       </div>
     </div>

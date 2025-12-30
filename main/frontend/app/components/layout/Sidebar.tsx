@@ -21,11 +21,11 @@ import {
   InformationCircleIcon,
   ChartBarIcon,
   WrenchScrewdriverIcon,
+  RectangleStackIcon,
 } from '@heroicons/react/24/outline';
 
 const additionalLinks = [
   { name: 'О платформе', href: '/about', icon: InformationCircleIcon },
-  { name: 'Фонд "ЗооПомощь"', href: '/fund', icon: HeartIcon },
   { name: 'Статистика', href: '/statistics', icon: ChartBarIcon },
   { name: 'Техподдержка', href: '/support', icon: WrenchScrewdriverIcon },
   { name: 'Команда', href: '/team', icon: UserGroupIcon },
@@ -35,14 +35,11 @@ export default function Sidebar() {
   const { user } = useAuth();
 
   const mainNavigation = [
-    { name: 'Лента', href: '/', icon: DocumentTextIcon },
+    { name: 'Метки', href: '/', icon: DocumentTextIcon },
     { name: 'Профиль', href: user ? `/id${user.id}` : '/profile', icon: UserIcon },
     { name: 'Мессенджер', href: '/messenger', icon: ChatBubbleLeftIcon, badge: '43' },
-    { name: 'Зоожурнал', href: '/journal', icon: NewspaperIcon },
-    { name: 'Афиша', href: '/events', icon: CalendarDaysIcon },
     { name: 'Организации', href: '/org', icon: BuildingOfficeIcon },
-    { name: 'Зоомаркет', href: '/market', icon: ShoppingBagIcon },
-    { name: 'Учебный центр', href: '/education', icon: AcademicCapIcon },
+    { name: 'Каталог', href: '/catalog', icon: RectangleStackIcon },
     { name: 'Сервисы', href: '/services', icon: Cog6ToothIcon },
   ];
   return (

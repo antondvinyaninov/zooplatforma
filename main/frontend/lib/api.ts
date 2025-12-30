@@ -433,8 +433,15 @@ export interface Pet {
   birth_date?: string;
   color?: string;
   photo?: string;
+  status?: string;
   is_sterilized?: boolean;
   is_vaccinated?: boolean;
   chip_number?: string;
+  region?: string;
+  city?: string;
+  urgent?: boolean;
+  contact_name?: string;
+  contact_phone?: string;
+  organization_id?: number;
   created_at: string;
 }

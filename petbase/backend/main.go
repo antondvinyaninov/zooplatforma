@@ -15,6 +15,8 @@ import (
 
 func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("🌐 CORS: %s %s from origin: %s", r.Method, r.URL.Path, r.Header.Get("Origin"))
+
 		origin := r.Header.Get("Origin")
 
 		// Получаем разрешённые origins из переменной окружения
@@ -34,12 +36,14 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 		// Проверяем, разрешён ли origin
 		if allowedOrigins[origin] {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
+			log.Printf("✅ Origin allowed: %s", origin)
 		} else if origin == "" {
 			// Если origin не указан, используем дефолтный
 			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4100")
+			log.Printf("⚠️ No origin, using default: http://localhost:4100")
 		} else {
 			// Origin не разрешён
-			log.Printf("⚠️ Blocked request from unauthorized origin: %s", origin)
+			log.Printf("❌ Blocked request from unauthorized origin: %s", origin)
 			http.Error(w, "Forbidden origin", http.StatusForbidden)
 			return
 		}
@@ -49,10 +53,12 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		if r.Method == "OPTIONS" {
+			log.Printf("✅ OPTIONS request handled")
 			w.WriteHeader(http.StatusOK)
 			return
 		}
 
+		log.Printf("➡️ Passing to handler: %s %s", r.Method, r.URL.Path)
 		next(w, r)
 	}
 }
@@ -75,10 +81,8 @@ func main() {
 	}
 
 	// Routes
-	http.HandleFunc("/", enableCORS(handleRoot))
-	http.HandleFunc("/api/health", enableCORS(handleHealth))
-
 	// Публичные endpoints (без аутентификации)
+	http.HandleFunc("/api/health", enableCORS(handleHealth))
 	http.HandleFunc("/api/species", enableCORS(handlers.SpeciesHandler))
 	http.HandleFunc("/api/species/", enableCORS(handlers.SpeciesDetailHandler))
 	http.HandleFunc("/api/breeds", enableCORS(handlers.BreedsHandler))
@@ -87,11 +91,15 @@ func main() {
 	http.HandleFunc("/api/cards", enableCORS(handlers.CardsHandler))
 	http.HandleFunc("/api/cards/breed/", enableCORS(handlers.CardsByBreedHandler))
 	http.HandleFunc("/api/cards/", enableCORS(handlers.CardDetailHandler))
+	http.HandleFunc("/api/catalog", enableCORS(handlers.CatalogHandler)) // Публичный каталог для главного сайта
 
 	// Защищённые endpoints (требуют аутентификации)
 	// Pets routes - реальные питомцы пользователей
 	http.HandleFunc("/api/pets", enableCORS(middleware.RequireAuth(handlers.PetsHandler)))
 	http.HandleFunc("/api/pets/", enableCORS(middleware.RequireAuth(handlers.PetDetailHandler)))
+
+	// Root route - должен быть последним!
+	http.HandleFunc("/", enableCORS(handleRoot))
 
 	port := ":8100"
 	fmt.Printf("🐾 ЗооБаза API starting on port %s\n", port)
@@ -116,6 +124,11 @@ func getAllowedOrigins() string {
 }
 
 func handleRoot(w http.ResponseWriter, r *http.Request) {
+	// Только для корневого пути, не для всех остальных
+	if r.URL.Path != "/" {
+		http.NotFound(w, r)
+		return
+	}
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, `{"message": "ЗооБаза API", "version": "1.0.0"}`)
 }

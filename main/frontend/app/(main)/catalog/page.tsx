@@ -1,0 +1,261 @@
+'use client';
+
+import { useState, useEffect } from 'react';
+import { MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline';
+
+interface Pet {
+  id: number;
+  name: string;
+  species: string;
+  breed?: string;
+  gender?: string;
+  birth_date?: string;
+  photo?: string;
+  status: string;
+  city?: string;
+  region?: string;
+  urgent?: boolean;
+  contact_name?: string;
+  contact_phone?: string;
+  story?: string;
+}
+
+export default function CatalogPage() {
+  const [pets, setPets] = useState<Pet[]>([]);
+  const [loading, setLoading] = useState(true);
+  const [searchQuery, setSearchQuery] = useState('');
+  const [filterStatus, setFilterStatus] = useState<string>('all');
+  const [filterSpecies, setFilterSpecies] = useState<string>('all');
+
+  useEffect(() => {
+    loadPets();
+  }, []);
+
+  const loadPets = async () => {
+    try {
+      console.log('🔍 Загрузка питомцев из каталога...');
+      const response = await fetch('http://localhost:8100/api/catalog');
+      console.log('📡 Response status:', response.status);
+      const result = await response.json();
+      console.log('📦 Result:', result);
+      if (result.success) {
+        console.log('✅ Питомцев загружено:', result.data?.length || 0);
+        setPets(result.data || []);
+      } else {
+        console.error('❌ Ошибка в ответе:', result);
+      }
+    } catch (error) {
+      console.error('❌ Ошибка загрузки питомцев:', error);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  const filteredPets = pets.filter(pet => {
+    const matchesSearch = pet.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
+                         pet.breed?.toLowerCase().includes(searchQuery.toLowerCase());
+    const matchesStatus = filterStatus === 'all' || pet.status === filterStatus;
+    const matchesSpecies = filterSpecies === 'all' || pet.species === filterSpecies;
+    
+    return matchesSearch && matchesStatus && matchesSpecies;
+  });
+
+  const getAge = (birthDate?: string) => {
+    if (!birthDate) return 'Возраст не указан';
+    
+    const birth = new Date(birthDate);
+    const today = new Date();
+    const years = today.getFullYear() - birth.getFullYear();
+    const months = today.getMonth() - birth.getMonth();
+    
+    if (years > 0) {
+      return `${years} ${years === 1 ? 'год' : years < 5 ? 'года' : 'лет'}`;
+    } else if (months > 0) {
+      return `${months} ${months === 1 ? 'месяц' : months < 5 ? 'месяца' : 'месяцев'}`;
+    }
+    return 'Новорождённый';
+  };
+
+  const statusLabels: Record<string, string> = {
+    looking_for_home: 'Ищет дом',
+    lost: 'Потерялся',
+    found: 'Найден',
+    needs_help: 'Требуется помощь',
+  };
+
+  const speciesLabels: Record<string, string> = {
+    dog: '🐕 Собака',
+    cat: '🐈 Кошка',
+    bird: '🐦 Птица',
+    other: '🐾 Другое',
+  };
+
+  return (
+    <div className="space-y-6">
+      {/* Заголовок */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <h1 className="text-3xl font-bold text-gray-900 mb-2">Каталог питомцев</h1>
+        <p className="text-gray-600">Найдите питомца, который ищет дом или помогите найти потерявшегося</p>
+      </div>
+
+      {/* Фильтры и поиск */}
+      <div className="bg-white rounded-2xl p-6 shadow-sm border border-gray-100">
+        <div className="flex flex-col md:flex-row gap-4">
+          {/* Поиск */}
+          <div className="flex-1">
+            <div className="relative">
+              <MagnifyingGlassIcon className="absolute left-3 top-1/2 -translate-y-1/2 w-5 h-5 text-gray-400" />
+              <input
+                type="text"
+                placeholder="Поиск по кличке или породе..."
+                value={searchQuery}
+                onChange={(e) => setSearchQuery(e.target.value)}
+                className="w-full pl-10 pr-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+              />
+            </div>
+          </div>
+
+          {/* Фильтр по статусу */}
+          <select
+            value={filterStatus}
+            onChange={(e) => setFilterStatus(e.target.value)}
+            className="px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">Все статусы</option>
+            <option value="looking_for_home">Ищет дом</option>
+            <option value="lost">Потерялся</option>
+            <option value="found">Найден</option>
+            <option value="needs_help">Требуется помощь</option>
+          </select>
+
+          {/* Фильтр по виду */}
+          <select
+            value={filterSpecies}
+            onChange={(e) => setFilterSpecies(e.target.value)}
+            className="px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">Все виды</option>
+            <option value="dog">Собаки</option>
+            <option value="cat">Кошки</option>
+            <option value="bird">Птицы</option>
+            <option value="other">Другие</option>
+          </select>
+        </div>
+
+        <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
+          <span>Найдено: {filteredPets.length} питомцев</span>
+        </div>
+      </div>
+
+      {/* Список питомцев */}
+      {loading ? (
+        <div className="text-center py-20">
+          <div className="animate-pulse text-gray-400">Загрузка...</div>
+        </div>
+      ) : filteredPets.length === 0 ? (
+        <div className="bg-white rounded-2xl p-16 text-center shadow-sm border border-gray-100">
+          <div className="text-6xl mb-4">🐾</div>
+          <h3 className="text-xl font-semibold text-gray-900 mb-2">Питомцы не найдены</h3>
+          <p className="text-gray-500">Попробуйте изменить параметры поиска</p>
+        </div>
+      ) : (
+        <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
+          {filteredPets.map((pet) => (
+            <div
+              key={pet.id}
+              className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-xl hover:border-blue-200 transition-all duration-300 cursor-pointer group"
+            >
+              {/* Фото */}
+              <div className="relative h-64 bg-gradient-to-br from-blue-50 to-purple-50 overflow-hidden">
+                {pet.photo ? (
+                  <img
+                    src={pet.photo}
+                    alt={pet.name}
+                    className="w-full h-full object-cover group-hover:scale-110 transition-transform duration-300"
+                  />
+                ) : (
+                  <div className="w-full h-full flex items-center justify-center text-6xl">
+                    {pet.species === 'dog' && '🐕'}
+                    {pet.species === 'cat' && '🐈'}
+                    {pet.species === 'bird' && '🐦'}
+                    {!pet.species && '🐾'}
+                  </div>
+                )}
+                
+                {/* Срочно бадж */}
+                {pet.urgent && (
+                  <div className="absolute top-3 left-3">
+                    <span className="inline-flex px-3 py-1 text-xs font-semibold rounded-full bg-red-500 text-white shadow-sm">
+                      СРОЧНО
+                    </span>
+                  </div>
+                )}
+
+                {/* Статус бадж */}
+                <div className="absolute top-3 right-3">
+                  <span className={`inline-flex px-3 py-1 text-xs font-semibold rounded-full shadow-sm backdrop-blur-sm ${
+                    pet.status === 'lost' ? 'bg-red-100 text-red-700' : 
+                    pet.status === 'found' ? 'bg-blue-100 text-blue-700' :
+                    pet.status === 'needs_help' ? 'bg-purple-100 text-purple-700' :
+                    'bg-orange-100 text-orange-700'
+                  }`}>
+                    {statusLabels[pet.status]}
+                  </span>
+                </div>
+              </div>
+
+              {/* Информация */}
+              <div className="p-5">
+                <h3 className="text-xl font-bold text-gray-900 mb-2 group-hover:text-blue-600 transition-colors">
+                  {pet.name}
+                </h3>
+
+                <div className="space-y-2 mb-4">
+                  <div className="flex items-center text-sm text-gray-600">
+                    <span className="text-lg mr-2">
+                      {pet.species === 'dog' && '🐕'}
+                      {pet.species === 'cat' && '🐈'}
+                      {pet.species === 'bird' && '🐦'}
+                      {!pet.species && '🐾'}
+                    </span>
+                    <span className="font-medium">{pet.breed || 'Порода не указана'}</span>
+                  </div>
+
+                  <div className="flex items-center justify-between text-sm">
+                    <span className="text-gray-500">
+                      {pet.gender === 'male' && '♂️ Самец'}
+                      {pet.gender === 'female' && '♀️ Самка'}
+                      {!pet.gender && '⚪ Не указан'}
+                    </span>
+                    <span className="text-gray-700 font-medium">{getAge(pet.birth_date)}</span>
+                  </div>
+
+                  {(pet.city || pet.region) && (
+                    <div className="text-sm text-gray-600">
+                      📍 {pet.city || pet.region}
+                    </div>
+                  )}
+                </div>
+
+                {pet.story && (
+                  <p className="text-sm text-gray-600 mb-4 line-clamp-2">{pet.story}</p>
+                )}
+
+                {/* Контакты */}
+                {pet.contact_phone && (
+                  <div className="pt-4 border-t border-gray-100">
+                    <div className="text-xs text-gray-500 mb-1">Контакт:</div>
+                    <div className="text-sm font-medium text-gray-900">{pet.contact_name || 'Не указан'}</div>
+                    <a href={`tel:${pet.contact_phone}`} className="text-sm text-blue-600 hover:text-blue-700">
+                      {pet.contact_phone}
+                    </a>
+                  </div>
+                )}
+              </div>
+            </div>
+          ))}
+        </div>
+      )}
+    </div>
+  );
+}

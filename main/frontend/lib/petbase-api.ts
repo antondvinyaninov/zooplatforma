@@ -50,6 +50,11 @@ export interface Pet {
   location?: string;
   foster_address?: string;
   shelter_name?: string;
+  // Поля для каталога
+  region?: string;
+  urgent?: boolean;
+  contact_name?: string;
+  organization_id?: number;
 }
 
 export interface Species {
