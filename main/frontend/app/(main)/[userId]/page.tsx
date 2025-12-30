@@ -212,7 +212,7 @@ export default function UserProfilePage() {
                   </div>
                 </div>
 
-                {isOwnProfile && (
+                {isOwnProfile ? (
                   <button 
                     onClick={handleEditClick}
                     className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors whitespace-nowrap"
@@ -221,6 +221,15 @@ export default function UserProfilePage() {
                     <PencilIcon className="w-4 h-4" />
                     <span className="hidden sm:inline">Редактировать профиль</span>
                     <span className="sm:hidden">Редактировать</span>
+                  </button>
+                ) : (
+                  <button 
+                    onClick={() => router.push(`/messenger?user=${userId}`)}
+                    className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors whitespace-nowrap"
+                    style={{ backgroundColor: '#1B76FF' }}
+                  >
+                    <ChatBubbleLeftIcon className="w-4 h-4" />
+                    <span>Написать</span>
                   </button>
                 )}
               </div>

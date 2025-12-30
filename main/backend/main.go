@@ -112,6 +112,12 @@ func main() {
 	http.HandleFunc("/api/organizations/user/", enableCORS(middleware.AuthMiddleware(handlers.GetUserOrganizationsHandler)))
 	http.HandleFunc("/api/organizations/members/", enableCORS(middleware.AuthMiddleware(handlers.GetOrganizationMembersHandler)))
 
+	// Messenger (личные чаты 1-1)
+	http.HandleFunc("/api/chats", enableCORS(middleware.AuthMiddleware(handlers.GetChatsHandler(database.DB))))
+	http.HandleFunc("/api/chats/", enableCORS(middleware.AuthMiddleware(handlers.GetChatMessagesHandler(database.DB))))
+	http.HandleFunc("/api/messages/send", enableCORS(middleware.AuthMiddleware(handlers.SendMessageHandler(database.DB))))
+	http.HandleFunc("/api/messages/unread", enableCORS(middleware.AuthMiddleware(handlers.GetUnreadCountHandler(database.DB))))
+
 	// Media - более специфичные роуты должны быть первыми
 	mediaHandler := handlers.NewMediaHandler(database.DB)
 	http.HandleFunc("/api/media/upload", enableCORS(middleware.AuthMiddleware(mediaHandler.UploadMedia)))

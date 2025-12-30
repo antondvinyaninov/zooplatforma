@@ -1,7 +1,8 @@
 'use client';
 
 import Link from 'next/link';
-import { useAuth } from '../../../contexts/AuthContext';
+import { useAuth } from '@/contexts/AuthContext';
+import { useUnreadMessages } from '@/app/hooks/useUnreadMessages';
 import {
   HomeIcon,
   UserIcon,
@@ -33,11 +34,12 @@ const additionalLinks = [
 
 export default function Sidebar() {
   const { user } = useAuth();
+  const unreadCount = useUnreadMessages();
 
   const mainNavigation = [
     { name: 'Метки', href: '/', icon: DocumentTextIcon },
     { name: 'Профиль', href: user ? `/id${user.id}` : '/profile', icon: UserIcon },
-    { name: 'Мессенджер', href: '/messenger', icon: ChatBubbleLeftIcon, badge: '43' },
+    { name: 'Мессенджер', href: '/messenger', icon: ChatBubbleLeftIcon, badge: unreadCount > 0 ? unreadCount.toString() : undefined },
     { name: 'Организации', href: '/org', icon: BuildingOfficeIcon },
     { name: 'Каталог', href: '/catalog', icon: RectangleStackIcon },
     { name: 'Сервисы', href: '/services', icon: Cog6ToothIcon },
