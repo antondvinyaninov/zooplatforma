@@ -105,6 +105,13 @@ func main() {
 	http.HandleFunc("/api/friends/remove", enableCORS(middleware.AuthMiddleware(handlers.RemoveFriendHandler)))
 	http.HandleFunc("/api/friends/status", enableCORS(middleware.AuthMiddleware(handlers.GetFriendshipStatusHandler)))
 
+	// Organizations
+	http.HandleFunc("/api/organizations/all", enableCORS(handlers.GetAllOrganizationsHandler)) // Публичный endpoint
+	http.HandleFunc("/api/organizations", enableCORS(middleware.AuthMiddleware(handlers.CreateOrganizationHandler)))
+	http.HandleFunc("/api/organizations/", enableCORS(handlers.GetOrganizationHandler)) // Публичный для просмотра
+	http.HandleFunc("/api/organizations/user/", enableCORS(middleware.AuthMiddleware(handlers.GetUserOrganizationsHandler)))
+	http.HandleFunc("/api/organizations/members/", enableCORS(middleware.AuthMiddleware(handlers.GetOrganizationMembersHandler)))
+
 	// Media - более специфичные роуты должны быть первыми
 	mediaHandler := handlers.NewMediaHandler(database.DB)
 	http.HandleFunc("/api/media/upload", enableCORS(middleware.AuthMiddleware(mediaHandler.UploadMedia)))
