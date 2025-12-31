@@ -92,6 +92,39 @@ services:
       - petbase-backend
     restart: unless-stopped
 
+  # Shelter Backend (Go)
+  shelter-backend:
+    build:
+      context: ../shelter/backend
+      dockerfile: ../../infrastructure/docker/shelter/Dockerfile.backend
+    ports:
+      - "8200:8200"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_PATH=/app/database/data.db
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:5100
+    volumes:
+      - ../database:/app/database
+    depends_on:
+      - database
+    restart: unless-stopped
+
+  # Shelter Frontend (Next.js)
+  shelter-frontend:
+    build:
+      context: ../shelter/frontend
+      dockerfile: ../../infrastructure/docker/shelter/Dockerfile.frontend
+    ports:
+      - "5100:5100"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8200
+      - NEXT_PUBLIC_ADMIN_API_URL=http://localhost:9000
+      - NEXT_PUBLIC_MAIN_SITE_URL=http://localhost:3000
+    depends_on:
+      - shelter-backend
+      - admin-backend
+    restart: unless-stopped
+
   # Database (SQLite - shared volume)
   database:
     image: alpine:latest

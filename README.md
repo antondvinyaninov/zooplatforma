@@ -250,7 +250,8 @@
 Это запустит все сервисы:
 - **Main (Соцсеть):** http://localhost:3000 (frontend) + :8000 (backend)
 - **Admin (Управление):** http://localhost:4000 (frontend) + :9000 (backend)
-- **PetID (Реестр):** http://localhost:4100 (frontend) + :8100 (backend)
+- **PetBase (Реестр):** http://localhost:4100 (frontend) + :8100 (backend)
+- **Shelter (Кабинет приюта):** http://localhost:5100 (frontend) + :8200 (backend)
 - **Mobile:** http://localhost:8081
 
 Остановка: `Ctrl+C`

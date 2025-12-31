@@ -1,0 +1,27 @@
+# Shelter Backend Dockerfile
+FROM golang:1.25-alpine AS builder
+
+WORKDIR /app
+
+RUN apk add --no-cache git gcc musl-dev sqlite-dev
+
+COPY go.mod go.sum ./
+RUN go mod download
+
+COPY . .
+
+RUN CGO_ENABLED=1 GOOS=linux go build -o shelter-server .
+
+FROM alpine:latest
+
+WORKDIR /app
+
+RUN apk add --no-cache sqlite-libs
+
+COPY --from=builder /app/shelter-server .
+
+RUN mkdir -p /app/database
+
+EXPOSE 8200
+
+CMD ["./shelter-server"]

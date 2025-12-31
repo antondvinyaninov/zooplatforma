@@ -13,7 +13,10 @@ infrastructure/
 │   ├── admin/                 # Dockerfiles для admin сервиса
 │   │   ├── Dockerfile.backend
 │   │   └── Dockerfile.frontend
-│   └── petbase/               # Dockerfiles для petbase сервиса
+│   ├── petbase/               # Dockerfiles для petbase сервиса
+│   │   ├── Dockerfile.backend
+│   │   └── Dockerfile.frontend
+│   └── shelter/               # Dockerfiles для shelter сервиса
 │       ├── Dockerfile.backend
 │       └── Dockerfile.frontend
 ├── kubernetes/                # Kubernetes манифесты (TODO)
@@ -57,6 +60,17 @@ docker-compose down
 | admin-frontend | 4000 | Admin frontend (Next.js) |
 | petbase-backend | 8100 | PetBase backend (Go) |
 | petbase-frontend | 4100 | PetBase frontend (Next.js) |
+| shelter-backend | 8200 | Shelter backend (Go) |
+| shelter-frontend | 5100 | Shelter frontend (Next.js) |
+
+### URL сервисов
+
+После запуска `docker-compose up -d` будут доступны:
+
+- **Main (Соцсеть):** http://localhost:3000 (frontend) + :8000 (backend)
+- **Admin (Управление):** http://localhost:4000 (frontend) + :9000 (backend)
+- **PetBase (Реестр):** http://localhost:4100 (frontend) + :8100 (backend)
+- **Shelter (Кабинет приюта):** http://localhost:5100 (frontend) + :8200 (backend)
 
 ### Команды
 
@@ -203,5 +217,5 @@ docker-compose restart main-backend
 
 ---
 
-**Последнее обновление:** 29 декабря 2024  
+**Последнее обновление:** 30 декабря 2024 (v0.7.0)  
 **Статус:** В разработке (Docker готов, Kubernetes TODO)
