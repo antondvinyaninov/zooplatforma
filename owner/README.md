@@ -4,7 +4,7 @@
 
 ## Порты
 
-- **Frontend:** http://localhost:7000
+- **Frontend:** http://localhost:6100
 - **Backend API:** http://localhost:8400
 
 ## Функционал

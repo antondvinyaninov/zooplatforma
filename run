@@ -9,25 +9,88 @@ rm -rf admin/frontend/.next 2>/dev/null || true
 rm -rf petbase/frontend/.next 2>/dev/null || true
 rm -rf shelter/frontend/.next 2>/dev/null || true
 rm -rf owner/frontend/.next 2>/dev/null || true
+rm -rf volunteer/frontend/.next 2>/dev/null || true
+rm -rf clinic/frontend/.next 2>/dev/null || true
 rm -rf mobile/.expo 2>/dev/null || true
 rm -rf mobile/node_modules/.cache 2>/dev/null || true
 echo "✅ Cache cleared"
 
+# Function to kill process on port
+kill_port() {
+  local port=$1
+  local max_attempts=3
+  local attempt=1
+  
+  while [ $attempt -le $max_attempts ]; do
+    local pids=$(lsof -ti:$port 2>/dev/null)
+    if [ -z "$pids" ]; then
+      return 0
+    fi
+    
+    if [ $attempt -eq 1 ]; then
+      echo "   Killing processes on port $port: $pids"
+    else
+      echo "   Attempt $attempt: Forcing kill on port $port..."
+    fi
+    
+    # Пробуем разные сигналы
+    if [ $attempt -eq 1 ]; then
+      echo "$pids" | xargs kill -15 2>/dev/null || true  # SIGTERM
+      sleep 0.3
+    elif [ $attempt -eq 2 ]; then
+      echo "$pids" | xargs kill -9 2>/dev/null || true   # SIGKILL
+      sleep 0.5
+    else
+      # Последняя попытка - убиваем через sudo (для системных процессов)
+      echo "$pids" | xargs sudo kill -9 2>/dev/null || true
+      sleep 0.5
+    fi
+    
+    attempt=$((attempt + 1))
+  done
+  
+  # Финальная проверка
+  local remaining=$(lsof -ti:$port 2>/dev/null)
+  if [ ! -z "$remaining" ]; then
+    echo "   ⚠️  WARNING: Port $port still occupied by PID $remaining"
+    echo "   Process info:"
+    lsof -i :$port | head -2
+    return 1
+  fi
+  return 0
+}
+
 # Kill processes on ports
 echo "🧹 Cleaning up ports..."
-lsof -ti:3000 | xargs kill -9 2>/dev/null || true
-lsof -ti:4000 | xargs kill -9 2>/dev/null || true
-lsof -ti:4100 | xargs kill -9 2>/dev/null || true
-lsof -ti:5100 | xargs kill -9 2>/dev/null || true
-lsof -ti:7000 | xargs kill -9 2>/dev/null || true
-lsof -ti:8000 | xargs kill -9 2>/dev/null || true
-lsof -ti:8081 | xargs kill -9 2>/dev/null || true
-lsof -ti:8100 | xargs kill -9 2>/dev/null || true
-lsof -ti:8200 | xargs kill -9 2>/dev/null || true
-lsof -ti:8400 | xargs kill -9 2>/dev/null || true
-lsof -ti:9000 | xargs kill -9 2>/dev/null || true
+kill_port 3000
+kill_port 4000
+kill_port 4100
+kill_port 5100
+kill_port 6100
+kill_port 6200
+kill_port 6300
+kill_port 8000
+kill_port 8081
+kill_port 8100
+kill_port 8200
+kill_port 8400
+kill_port 8500
+kill_port 8600
+kill_port 9000
 
 echo "✅ Ports cleared"
+
+# Final check - wait a bit for ports to be fully released
+sleep 1
+
+# Verify ports are free
+echo "🔍 Verifying ports are free..."
+for port in 3000 4000 4100 5100 6100 6200 6300 8000 8081 8100 8200 8400 8500 8600 9000; do
+  if lsof -i :$port -sTCP:LISTEN >/dev/null 2>&1; then
+    echo "   ⚠️  WARNING: Port $port is still occupied!"
+    lsof -i :$port
+  fi
+done
 
 # Start main backend with Air
 echo "🔧 Starting Main Backend on port 8000 (with hot reload)..."
@@ -60,6 +123,16 @@ echo "👤 Starting Owner Backend on port 8400 (with hot reload)..."
 (cd owner/backend && /Users/dvinyaninov/go/bin/air) &
 OWNER_BACKEND_PID=$!
 
+# Start volunteer backend with Air
+echo "🤝 Starting Volunteer Backend on port 8500 (with hot reload)..."
+(cd volunteer/backend && /Users/dvinyaninov/go/bin/air) &
+VOLUNTEER_BACKEND_PID=$!
+
+# Start clinic backend with Air
+echo "🏥 Starting Clinic Backend on port 8600 (with hot reload)..."
+(cd clinic/backend && /Users/dvinyaninov/go/bin/air) &
+CLINIC_BACKEND_PID=$!
+
 # Start web frontend
 echo "⚛️  Starting Web Frontend on port 3000..."
 (cd main/frontend && npm run dev) &
@@ -81,9 +154,37 @@ echo "🏠 Starting Shelter Frontend on port 5100..."
 SHELTER_FRONTEND_PID=$!
 
 # Start owner frontend
-echo "👤 Starting Owner Frontend on port 7000..."
+echo "👤 Starting Owner Frontend on port 6100..."
+# Дополнительная проверка и очистка порта 6100 перед запуском
+if lsof -i :6100 -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "   ⚠️  Port 6100 still occupied, forcing cleanup..."
+  lsof -ti:6100 | xargs sudo kill -9 2>/dev/null || true
+  sleep 1
+fi
 (cd owner/frontend && npm run dev) &
 OWNER_FRONTEND_PID=$!
+
+# Start volunteer frontend
+echo "🤝 Starting Volunteer Frontend on port 6200..."
+# Дополнительная проверка и очистка порта 6200 перед запуском
+if lsof -i :6200 -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "   ⚠️  Port 6200 still occupied, forcing cleanup..."
+  lsof -ti:6200 | xargs sudo kill -9 2>/dev/null || true
+  sleep 1
+fi
+(cd volunteer/frontend && npm run dev) &
+VOLUNTEER_FRONTEND_PID=$!
+
+# Start clinic frontend
+echo "🏥 Starting Clinic Frontend on port 6300..."
+# Дополнительная проверка и очистка порта 6300 перед запуском
+if lsof -i :6300 -sTCP:LISTEN >/dev/null 2>&1; then
+  echo "   ⚠️  Port 6300 still occupied, forcing cleanup..."
+  lsof -ti:6300 | xargs sudo kill -9 2>/dev/null || true
+  sleep 1
+fi
+(cd clinic/frontend && npm run dev) &
+CLINIC_FRONTEND_PID=$!
 
 # Start mobile
 echo "📱 Starting Mobile on port 8081 (Expo default)..."
@@ -109,43 +210,55 @@ check_port() {
   fi
 }
 
-check_port 3000 "Web Frontend    "
-check_port 4000 "Admin Frontend  "
-check_port 4100 "PetBase Frontend"
-check_port 5100 "Shelter Frontend"
-check_port 7000 "Owner Frontend  "
-check_port 8081 "Mobile          "
-check_port 8000 "Main Backend    "
-check_port 8100 "PetBase Backend "
-check_port 8200 "Shelter Backend "
-check_port 8400 "Owner Backend   "
-check_port 9000 "Admin Backend   "
+check_port 3000 "Web Frontend       "
+check_port 4000 "Admin Frontend     "
+check_port 4100 "PetBase Frontend   "
+check_port 5100 "Shelter Frontend   "
+check_port 6100 "Owner Frontend     "
+check_port 6200 "Volunteer Frontend "
+check_port 6300 "Clinic Frontend    "
+check_port 8081 "Mobile             "
+check_port 8000 "Main Backend       "
+check_port 8100 "PetBase Backend    "
+check_port 8200 "Shelter Backend    "
+check_port 8400 "Owner Backend      "
+check_port 8500 "Volunteer Backend  "
+check_port 8600 "Clinic Backend     "
+check_port 9000 "Admin Backend      "
 
 echo ""
 echo "✅ ЗооПлатформа запущена!"
 echo ""
-echo "   🌐 Web Frontend:     http://localhost:3000"
-echo "   🔐 Admin Frontend:   http://localhost:4000"
-echo "   🐾 PetBase Frontend: http://localhost:4100"
-echo "   🏠 Shelter Frontend: http://localhost:5100"
-echo "   👤 Owner Frontend:   http://localhost:7000"
-echo "   📱 Mobile:           http://localhost:8081"
-echo "   🔧 Main Backend:     http://localhost:8000"
-echo "   🐾 PetBase Backend:  http://localhost:8100"
-echo "   🏠 Shelter Backend:  http://localhost:8200"
-echo "   👤 Owner Backend:    http://localhost:8400"
-echo "   🛡️  Admin Backend:    http://localhost:9000"
+echo "   🌐 Web Frontend:        http://localhost:3000"
+echo "   🔐 Admin Frontend:      http://localhost:4000"
+echo "   🐾 PetBase Frontend:    http://localhost:4100"
+echo "   🏠 Shelter Frontend:    http://localhost:5100"
+echo "   👤 Owner Frontend:      http://localhost:6100"
+echo "   🤝 Volunteer Frontend:  http://localhost:6200"
+echo "   🏥 Clinic Frontend:     http://localhost:6300"
+echo "   📱 Mobile:              http://localhost:8081"
+echo "   🔧 Main Backend:        http://localhost:8000"
+echo "   🐾 PetBase Backend:     http://localhost:8100"
+echo "   🏠 Shelter Backend:     http://localhost:8200"
+echo "   👤 Owner Backend:       http://localhost:8400"
+echo "   🤝 Volunteer Backend:   http://localhost:8500"
+echo "   🏥 Clinic Backend:      http://localhost:8600"
+echo "   🛡️  Admin Backend:       http://localhost:9000"
 echo ""
 echo "📚 Документация:"
-echo "   - Админ-панель:  admin/README.md"
-echo "   - ЗооБаза:       petbase/README.md"
-echo "   - SSO Setup:     admin/SSO_SETUP.md"
-echo "   - Тесты:         tests/README.md"
+echo "   - Админ-панель:     admin/README.md"
+echo "   - ЗооБаза:          petbase/README.md"
+echo "   - Приют:            shelter/README.md"
+echo "   - Владелец:         owner/README.md"
+echo "   - Зоопомощник:      volunteer/README.md"
+echo "   - Ветклиника:       clinic/README.md"
+echo "   - SSO Setup:        admin/SSO_SETUP.md"
+echo "   - Тесты:            tests/README.md"
 echo ""
 echo "🧪 Тест SSO:        ./tests/debug-sso.sh"
 echo ""
 echo "Press Ctrl+C to stop all services"
 
 # Wait for Ctrl+C
-trap "echo ''; echo '🛑 Stopping all services...'; kill $BACKEND_PID $ADMIN_BACKEND_PID $PETBASE_BACKEND_PID $SHELTER_BACKEND_PID $OWNER_BACKEND_PID $FRONTEND_PID $ADMIN_FRONTEND_PID $PETBASE_FRONTEND_PID $SHELTER_FRONTEND_PID $OWNER_FRONTEND_PID $MOBILE_PID 2>/dev/null; exit" INT
+trap "echo ''; echo '🛑 Stopping all services...'; kill $BACKEND_PID $ADMIN_BACKEND_PID $PETBASE_BACKEND_PID $SHELTER_BACKEND_PID $OWNER_BACKEND_PID $VOLUNTEER_BACKEND_PID $CLINIC_BACKEND_PID $FRONTEND_PID $ADMIN_FRONTEND_PID $PETBASE_FRONTEND_PID $SHELTER_FRONTEND_PID $OWNER_FRONTEND_PID $VOLUNTEER_FRONTEND_PID $CLINIC_FRONTEND_PID $MOBILE_PID 2>/dev/null; exit" INT
 wait

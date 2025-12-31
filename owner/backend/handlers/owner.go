@@ -19,10 +19,10 @@ func GetMyPets(db *sql.DB) http.HandlerFunc {
 		}
 
 		rows, err := db.Query(`
-			SELECT id, owner_id, name, species, breed, birth_date, gender, color, 
+			SELECT id, user_id, name, species, breed, birth_date, gender, color, 
 			       chip_number, photo, status, created_at, updated_at
 			FROM pets
-			WHERE owner_id = ?
+			WHERE user_id = ?
 			ORDER BY created_at DESC
 		`, userID)
 
@@ -73,7 +73,7 @@ func GetPetEvents(db *sql.DB) http.HandlerFunc {
 
 		// Проверяем, что питомец принадлежит пользователю
 		var ownerID int
-		err := db.QueryRow("SELECT owner_id FROM pets WHERE id = ?", petID).Scan(&ownerID)
+		err := db.QueryRow("SELECT user_id FROM pets WHERE id = ?", petID).Scan(&ownerID)
 		if err != nil {
 			http.Error(w, "Pet not found", http.StatusNotFound)
 			return

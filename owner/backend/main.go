@@ -22,7 +22,7 @@ func enableCORSHandler(next http.Handler) http.Handler {
 		allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
 		allowedOrigins := map[string]bool{
 			"http://localhost:3000": true,
-			"http://localhost:7000": true,
+			"http://localhost:6100": true,
 		}
 
 		if allowedOriginsEnv != "" {
@@ -35,8 +35,8 @@ func enableCORSHandler(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			log.Printf("✅ Origin allowed: %s", origin)
 		} else if origin == "" {
-			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:7000")
-			log.Printf("⚠️ No origin, using default: http://localhost:7000")
+			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:6100")
+			log.Printf("⚠️ No origin, using default: http://localhost:6100")
 		}
 
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -59,13 +59,13 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 		origin := r.Header.Get("Origin")
 		allowedOrigins := map[string]bool{
 			"http://localhost:3000": true,
-			"http://localhost:7000": true,
+			"http://localhost:6100": true,
 		}
 
 		if allowedOrigins[origin] {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 		} else if origin == "" {
-			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:7000")
+			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:6100")
 		}
 
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -136,7 +136,7 @@ func getAllowedOrigins() string {
 	if origins != "" {
 		return origins
 	}
-	return "localhost:3000, localhost:7000"
+	return "localhost:3000, localhost:6100"
 }
 
 func handleRoot(w http.ResponseWriter, r *http.Request) {
