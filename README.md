@@ -277,6 +277,38 @@
 
 ## Быстрый старт
 
+### Вариант 1: Makefile (рекомендуется)
+
+```bash
+# Показать все команды
+make help
+
+# Запустить Admin (Main + Admin)
+make admin
+
+# Запустить Clinic (Main + Admin + Clinic)
+make clinic
+
+# Запустить Owner (Main + Owner)
+make owner
+
+# Запустить всё
+make all
+
+# Остановить
+make stop
+```
+
+**Преимущества Makefile:**
+- ✅ Не нужно помнить команды - просто `make admin`
+- ✅ Автоматический запуск зависимостей (Main для всех сервисов)
+- ✅ 60+ команд для всех задач разработки
+- ✅ Самодокументируемый - `make help` всегда под рукой
+
+**Полная документация:** [MAKEFILE_GUIDE.md](MAKEFILE_GUIDE.md)
+
+### Вариант 2: Скрипт ./run
+
 ```bash
 ./run
 ```
