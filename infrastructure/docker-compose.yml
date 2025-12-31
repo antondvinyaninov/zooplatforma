@@ -125,6 +125,101 @@ services:
       - admin-backend
     restart: unless-stopped
 
+  # Owner Backend (Go)
+  owner-backend:
+    build:
+      context: ../owner/backend
+      dockerfile: ../../infrastructure/docker/owner/Dockerfile.backend
+    ports:
+      - "8400:8400"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_PATH=/app/database/data.db
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:6100
+    volumes:
+      - ../database:/app/database
+    depends_on:
+      - database
+    restart: unless-stopped
+
+  # Owner Frontend (Next.js)
+  owner-frontend:
+    build:
+      context: ../owner/frontend
+      dockerfile: ../../infrastructure/docker/owner/Dockerfile.frontend
+    ports:
+      - "6100:6100"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8400
+      - NEXT_PUBLIC_MAIN_SITE_URL=http://localhost:3000
+    depends_on:
+      - owner-backend
+    restart: unless-stopped
+
+  # Volunteer Backend (Go)
+  volunteer-backend:
+    build:
+      context: ../volunteer/backend
+      dockerfile: ../../infrastructure/docker/volunteer/Dockerfile.backend
+    ports:
+      - "8500:8500"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_PATH=/app/database/data.db
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:6200
+    volumes:
+      - ../database:/app/database
+    depends_on:
+      - database
+    restart: unless-stopped
+
+  # Volunteer Frontend (Next.js)
+  volunteer-frontend:
+    build:
+      context: ../volunteer/frontend
+      dockerfile: ../../infrastructure/docker/volunteer/Dockerfile.frontend
+    ports:
+      - "6200:6200"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8500
+      - NEXT_PUBLIC_MAIN_SITE_URL=http://localhost:3000
+    depends_on:
+      - volunteer-backend
+    restart: unless-stopped
+
+  # Clinic Backend (Go)
+  clinic-backend:
+    build:
+      context: ../clinic/backend
+      dockerfile: ../../infrastructure/docker/clinic/Dockerfile.backend
+    ports:
+      - "8600:8600"
+    environment:
+      - JWT_SECRET=${JWT_SECRET}
+      - DATABASE_PATH=/app/database/data.db
+      - ALLOWED_ORIGINS=http://localhost:3000,http://localhost:6300
+    volumes:
+      - ../database:/app/database
+    depends_on:
+      - database
+    restart: unless-stopped
+
+  # Clinic Frontend (Next.js)
+  clinic-frontend:
+    build:
+      context: ../clinic/frontend
+      dockerfile: ../../infrastructure/docker/clinic/Dockerfile.frontend
+    ports:
+      - "6300:6300"
+    environment:
+      - NEXT_PUBLIC_API_URL=http://localhost:8600
+      - NEXT_PUBLIC_ADMIN_API_URL=http://localhost:9000
+      - NEXT_PUBLIC_MAIN_SITE_URL=http://localhost:3000
+    depends_on:
+      - clinic-backend
+      - admin-backend
+    restart: unless-stopped
+
   # Database (SQLite - shared volume)
   database:
     image: alpine:latest

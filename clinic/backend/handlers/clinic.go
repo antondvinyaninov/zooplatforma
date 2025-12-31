@@ -1,12 +1,12 @@
 package handlers
 
 import (
-"clinic/middleware"
-"clinic/models"
-"database/sql"
-"encoding/json"
-"log"
-"net/http"
+	"clinic/middleware"
+	"clinic/models"
+	"database/sql"
+	"encoding/json"
+	"log"
+	"net/http"
 )
 
 // GetMyClinics возвращает список клиник, где пользователь является членом
@@ -66,9 +66,9 @@ func GetMyClinics(db *sql.DB) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-"success": true,
-"data":    clinics,
-})
+			"success": true,
+			"data":    clinics,
+		})
 	}
 }
 
@@ -143,12 +143,12 @@ func CreateClinic(db *sql.DB) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-"success": true,
-"data": map[string]interface{}{
-"id":   orgID,
-"name": data.Name,
-},
-})
+			"success": true,
+			"data": map[string]interface{}{
+				"id":   orgID,
+				"name": data.Name,
+			},
+		})
 	}
 }
 
@@ -161,12 +161,14 @@ func GetMyPatients(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		// Получаем tenant ID из контекста
 		_, ok = middleware.GetTenantID(r)
 		if !ok {
 			http.Error(w, "Clinic not selected", http.StatusBadRequest)
 			return
 		}
 
+		// Пока возвращаем всех питомцев для демонстрации
 		rows, err := db.Query(`
 			SELECT id, user_id, name, species, breed, birth_date, gender, color, 
 			       chip_number, photo, status, created_at, updated_at
@@ -186,7 +188,7 @@ func GetMyPatients(db *sql.DB) http.HandlerFunc {
 		for rows.Next() {
 			var pet models.Pet
 			err := rows.Scan(
-&pet.ID, &pet.OwnerID, &pet.Name, &pet.Species, &pet.Breed,
+				&pet.ID, &pet.OwnerID, &pet.Name, &pet.Species, &pet.Breed,
 				&pet.BirthDate, &pet.Gender, &pet.Color, &pet.ChipNumber,
 				&pet.Photo, &pet.Status, &pet.CreatedAt, &pet.UpdatedAt,
 			)
@@ -199,9 +201,9 @@ func GetMyPatients(db *sql.DB) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-"success": true,
-"data":    pets,
-})
+			"success": true,
+			"data":    pets,
+		})
 	}
 }
 
@@ -218,9 +220,9 @@ func GetAppointments(db *sql.DB) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-"success": true,
-"data":    appointments,
-})
+			"success": true,
+			"data":    appointments,
+		})
 	}
 }
 
@@ -248,9 +250,9 @@ func GetProfile(db *sql.DB) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-"success": true,
-"data":    user,
-})
+			"success": true,
+			"data":    user,
+		})
 	}
 }
 
@@ -279,7 +281,7 @@ func GetOrganization(db *sql.DB) http.HandlerFunc {
 			FROM organizations
 			WHERE id = ?
 		`, tenantID).Scan(
-&org.ID, &org.Name, &org.Type, &org.Description,
+			&org.ID, &org.Name, &org.Type, &org.Description,
 			&org.Address, &org.Phone, &org.Email, &org.Website,
 			&org.Logo, &org.CreatedAt,
 		)
@@ -292,8 +294,8 @@ func GetOrganization(db *sql.DB) http.HandlerFunc {
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-"success": true,
-"data":    org,
-})
+			"success": true,
+			"data":    org,
+		})
 	}
 }

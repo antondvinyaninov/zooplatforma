@@ -15,6 +15,18 @@
 ├── petbase/              # ЗооБаза - справочник животных (микросервис)
 │   ├── backend/          # PetBase API сервер (порт 8100)
 │   └── frontend/         # PetBase UI (Next.js, порт 4100)
+├── shelter/              # Кабинет приюта (микросервис)
+│   ├── backend/          # Shelter API сервер (порт 8200)
+│   └── frontend/         # Shelter UI (Next.js, порт 5100)
+├── owner/                # Кабинет владельца (микросервис)
+│   ├── backend/          # Owner API сервер (порт 8400)
+│   └── frontend/         # Owner UI (Next.js, порт 6100)
+├── volunteer/            # Кабинет зоопомощника (микросервис)
+│   ├── backend/          # Volunteer API сервер (порт 8500)
+│   └── frontend/         # Volunteer UI (Next.js, порт 6200)
+├── clinic/               # Кабинет ветклиники (микросервис)
+│   ├── backend/          # Clinic API сервер (порт 8600)
+│   └── frontend/         # Clinic UI (Next.js, порт 6300)
 ├── mobile/               # React Native мобильное приложение (порт 8081)
 ├── shared/               # Общие компоненты (@pet/shared npm пакет)
 │   ├── src/
@@ -24,6 +36,7 @@
 │   │   └── hooks/        # React хуки
 │   └── package.json      # npm пакет
 ├── database/             # SQLite база данных (общая для всех)
+├── infrastructure/       # Docker, Kubernetes, деплой
 ├── docs/                 # Документация проекта
 │   ├── README.md         # Обзор документации
 │   ├── CHANGELOG.md      # История изменений

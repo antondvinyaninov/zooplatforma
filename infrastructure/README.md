@@ -16,7 +16,16 @@ infrastructure/
 │   ├── petbase/               # Dockerfiles для petbase сервиса
 │   │   ├── Dockerfile.backend
 │   │   └── Dockerfile.frontend
-│   └── shelter/               # Dockerfiles для shelter сервиса
+│   ├── shelter/               # Dockerfiles для shelter сервиса
+│   │   ├── Dockerfile.backend
+│   │   └── Dockerfile.frontend
+│   ├── owner/                 # Dockerfiles для owner сервиса
+│   │   ├── Dockerfile.backend
+│   │   └── Dockerfile.frontend
+│   ├── volunteer/             # Dockerfiles для volunteer сервиса
+│   │   ├── Dockerfile.backend
+│   │   └── Dockerfile.frontend
+│   └── clinic/                # Dockerfiles для clinic сервиса
 │       ├── Dockerfile.backend
 │       └── Dockerfile.frontend
 ├── kubernetes/                # Kubernetes манифесты (TODO)
@@ -62,6 +71,12 @@ docker-compose down
 | petbase-frontend | 4100 | PetBase frontend (Next.js) |
 | shelter-backend | 8200 | Shelter backend (Go) |
 | shelter-frontend | 5100 | Shelter frontend (Next.js) |
+| owner-backend | 8400 | Owner backend (Go) |
+| owner-frontend | 6100 | Owner frontend (Next.js) |
+| volunteer-backend | 8500 | Volunteer backend (Go) |
+| volunteer-frontend | 6200 | Volunteer frontend (Next.js) |
+| clinic-backend | 8600 | Clinic backend (Go) |
+| clinic-frontend | 6300 | Clinic frontend (Next.js) |
 
 ### URL сервисов
 
@@ -71,6 +86,9 @@ docker-compose down
 - **Admin (Управление):** http://localhost:4000 (frontend) + :9000 (backend)
 - **PetBase (Реестр):** http://localhost:4100 (frontend) + :8100 (backend)
 - **Shelter (Кабинет приюта):** http://localhost:5100 (frontend) + :8200 (backend)
+- **Owner (Кабинет владельца):** http://localhost:6100 (frontend) + :8400 (backend)
+- **Volunteer (Кабинет зоопомощника):** http://localhost:6200 (frontend) + :8500 (backend)
+- **Clinic (Кабинет ветклиники):** http://localhost:6300 (frontend) + :8600 (backend)
 
 ### Команды
 
@@ -217,5 +235,5 @@ docker-compose restart main-backend
 
 ---
 
-**Последнее обновление:** 30 декабря 2024 (v0.7.0)  
+**Последнее обновление:** 31 декабря 2024 (v0.8.0)  
 **Статус:** В разработке (Docker готов, Kubernetes TODO)

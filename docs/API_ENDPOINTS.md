@@ -14,10 +14,16 @@
 | **Main API** | http://localhost:8000 | https://api.zooplatform.ru | Backend основного сайта |
 | **Admin** | http://localhost:4000 | https://admin.zooplatform.ru | Админ-панель |
 | **Admin API** | http://localhost:9000 | https://admin-api.zooplatform.ru | Backend админ-панели |
-| **PetID** | http://localhost:41000 | https://petid.zooplatform.ru | Реестр животных |
+| **PetID** | http://localhost:4100 | https://petid.zooplatform.ru | Реестр животных |
 | **PetID API** | http://localhost:8100 | https://petid-api.zooplatform.ru | Backend реестра животных |
-| **Shelter** | http://localhost:5000 | https://shelter.zooplatform.ru | Кабинеты организаций |
-| **Shelter API** | http://localhost:8200 | https://shelter-api.zooplatform.ru | Backend организаций |
+| **Shelter** | http://localhost:5100 | https://shelter.zooplatform.ru | Кабинет приюта |
+| **Shelter API** | http://localhost:8200 | https://shelter-api.zooplatform.ru | Backend приюта |
+| **Owner** | http://localhost:6100 | https://owner.zooplatform.ru | Кабинет владельца |
+| **Owner API** | http://localhost:8400 | https://owner-api.zooplatform.ru | Backend владельца |
+| **Volunteer** | http://localhost:6200 | https://volunteer.zooplatform.ru | Кабинет зоопомощника |
+| **Volunteer API** | http://localhost:8500 | https://volunteer-api.zooplatform.ru | Backend зоопомощника |
+| **Clinic** | http://localhost:6300 | https://clinic.zooplatform.ru | Кабинет ветклиники |
+| **Clinic API** | http://localhost:8600 | https://clinic-api.zooplatform.ru | Backend ветклиники |
 | **Mobile** | http://localhost:8081 | - | React Native (Expo) |
 
 ---
@@ -444,7 +450,117 @@ GET    /api/pets/:id/children          Потомки питомца
 
 ---
 
-## 🏥 Shelter API (localhost:8200) - планируется
+## 🏥 Shelter API (localhost:8200)
+
+### Приюты
+
+```
+GET    /api/my-shelters                Список приютов пользователя
+POST   /api/shelters                   Создать приют
+GET    /api/organization               Информация о текущем приюте (требует X-Shelter-ID)
+GET    /api/profile                    Профиль текущего пользователя
+```
+
+### Животные в приюте
+
+```
+GET    /api/my-animals                 Животные текущего приюта (требует X-Shelter-ID)
+GET    /api/adoptions                  Заявки на пристройство (требует X-Shelter-ID)
+GET    /api/volunteers                 Волонтёры приюта (требует X-Shelter-ID)
+```
+
+**Multi-tenancy:** Все endpoints с животными требуют заголовок `X-Shelter-ID` для изоляции данных между приютами.
+
+---
+
+## 👤 Owner API (localhost:8400)
+
+### Питомцы владельца
+
+```
+GET    /api/my-pets                    Список питомцев пользователя
+GET    /api/pets/events                События питомцев
+GET    /api/profile                    Профиль текущего пользователя
+GET    /api/health                     Health check
+```
+
+**Примеры:**
+
+```bash
+# Получить моих питомцев
+curl -H "Cookie: auth_token=<jwt>" http://localhost:8400/api/my-pets
+
+# Получить события питомцев
+curl -H "Cookie: auth_token=<jwt>" http://localhost:8400/api/pets/events
+```
+
+---
+
+## 🤝 Volunteer API (localhost:8500)
+
+### Подопечные зоопомощника
+
+```
+GET    /api/my-pets                    Список подопечных питомцев (где curator_id = user_id)
+GET    /api/my-tasks                   Задачи зоопомощника
+GET    /api/profile                    Профиль текущего пользователя
+GET    /api/health                     Health check
+```
+
+**Примеры:**
+
+```bash
+# Получить подопечных питомцев
+curl -H "Cookie: auth_token=<jwt>" http://localhost:8500/api/my-pets
+
+# Получить задачи
+curl -H "Cookie: auth_token=<jwt>" http://localhost:8500/api/my-tasks
+```
+
+---
+
+## 🏥 Clinic API (localhost:8600)
+
+### Клиники
+
+```
+GET    /api/my-clinics                 Список клиник пользователя
+POST   /api/clinics                    Создать клинику
+GET    /api/organization               Информация о текущей клинике (требует X-Clinic-ID)
+GET    /api/profile                    Профиль текущего пользователя
+```
+
+### Пациенты клиники
+
+```
+GET    /api/my-patients                Пациенты текущей клиники (требует X-Clinic-ID)
+GET    /api/appointments               Записи на приём (требует X-Clinic-ID)
+```
+
+**Multi-tenancy:** Все endpoints с пациентами требуют заголовок `X-Clinic-ID` для изоляции данных между клиниками.
+
+**Примеры:**
+
+```bash
+# Получить список клиник
+curl -H "Cookie: auth_token=<jwt>" http://localhost:8600/api/my-clinics
+
+# Получить пациентов клиники
+curl -H "Cookie: auth_token=<jwt>" \
+     -H "X-Clinic-ID: 3" \
+     http://localhost:8600/api/my-patients
+
+# Создать клинику
+curl -X POST \
+     -H "Cookie: auth_token=<jwt>" \
+     -H "Content-Type: application/json" \
+     -d '{"name":"Ветклиника Айболит","address":"ул. Пушкина, 10"}' \
+     http://localhost:8600/api/clinics
+```
+
+---
+
+## 🏥 Shelter API (localhost:8200) - планируется расширение
 
 ### Приюты
 
@@ -738,6 +854,6 @@ X-RateLimit-Reset: 1640000000
 ---
 
 **Документ создан:** 29 декабря 2024  
-**Последнее обновление:** 29 декабря 2024 (v0.3.4)  
+**Последнее обновление:** 31 декабря 2024 (v0.8.0)  
 **Автор:** ЗооПлатформа Team  
-**Версия:** 1.2 (обновлены endpoints пользователей и питомцев)
+**Версия:** 1.3 (добавлены Owner, Volunteer, Clinic API)

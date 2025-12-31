@@ -20,6 +20,14 @@
 - `admin-api.zooplatform.ru` → Admin Backend
 - `petid.zooplatform.ru` → PetBase Frontend
 - `petid-api.zooplatform.ru` → PetBase Backend
+- `shelter.zooplatform.ru` → Shelter Frontend
+- `shelter-api.zooplatform.ru` → Shelter Backend
+- `owner.zooplatform.ru` → Owner Frontend
+- `owner-api.zooplatform.ru` → Owner Backend
+- `volunteer.zooplatform.ru` → Volunteer Frontend
+- `volunteer-api.zooplatform.ru` → Volunteer Backend
+- `clinic.zooplatform.ru` → Clinic Frontend
+- `clinic-api.zooplatform.ru` → Clinic Backend
 
 ## 🚀 Быстрый деплой
 
@@ -83,6 +91,14 @@ sudo certbot certonly --standalone -d admin.zooplatform.ru
 sudo certbot certonly --standalone -d admin-api.zooplatform.ru
 sudo certbot certonly --standalone -d petid.zooplatform.ru
 sudo certbot certonly --standalone -d petid-api.zooplatform.ru
+sudo certbot certonly --standalone -d shelter.zooplatform.ru
+sudo certbot certonly --standalone -d shelter-api.zooplatform.ru
+sudo certbot certonly --standalone -d owner.zooplatform.ru
+sudo certbot certonly --standalone -d owner-api.zooplatform.ru
+sudo certbot certonly --standalone -d volunteer.zooplatform.ru
+sudo certbot certonly --standalone -d volunteer-api.zooplatform.ru
+sudo certbot certonly --standalone -d clinic.zooplatform.ru
+sudo certbot certonly --standalone -d clinic-api.zooplatform.ru
 
 # Автоматическое обновление сертификатов
 sudo certbot renew --dry-run
@@ -227,10 +243,154 @@ server {
     }
 }
 
+# Shelter Frontend
+server {
+    listen 443 ssl http2;
+    server_name shelter.zooplatform.ru;
+
+    ssl_certificate /etc/letsencrypt/live/shelter.zooplatform.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/shelter.zooplatform.ru/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:5100;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# Shelter Backend
+server {
+    listen 443 ssl http2;
+    server_name shelter-api.zooplatform.ru;
+
+    ssl_certificate /etc/letsencrypt/live/shelter-api.zooplatform.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/shelter-api.zooplatform.ru/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:8200;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Owner Frontend
+server {
+    listen 443 ssl http2;
+    server_name owner.zooplatform.ru;
+
+    ssl_certificate /etc/letsencrypt/live/owner.zooplatform.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/owner.zooplatform.ru/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:6100;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# Owner Backend
+server {
+    listen 443 ssl http2;
+    server_name owner-api.zooplatform.ru;
+
+    ssl_certificate /etc/letsencrypt/live/owner-api.zooplatform.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/owner-api.zooplatform.ru/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:8400;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Volunteer Frontend
+server {
+    listen 443 ssl http2;
+    server_name volunteer.zooplatform.ru;
+
+    ssl_certificate /etc/letsencrypt/live/volunteer.zooplatform.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/volunteer.zooplatform.ru/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:6200;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# Volunteer Backend
+server {
+    listen 443 ssl http2;
+    server_name volunteer-api.zooplatform.ru;
+
+    ssl_certificate /etc/letsencrypt/live/volunteer-api.zooplatform.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/volunteer-api.zooplatform.ru/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:8500;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
+# Clinic Frontend
+server {
+    listen 443 ssl http2;
+    server_name clinic.zooplatform.ru;
+
+    ssl_certificate /etc/letsencrypt/live/clinic.zooplatform.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/clinic.zooplatform.ru/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:6300;
+        proxy_http_version 1.1;
+        proxy_set_header Upgrade $http_upgrade;
+        proxy_set_header Connection 'upgrade';
+        proxy_set_header Host $host;
+        proxy_cache_bypass $http_upgrade;
+    }
+}
+
+# Clinic Backend
+server {
+    listen 443 ssl http2;
+    server_name clinic-api.zooplatform.ru;
+
+    ssl_certificate /etc/letsencrypt/live/clinic-api.zooplatform.ru/fullchain.pem;
+    ssl_certificate_key /etc/letsencrypt/live/clinic-api.zooplatform.ru/privkey.pem;
+
+    location / {
+        proxy_pass http://localhost:8600;
+        proxy_http_version 1.1;
+        proxy_set_header Host $host;
+        proxy_set_header X-Real-IP $remote_addr;
+        proxy_set_header X-Forwarded-For $proxy_add_x_forwarded_for;
+        proxy_set_header X-Forwarded-Proto $scheme;
+    }
+}
+
 # HTTP to HTTPS redirect
 server {
     listen 80;
-    server_name zooplatform.ru api.zooplatform.ru admin.zooplatform.ru admin-api.zooplatform.ru petid.zooplatform.ru petid-api.zooplatform.ru;
+    server_name zooplatform.ru api.zooplatform.ru admin.zooplatform.ru admin-api.zooplatform.ru petid.zooplatform.ru petid-api.zooplatform.ru shelter.zooplatform.ru shelter-api.zooplatform.ru owner.zooplatform.ru owner-api.zooplatform.ru volunteer.zooplatform.ru volunteer-api.zooplatform.ru clinic.zooplatform.ru clinic-api.zooplatform.ru;
     return 301 https://$server_name$request_uri;
 }
 ```
@@ -389,5 +549,5 @@ sudo nginx -t
 
 ---
 
-**Последнее обновление:** 29 декабря 2024  
+**Последнее обновление:** 31 декабря 2024 (v0.8.0)  
 **Статус:** Готово к использованию
