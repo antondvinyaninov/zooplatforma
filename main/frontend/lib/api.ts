@@ -392,6 +392,34 @@ export const notificationsApi = {
     apiClient.post<{ message: string }>('/api/notifications/read-all', {}),
 };
 
+// API методы для организаций
+export const organizationsApi = {
+  // Получить все организации
+  getAll: () => apiClient.get<Organization[]>('/api/organizations/all'),
+  
+  // Получить организацию по ID
+  getById: (id: number) => apiClient.get<Organization>(`/api/organizations/${id}`),
+  
+  // Создать организацию
+  create: (data: CreateOrganizationRequest) =>
+    apiClient.post<{ id: number }>('/api/organizations', data),
+  
+  // Обновить организацию
+  update: (id: number, data: Partial<CreateOrganizationRequest>) =>
+    apiClient.put<{ message: string }>(`/api/organizations/${id}`, data),
+  
+  // Удалить организацию
+  delete: (id: number) => apiClient.delete<{ message: string }>(`/api/organizations/${id}`),
+  
+  // Получить организации пользователя
+  getUserOrganizations: (userId: number) =>
+    apiClient.get<Organization[]>(`/api/organizations/user/${userId}`),
+  
+  // Получить участников организации
+  getMembers: (organizationId: number) =>
+    apiClient.get<any[]>(`/api/organizations/members/${organizationId}`),
+};
+
 // Типы
 export interface User {
   id: number;
@@ -541,4 +569,72 @@ export interface Notification {
   is_read: boolean;
   created_at: string;
   actor?: User;
+}
+
+// Типы для организаций
+export interface Organization {
+  id: number;
+  name: string;
+  short_name?: string;
+  legal_form?: string;
+  type: string;
+  inn: string;
+  ogrn?: string;
+  kpp?: string;
+  registration_date?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  address_full?: string;
+  address_postal_code?: string;
+  address_region?: string;
+  address_city?: string;
+  address_street?: string;
+  address_house?: string;
+  address_office?: string;
+  geo_lat?: number;
+  geo_lon?: number;
+  description?: string;
+  bio?: string;
+  logo?: string;
+  cover_photo?: string;
+  director_name?: string;
+  director_position?: string;
+  owner_user_id: number;
+  profile_visibility?: string;
+  show_phone?: string;
+  show_email?: string;
+  allow_messages?: string;
+  is_verified: boolean;
+  is_active: boolean;
+  status: string;
+  created_at: string;
+  updated_at: string;
+}
+
+export interface CreateOrganizationRequest {
+  name: string;
+  short_name?: string;
+  legal_form?: string;
+  type: string;
+  inn: string;
+  ogrn?: string;
+  kpp?: string;
+  registration_date?: string;
+  email?: string;
+  phone?: string;
+  website?: string;
+  address_full?: string;
+  address_postal_code?: string;
+  address_region?: string;
+  address_city?: string;
+  address_street?: string;
+  address_house?: string;
+  address_office?: string;
+  geo_lat?: number | null;
+  geo_lon?: number | null;
+  description?: string;
+  bio?: string;
+  director_name?: string;
+  director_position?: string;
 }

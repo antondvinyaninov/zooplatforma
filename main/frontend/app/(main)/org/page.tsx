@@ -263,7 +263,7 @@ export default function OrganizationsPage() {
           {/* Create Button */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-4">
             <button
-              onClick={() => {/* TODO: открыть модальное окно создания */}}
+              onClick={() => router.push('/org/create')}
               className="w-full px-4 py-2.5 bg-blue-500 text-white rounded-lg font-semibold hover:bg-blue-600 transition-colors text-sm"
             >
               Создать организацию
