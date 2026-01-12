@@ -308,6 +308,13 @@ export const postsApi = {
     apiClient.put<Post>(`/api/posts/${id}`, data),
   
   delete: (id: number) => apiClient.delete<{ message: string }>(`/api/posts/${id}`),
+  
+  // Лайки
+  toggleLike: (postId: number) => 
+    apiClient.post<{ liked: boolean; likes_count: number }>(`/api/posts/${postId}/like`, {}),
+  
+  getLikeStatus: (postId: number) => 
+    apiClient.get<{ liked: boolean; likes_count: number }>(`/api/posts/${postId}/like`),
 };
 
 // API методы для комментариев
@@ -354,6 +361,7 @@ export interface Post {
   author_id: number;
   author_type: string;
   content: string;
+  post_type?: string;
   attached_pets: number[];
   attachments: Attachment[];
   tags: string[];
@@ -366,6 +374,9 @@ export interface Post {
   pets?: Pet[];
   poll?: Poll;
   comments_count?: number;
+  // Лайки
+  liked?: boolean;
+  likes_count?: number;
 }
 
 export interface Attachment {
