@@ -131,9 +131,6 @@ export default function CreateOrganizationPage() {
   const selectOrganization = (suggestion: DaDataSuggestion) => {
     const data = suggestion.data;
     
-    // Логируем данные для отладки
-    console.log('DaData response:', data);
-    
     // Безопасное извлечение данных с проверками
     const getName = () => data.name?.full || data.name?.short || '';
     const getShortName = () => data.name?.short || '';
@@ -178,7 +175,7 @@ export default function CreateOrganizationPage() {
              data.address?.data?.settlement || '';
     };
     
-    // Определение типа организации по названию и ОКВЭД
+    // Определение типа организации по названию
     const determineOrganizationType = (): string => {
       const name = getName().toLowerCase();
       
@@ -213,7 +210,7 @@ export default function CreateOrganizationPage() {
       return 'other';
     };
     
-    const formDataToSet = {
+    setFormData({
       name: getName(),
       short_name: getShortName(),
       legal_form: getLegalForm(),
@@ -237,10 +234,7 @@ export default function CreateOrganizationPage() {
       bio: '',
       director_name: data.management?.name || '',
       director_position: data.management?.post || '',
-    };
-    
-    console.log('Form data to set:', formDataToSet);
-    setFormData(formDataToSet);
+    });
     
     setStep('form');
   };
