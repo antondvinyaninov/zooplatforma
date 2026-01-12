@@ -539,7 +539,7 @@ func AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 
 // UpdateMemberHandler обновляет роль участника
 func UpdateMemberHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodPUT {
+	if r.Method != http.MethodPut {
 		sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
 		return
 	}

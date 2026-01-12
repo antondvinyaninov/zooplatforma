@@ -120,7 +120,7 @@ func handleGetAnnouncements(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleGetAnnouncement - получить конкретное объявление со всеми данными
-func handleGetAnnouncement(w http.ResponseWriter, r *http.Request, id int) {
+func handleGetAnnouncement(w http.ResponseWriter, _ *http.Request, id int) {
 	var a models.PetAnnouncement
 
 	query := `

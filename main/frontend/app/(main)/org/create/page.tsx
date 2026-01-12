@@ -26,10 +26,13 @@ interface DaDataSuggestion {
       data: {
         postal_code?: string;
         region?: string;
+        region_with_type?: string;
         city?: string;
+        settlement?: string;
         street?: string;
         house?: string;
         flat?: string;
+        office?: string;
         geo_lat?: string;
         geo_lon?: string;
       };
@@ -42,6 +45,7 @@ interface DaDataSuggestion {
     phones?: Array<{ value: string }>;
     opf?: {
       full?: string;
+      short?: string;
     };
   };
 }
@@ -124,26 +128,51 @@ export default function CreateOrganizationPage() {
   const selectOrganization = (suggestion: DaDataSuggestion) => {
     const data = suggestion.data;
     
+    // Безопасное извлечение данных с проверками
+    const getName = () => data.name?.full || data.name?.short || '';
+    const getShortName = () => data.name?.short || '';
+    const getLegalForm = () => data.opf?.full || data.opf?.short || '';
+    const getEmail = () => {
+      if (data.emails && data.emails.length > 0) {
+        return data.emails[0].value || '';
+      }
+      return '';
+    };
+    const getPhone = () => {
+      if (data.phones && data.phones.length > 0) {
+        return data.phones[0].value || '';
+      }
+      return '';
+    };
+    const getRegion = () => {
+      return data.address?.data?.region_with_type || 
+             data.address?.data?.region || '';
+    };
+    const getCity = () => {
+      return data.address?.data?.city || 
+             data.address?.data?.settlement || '';
+    };
+    
     setFormData({
-      name: data.name.full,
-      short_name: data.name.short || '',
-      legal_form: data.opf?.full || '',
+      name: getName(),
+      short_name: getShortName(),
+      legal_form: getLegalForm(),
       type: 'other',
-      inn: data.inn,
-      ogrn: data.ogrn,
+      inn: data.inn || '',
+      ogrn: data.ogrn || '',
       kpp: data.kpp || '',
-      email: data.emails?.[0]?.value || '',
-      phone: data.phones?.[0]?.value || '',
+      email: getEmail(),
+      phone: getPhone(),
       website: '',
-      address_full: data.address.value,
-      address_postal_code: data.address.data.postal_code || '',
-      address_region: data.address.data.region || '',
-      address_city: data.address.data.city || '',
-      address_street: data.address.data.street || '',
-      address_house: data.address.data.house || '',
-      address_office: data.address.data.flat || '',
-      geo_lat: data.address.data.geo_lat ? parseFloat(data.address.data.geo_lat) : null,
-      geo_lon: data.address.data.geo_lon ? parseFloat(data.address.data.geo_lon) : null,
+      address_full: data.address?.value || '',
+      address_postal_code: data.address?.data?.postal_code || '',
+      address_region: getRegion(),
+      address_city: getCity(),
+      address_street: data.address?.data?.street || '',
+      address_house: data.address?.data?.house || '',
+      address_office: data.address?.data?.flat || data.address?.data?.office || '',
+      geo_lat: data.address?.data?.geo_lat ? parseFloat(data.address.data.geo_lat) : null,
+      geo_lon: data.address?.data?.geo_lon ? parseFloat(data.address.data.geo_lon) : null,
       description: '',
       bio: '',
       director_name: data.management?.name || '',
