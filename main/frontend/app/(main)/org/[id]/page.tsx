@@ -329,7 +329,9 @@ export default function OrganizationPage() {
           <div className="space-y-2.5">
             {/* Форма создания поста (только для owner/admin с правом публикации) */}
             {isOwnerOrAdmin() && (
-              <CreatePost onPostCreated={loadPosts} />
+              <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                <CreatePost onPostCreated={loadPosts} />
+              </div>
             )}
 
             {/* Список постов */}

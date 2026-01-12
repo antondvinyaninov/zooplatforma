@@ -278,7 +278,9 @@ export default function UserProfilePage() {
                 <div className="space-y-2.5">
                   {/* Форма создания поста (только для своего профиля) */}
                   {isOwnProfile && (
-                    <CreatePost onPostCreated={loadUserProfile} />
+                    <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                      <CreatePost onPostCreated={loadUserProfile} />
+                    </div>
                   )}
 
                   {loading ? (
