@@ -42,8 +42,10 @@ interface DaDataSuggestion {
       name?: string;
       post?: string;
     };
-    emails?: Array<{ value: string }>;
-    phones?: Array<{ value: string }>;
+    emails?: Array<{ value: string }> | Array<string> | string;
+    phones?: Array<{ value: string }> | Array<string> | string;
+    website?: string;
+    site?: string;
     opf?: {
       full?: string;
       short?: string;
@@ -129,42 +131,99 @@ export default function CreateOrganizationPage() {
   const selectOrganization = (suggestion: DaDataSuggestion) => {
     const data = suggestion.data;
     
+    // Логируем данные для отладки
+    console.log('DaData response:', data);
+    
     // Безопасное извлечение данных с проверками
     const getName = () => data.name?.full || data.name?.short || '';
     const getShortName = () => data.name?.short || '';
     const getLegalForm = () => data.opf?.full || data.opf?.short || '';
+    
     const getEmail = () => {
-      if (data.emails && data.emails.length > 0) {
-        return data.emails[0].value || '';
+      // Пробуем разные варианты
+      if (data.emails && Array.isArray(data.emails) && data.emails.length > 0) {
+        return data.emails[0].value || data.emails[0] || '';
+      }
+      // Иногда email может быть строкой
+      if (typeof data.emails === 'string') {
+        return data.emails;
       }
       return '';
     };
+    
     const getPhone = () => {
-      if (data.phones && data.phones.length > 0) {
-        return data.phones[0].value || '';
+      // Пробуем разные варианты
+      if (data.phones && Array.isArray(data.phones) && data.phones.length > 0) {
+        return data.phones[0].value || data.phones[0] || '';
+      }
+      // Иногда phone может быть строкой
+      if (typeof data.phones === 'string') {
+        return data.phones;
       }
       return '';
     };
+    
+    const getWebsite = () => {
+      // DaData может возвращать сайт в разных полях
+      return data.website || data.site || '';
+    };
+    
     const getRegion = () => {
       return data.address?.data?.region_with_type || 
              data.address?.data?.region || '';
     };
+    
     const getCity = () => {
       return data.address?.data?.city || 
              data.address?.data?.settlement || '';
     };
     
-    setFormData({
+    // Определение типа организации по названию и ОКВЭД
+    const determineOrganizationType = (): string => {
+      const name = getName().toLowerCase();
+      
+      // Приют
+      if (name.includes('приют') || name.includes('питомник')) {
+        return 'shelter';
+      }
+      
+      // Ветклиника
+      if (name.includes('ветеринар') || name.includes('ветклиник') || 
+          name.includes('ветлечебниц') || name.includes('ветстанци')) {
+        return 'vet_clinic';
+      }
+      
+      // Зоомагазин
+      if (name.includes('зоомагазин') || name.includes('зоотовар') || 
+          name.includes('товары для животных')) {
+        return 'pet_shop';
+      }
+      
+      // Фонд
+      if (name.includes('фонд') || name.includes('благотворительн')) {
+        return 'foundation';
+      }
+      
+      // Кинологический центр
+      if (name.includes('кинолог') || name.includes('дрессировк') || 
+          name.includes('школа собак')) {
+        return 'kennel';
+      }
+      
+      return 'other';
+    };
+    
+    const formDataToSet = {
       name: getName(),
       short_name: getShortName(),
       legal_form: getLegalForm(),
-      type: 'other',
+      type: determineOrganizationType(),
       inn: data.inn || '',
       ogrn: data.ogrn || '',
       kpp: data.kpp || '',
       email: getEmail(),
       phone: getPhone(),
-      website: '',
+      website: getWebsite(),
       address_full: data.address?.value || '',
       address_postal_code: data.address?.data?.postal_code || '',
       address_region: getRegion(),
@@ -178,7 +237,10 @@ export default function CreateOrganizationPage() {
       bio: '',
       director_name: data.management?.name || '',
       director_position: data.management?.post || '',
-    });
+    };
+    
+    console.log('Form data to set:', formDataToSet);
+    setFormData(formDataToSet);
     
     setStep('form');
   };
