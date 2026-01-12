@@ -51,9 +51,11 @@ export interface Pet {
   foster_address?: string;
   shelter_name?: string;
   // Поля для каталога
+  city?: string;
   region?: string;
   urgent?: boolean;
   contact_name?: string;
+  contact_phone?: string;
   organization_id?: number;
 }
 

@@ -7,8 +7,8 @@ type Pet struct {
 	Species        string `json:"species"`
 	Photo          string `json:"photo"`
 	Status         string `json:"status"`
-	Region         string `json:"region,omitempty"`
 	City           string `json:"city,omitempty"`
+	Region         string `json:"region,omitempty"`
 	Urgent         bool   `json:"urgent"`
 	ContactName    string `json:"contact_name,omitempty"`
 	ContactPhone   string `json:"contact_phone,omitempty"`

@@ -12,6 +12,7 @@ import (
 
 // CatalogHandler - публичный endpoint для каталога питомцев (без авторизации)
 // Возвращает только питомцев со статусами: looking_for_home, lost, found, needs_help
+// Поддерживает фильтрацию: ?status=lost&city=Ижевск&region=Удмуртская Респ&urgent=true&species=dog&search=Бобик
 func CatalogHandler(w http.ResponseWriter, r *http.Request) {
 	log.Printf("📋 CatalogHandler called: %s %s", r.Method, r.URL.Path)
 
@@ -21,6 +22,19 @@ func CatalogHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Получаем query параметры для фильтрации
+	queryParams := r.URL.Query()
+	statusFilter := queryParams.Get("status")
+	cityFilter := queryParams.Get("city")
+	regionFilter := queryParams.Get("region")
+	urgentFilter := queryParams.Get("urgent")
+	speciesFilter := queryParams.Get("species")
+	searchFilter := queryParams.Get("search")
+
+	log.Printf("🔍 Filters: status=%s, city=%s, region=%s, urgent=%s, species=%s, search=%s",
+		statusFilter, cityFilter, regionFilter, urgentFilter, speciesFilter, searchFilter)
+
+	// Строим динамический SQL запрос
 	query := `
 		SELECT 
 			id, user_id, name, species, breed, gender, birth_date, color, size, weight,
@@ -32,14 +46,50 @@ func CatalogHandler(w http.ResponseWriter, r *http.Request) {
 			distinctive_marks, owner_name, owner_address, owner_phone, owner_email,
 			blood_type, allergies, chronic_diseases, current_medications,
 			pedigree_number, registration_org,
-			curator_id, curator_name, curator_phone, location, foster_address, shelter_name
+			curator_id, curator_name, curator_phone, location, foster_address, shelter_name,
+			city, region, urgent, contact_name, contact_phone
 		FROM pets
 		WHERE status IN ('looking_for_home', 'lost', 'found', 'needs_help')
-		ORDER BY created_at DESC
 	`
 
-	log.Printf("🔍 Executing catalog query...")
-	rows, err := database.DB.Query(query)
+	// Добавляем фильтры
+	var args []interface{}
+
+	if statusFilter != "" {
+		query += " AND status = ?"
+		args = append(args, statusFilter)
+	}
+
+	if cityFilter != "" {
+		query += " AND city = ?"
+		args = append(args, cityFilter)
+	}
+
+	if regionFilter != "" {
+		query += " AND region = ?"
+		args = append(args, regionFilter)
+	}
+
+	if urgentFilter == "true" {
+		query += " AND urgent = 1"
+	}
+
+	if speciesFilter != "" {
+		query += " AND species = ?"
+		args = append(args, speciesFilter)
+	}
+
+	if searchFilter != "" {
+		query += " AND (name LIKE ? OR breed LIKE ?)"
+		searchPattern := "%" + searchFilter + "%"
+		args = append(args, searchPattern, searchPattern)
+	}
+
+	// Сортировка: срочные первые, потом новые
+	query += " ORDER BY urgent DESC, created_at DESC"
+
+	log.Printf("🔍 Executing catalog query with %d filters...", len(args))
+	rows, err := database.DB.Query(query, args...)
 	if err != nil {
 		log.Printf("❌ Error querying catalog pets: %v", err)
 		http.Error(w, "Internal server error", http.StatusInternalServerError)
@@ -64,6 +114,7 @@ func CatalogHandler(w http.ResponseWriter, r *http.Request) {
 			&pet.BloodType, &pet.Allergies, &pet.ChronicDiseases, &pet.CurrentMedications,
 			&pet.PedigreeNumber, &pet.RegistrationOrg,
 			&pet.CuratorID, &pet.CuratorName, &pet.CuratorPhone, &pet.Location, &pet.FosterAddress, &pet.ShelterName,
+			&pet.City, &pet.Region, &pet.Urgent, &pet.ContactName, &pet.ContactPhone,
 		)
 		if err != nil {
 			log.Printf("❌ Error scanning catalog pet: %v", err)
@@ -157,10 +208,12 @@ type Pet struct {
 	CardNutrition       string `json:"card_nutrition,omitempty"`
 	CardPhotos          string `json:"card_photos,omitempty"`
 	CardIsPublished     bool   `json:"card_is_published"`
-	// Поля для каталога (миграция 020)
+	// Поля для каталога (миграция 020, 023)
+	City           string `json:"city,omitempty"`
 	Region         string `json:"region,omitempty"`
 	Urgent         bool   `json:"urgent"`
 	ContactName    string `json:"contact_name,omitempty"`
+	ContactPhone   string `json:"contact_phone,omitempty"`
 	OrganizationID *int   `json:"organization_id,omitempty"`
 }
 
