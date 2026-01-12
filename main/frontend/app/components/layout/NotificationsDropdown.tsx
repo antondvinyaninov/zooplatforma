@@ -195,10 +195,10 @@ export default function NotificationsDropdown() {
             ) : (
               <div className="divide-y divide-gray-100">
                 {notifications.map((notification) => (
-                  <button
+                  <div
                     key={notification.id}
                     onClick={() => handleNotificationClick(notification)}
-                    className={`w-full p-3 hover:bg-gray-50 transition-colors text-left ${
+                    className={`w-full p-3 hover:bg-gray-50 transition-colors cursor-pointer ${
                       !notification.is_read ? 'bg-blue-50' : ''
                     }`}
                   >
@@ -227,7 +227,7 @@ export default function NotificationsDropdown() {
                         />
                       )}
                     </div>
-                  </button>
+                  </div>
                 ))}
               </div>
             )}
