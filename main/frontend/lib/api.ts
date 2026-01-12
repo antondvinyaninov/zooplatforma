@@ -307,6 +307,8 @@ export const postsApi = {
   
   getPetPosts: (petId: number) => apiClient.get<Post[]>(`/api/posts/pet/${petId}`),
   
+  getOrganizationPosts: (orgId: number) => apiClient.get<Post[]>(`/api/posts/organization/${orgId}`),
+  
   create: (data: { content: string; post_type?: string }) =>
     apiClient.post<Post>('/api/posts', data),
   
@@ -477,6 +479,7 @@ export interface Post {
   updated_at: string;
   is_deleted?: boolean;
   user?: User;
+  organization?: Organization;
   pets?: Pet[];
   poll?: Poll;
   comments_count?: number;

@@ -173,16 +173,29 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
         <div className="flex items-center gap-3">
           {/* Avatar */}
           <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-semibold overflow-hidden">
-            {post.user?.avatar ? (
-              <img src={getMediaUrl(post.user.avatar) || ''} alt={post.user.name} className="w-full h-full object-cover" />
+            {post.author_type === 'organization' ? (
+              post.organization?.logo ? (
+                <img src={getMediaUrl(post.organization.logo) || ''} alt={post.organization.name} className="w-full h-full object-cover" />
+              ) : (
+                <UserIcon className="w-6 h-6 text-gray-500" />
+              )
             ) : (
-              <UserIcon className="w-6 h-6 text-gray-500" />
+              post.user?.avatar ? (
+                <img src={getMediaUrl(post.user.avatar) || ''} alt={post.user.name} className="w-full h-full object-cover" />
+              ) : (
+                <UserIcon className="w-6 h-6 text-gray-500" />
+              )
             )}
           </div>
 
           {/* User Info */}
           <div>
-            <div className="font-semibold text-gray-900">{getFullName(post.user?.name || 'Пользователь', post.user?.last_name)}</div>
+            <div className="font-semibold text-gray-900">
+              {post.author_type === 'organization' 
+                ? (post.organization?.short_name || post.organization?.name || 'Организация')
+                : getFullName(post.user?.name || 'Пользователь', post.user?.last_name)
+              }
+            </div>
             <div className="text-sm text-gray-500">{getTimeAgo(post.created_at)}</div>
           </div>
         </div>

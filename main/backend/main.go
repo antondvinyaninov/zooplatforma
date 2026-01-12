@@ -77,6 +77,7 @@ func main() {
 	http.HandleFunc("/api/posts/", enableCORS(middleware.AuthMiddleware(handlers.PostHandler)))
 	http.HandleFunc("/api/posts/user/", enableCORS(middleware.AuthMiddleware(handlers.UserPostsHandler)))
 	http.HandleFunc("/api/posts/pet/", enableCORS(middleware.AuthMiddleware(handlers.PetPostsHandler)))
+	http.HandleFunc("/api/posts/organization/", enableCORS(middleware.AuthMiddleware(handlers.OrganizationPostsHandler)))
 
 	// Comments
 	http.HandleFunc("/api/comments/post/", enableCORS(middleware.AuthMiddleware(handlers.CommentsHandler)))

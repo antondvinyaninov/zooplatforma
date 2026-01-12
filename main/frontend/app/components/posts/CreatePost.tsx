@@ -309,7 +309,12 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
     }
   }, [showPetsModal]);
 
-  // Загрузка организаций при открытии модального окна
+  // Загрузка организаций при монтировании компонента
+  useEffect(() => {
+    loadOrganizations();
+  }, []);
+
+  // Также загружаем при открытии модального окна (для случая когда форма в модалке)
   useEffect(() => {
     if (showModal) {
       loadOrganizations();
@@ -331,6 +336,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const loadOrganizations = async () => {
     try {
       const response = await apiClient.get('/api/organizations/my');
+      console.log('📋 Загружены организации:', response.data);
       setOrganizations(response.data?.organizations || []);
     } catch (error) {
       console.error('Ошибка загрузки организаций:', error);
@@ -557,7 +563,9 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                       {selectedAuthor === 'user' ? (
                         getFullName(user?.name || 'Пользователь', user?.last_name)
                       ) : (
-                        organizations.find(org => org.id === selectedOrganizationId)?.name || 'Организация'
+                        organizations.find(org => org.id === selectedOrganizationId)?.short_name || 
+                        organizations.find(org => org.id === selectedOrganizationId)?.name || 
+                        'Организация'
                       )}
                       <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
                         <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
@@ -611,7 +619,7 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
                                   )}
                                 </div>
                                 <div>
-                                  <div className="font-medium text-sm">{org.name}</div>
+                                  <div className="font-medium text-sm">{org.short_name || org.name}</div>
                                   <div className="text-xs text-gray-500">Организация</div>
                                 </div>
                               </button>

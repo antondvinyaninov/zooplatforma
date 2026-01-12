@@ -5,6 +5,7 @@ import (
 	"database"
 	"database/sql"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -678,11 +679,23 @@ func GetMyOrganizationsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID := r.Context().Value("userID").(int)
-	if userID == 0 {
-		sendJSONError(w, http.StatusUnauthorized, "Unauthorized")
+	userIDValue := r.Context().Value("userID")
+	log.Printf("🔍 GetMyOrganizationsHandler: userIDValue=%v, type=%T", userIDValue, userIDValue)
+
+	if userIDValue == nil {
+		log.Printf("❌ userID not found in context")
+		sendJSONError(w, http.StatusUnauthorized, "Unauthorized: userID not found in context")
 		return
 	}
+
+	userID, ok := userIDValue.(int)
+	if !ok || userID == 0 {
+		log.Printf("❌ invalid userID type or zero: %v", userIDValue)
+		sendJSONError(w, http.StatusUnauthorized, "Unauthorized: invalid userID")
+		return
+	}
+
+	log.Printf("✅ userID extracted: %d", userID)
 
 	// Получаем организации где пользователь owner или admin с правом публикации
 	query := `
@@ -697,8 +710,10 @@ func GetMyOrganizationsHandler(w http.ResponseWriter, r *http.Request) {
 		ORDER BY o.name ASC
 	`
 
+	log.Printf("🔍 Executing query for userID=%d", userID)
 	rows, err := database.DB.Query(query, userID)
 	if err != nil {
+		log.Printf("❌ Query error: %v", err)
 		sendJSONError(w, http.StatusInternalServerError, "Failed to fetch organizations: "+err.Error())
 		return
 	}
@@ -707,12 +722,13 @@ func GetMyOrganizationsHandler(w http.ResponseWriter, r *http.Request) {
 	organizations := []map[string]interface{}{}
 	for rows.Next() {
 		var id int
-		var name, shortName, orgType string
-		var logo, bio sql.NullString
+		var name string
+		var shortName, orgType, logo, bio sql.NullString
 		var role string
 		var canPost bool
 
 		if err := rows.Scan(&id, &name, &shortName, &orgType, &logo, &bio, &role, &canPost); err != nil {
+			log.Printf("❌ Scan error: %v", err)
 			sendJSONError(w, http.StatusInternalServerError, "Failed to scan organization: "+err.Error())
 			return
 		}
@@ -720,14 +736,20 @@ func GetMyOrganizationsHandler(w http.ResponseWriter, r *http.Request) {
 		org := map[string]interface{}{
 			"id":         id,
 			"name":       name,
-			"short_name": shortName,
-			"type":       orgType,
+			"short_name": "",
+			"type":       "",
 			"logo":       nil,
 			"bio":        nil,
 			"role":       role,
 			"can_post":   canPost,
 		}
 
+		if shortName.Valid {
+			org["short_name"] = shortName.String
+		}
+		if orgType.Valid {
+			org["type"] = orgType.String
+		}
 		if logo.Valid {
 			org["logo"] = logo.String
 		}
@@ -736,8 +758,10 @@ func GetMyOrganizationsHandler(w http.ResponseWriter, r *http.Request) {
 		}
 
 		organizations = append(organizations, org)
+		log.Printf("✅ Found organization: id=%d, name=%s, role=%s, can_post=%v", id, name, role, canPost)
 	}
 
+	log.Printf("📋 Total organizations found: %d", len(organizations))
 	sendJSONSuccess(w, map[string]interface{}{
 		"organizations": organizations,
 	})

@@ -84,11 +84,10 @@ export default function OrganizationPage() {
   const loadPosts = async () => {
     try {
       setPostsLoading(true);
-      // TODO: Создать endpoint для постов организации
-      // const response = await postsApi.getOrganizationPosts(Number(params.id));
-      // if (response.success && response.data) {
-      //   setPosts(response.data);
-      // }
+      const response = await postsApi.getOrganizationPosts(Number(params.id));
+      if (response.success && response.data) {
+        setPosts(response.data);
+      }
     } catch (error) {
       console.error('Error loading posts:', error);
     } finally {

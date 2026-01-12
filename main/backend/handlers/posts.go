@@ -120,6 +120,23 @@ func PetPostsHandler(w http.ResponseWriter, r *http.Request) {
 	getPetPosts(w, r, petID)
 }
 
+func OrganizationPostsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Извлекаем ID организации из URL
+	path := strings.TrimPrefix(r.URL.Path, "/api/posts/organization/")
+	orgID, err := strconv.Atoi(path)
+	if err != nil {
+		sendErrorResponse(w, "Неверный ID организации", http.StatusBadRequest)
+		return
+	}
+
+	getOrganizationPosts(w, r, orgID)
+}
+
 // getAllPosts получает все посты для Feed
 func getAllPosts(w http.ResponseWriter, r *http.Request) {
 	// Получаем userID из контекста (может быть 0 для неавторизованных)
@@ -129,9 +146,11 @@ func getAllPosts(w http.ResponseWriter, r *http.Request) {
 		SELECT p.id, p.author_id, p.author_type, p.content, p.attached_pets, 
 		       p.attachments, p.tags, p.status, p.scheduled_at, p.created_at, p.updated_at,
 		       u.name, u.email, u.avatar,
+		       o.name as org_name, o.short_name as org_short_name, o.logo as org_logo,
 		       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count
 		FROM posts p
 		LEFT JOIN users u ON p.author_id = u.id AND p.author_type = 'user'
+		LEFT JOIN organizations o ON p.author_id = o.id AND p.author_type = 'organization'
 		WHERE p.is_deleted = 0 AND p.status = 'published'
 		ORDER BY p.created_at DESC
 	`
@@ -175,9 +194,11 @@ func getDrafts(w http.ResponseWriter, r *http.Request) {
 		SELECT p.id, p.author_id, p.author_type, p.content, p.attached_pets, 
 		       p.attachments, p.tags, p.status, p.scheduled_at, p.created_at, p.updated_at,
 		       u.name, u.email, u.avatar,
+		       o.name as org_name, o.short_name as org_short_name, o.logo as org_logo,
 		       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count
 		FROM posts p
 		LEFT JOIN users u ON p.author_id = u.id AND p.author_type = 'user'
+		LEFT JOIN organizations o ON p.author_id = o.id AND p.author_type = 'organization'
 		WHERE p.author_id = ? AND p.author_type = 'user' AND p.status = 'draft' AND p.is_deleted = 0
 		ORDER BY p.created_at DESC
 	`
@@ -227,9 +248,11 @@ func getUserPosts(w http.ResponseWriter, r *http.Request, userID int) {
 		SELECT p.id, p.author_id, p.author_type, p.content, p.attached_pets, 
 		       p.attachments, p.tags, p.status, p.scheduled_at, p.created_at, p.updated_at,
 		       u.name, u.email, u.avatar,
+		       o.name as org_name, o.short_name as org_short_name, o.logo as org_logo,
 		       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count
 		FROM posts p
 		LEFT JOIN users u ON p.author_id = u.id AND p.author_type = 'user'
+		LEFT JOIN organizations o ON p.author_id = o.id AND p.author_type = 'organization'
 		WHERE p.author_id = ? AND p.author_type = 'user' AND p.is_deleted = 0
 		ORDER BY p.created_at DESC
 	`
@@ -270,15 +293,62 @@ func getPetPosts(w http.ResponseWriter, r *http.Request, petID int) {
 		SELECT p.id, p.author_id, p.author_type, p.content, p.attached_pets, 
 		       p.attachments, p.tags, p.status, p.scheduled_at, p.created_at, p.updated_at,
 		       u.name, u.email, u.avatar,
+		       o.name as org_name, o.short_name as org_short_name, o.logo as org_logo,
 		       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count
 		FROM posts p
 		LEFT JOIN users u ON p.author_id = u.id AND p.author_type = 'user'
+		LEFT JOIN organizations o ON p.author_id = o.id AND p.author_type = 'organization'
 		INNER JOIN post_pets pp ON p.id = pp.post_id
 		WHERE pp.pet_id = ? AND p.is_deleted = 0 AND p.status = 'published'
 		ORDER BY p.created_at DESC
 	`
 
 	rows, err := database.DB.Query(query, petID)
+	if err != nil {
+		sendErrorResponse(w, "Ошибка получения постов: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var posts []models.Post
+	for rows.Next() {
+		post, err := scanPost(rows)
+		if err != nil {
+			sendErrorResponse(w, "Ошибка чтения данных: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		posts = append(posts, post)
+	}
+
+	if posts == nil {
+		posts = []models.Post{}
+	}
+
+	// Загружаем опросы для всех постов
+	posts = loadPollsForPosts(posts, currentUserID)
+
+	sendSuccessResponse(w, posts)
+}
+
+// getOrganizationPosts получает посты организации
+func getOrganizationPosts(w http.ResponseWriter, r *http.Request, orgID int) {
+	// Получаем текущего пользователя из контекста
+	currentUserID, _ := r.Context().Value("userID").(int)
+
+	query := `
+		SELECT p.id, p.author_id, p.author_type, p.content, p.attached_pets, 
+		       p.attachments, p.tags, p.status, p.scheduled_at, p.created_at, p.updated_at,
+		       u.name, u.email, u.avatar,
+		       o.name as org_name, o.short_name as org_short_name, o.logo as org_logo,
+		       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count
+		FROM posts p
+		LEFT JOIN users u ON p.author_id = u.id AND p.author_type = 'user'
+		LEFT JOIN organizations o ON p.author_id = o.id AND p.author_type = 'organization'
+		WHERE p.author_id = ? AND p.author_type = 'organization' AND p.is_deleted = 0 AND p.status = 'published'
+		ORDER BY p.created_at DESC
+	`
+
+	rows, err := database.DB.Query(query, orgID)
 	if err != nil {
 		sendErrorResponse(w, "Ошибка получения постов: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -341,9 +411,29 @@ func createPost(w http.ResponseWriter, r *http.Request) {
 		scheduledAt = req.ScheduledAt
 	}
 
+	// Определяем автора поста
+	authorType := "user"
+	authorID := userID
+	if req.AuthorType == "organization" && req.OrganizationID != nil {
+		// Проверяем права пользователя на публикацию от имени организации
+		var canPost bool
+		err := database.DB.QueryRow(`
+			SELECT can_post FROM organization_members
+			WHERE organization_id = ? AND user_id = ?
+		`, *req.OrganizationID, userID).Scan(&canPost)
+
+		if err != nil || !canPost {
+			sendErrorResponse(w, "Нет прав на публикацию от имени этой организации", http.StatusForbidden)
+			return
+		}
+
+		authorType = "organization"
+		authorID = *req.OrganizationID
+	}
+
 	query := `INSERT INTO posts (author_id, author_type, content, attached_pets, attachments, tags, status, scheduled_at) 
-	          VALUES (?, 'user', ?, ?, ?, ?, ?, ?)`
-	result, err := database.DB.Exec(query, userID, req.Content, string(attachedPetsJSON), string(attachmentsJSON), string(tagsJSON), status, scheduledAt)
+	          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+	result, err := database.DB.Exec(query, authorID, authorType, req.Content, string(attachedPetsJSON), string(attachmentsJSON), string(tagsJSON), status, scheduledAt)
 	if err != nil {
 		sendErrorResponse(w, "Ошибка создания поста: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -474,6 +564,7 @@ func scanPost(rows interface {
 	var user models.User
 	var attachedPetsJSON, attachmentsJSON, tagsJSON string
 	var userName, userEmail, userAvatar *string
+	var orgName, orgShortName, orgLogo *string
 
 	err := rows.Scan(
 		&post.ID, &post.AuthorID, &post.AuthorType, &post.Content,
@@ -481,6 +572,7 @@ func scanPost(rows interface {
 		&post.Status, &post.ScheduledAt,
 		&post.CreatedAt, &post.UpdatedAt,
 		&userName, &userEmail, &userAvatar,
+		&orgName, &orgShortName, &orgLogo,
 		&post.CommentsCount,
 	)
 	if err != nil {
@@ -516,6 +608,17 @@ func scanPost(rows interface {
 		post.User = &user
 	}
 
+	// Добавляем данные организации если это organization
+	if post.AuthorType == "organization" && orgName != nil {
+		org := models.Organization{
+			ID:        post.AuthorID,
+			Name:      *orgName,
+			ShortName: orgShortName,
+			Logo:      orgLogo,
+		}
+		post.Organization = &org
+	}
+
 	// Загружаем данные прикреплённых питомцев
 	if len(post.AttachedPets) > 0 {
 		post.Pets = loadPetsForPost(post.AttachedPets)
@@ -530,9 +633,11 @@ func getPostByID(postID int, userID int) (models.Post, error) {
 		SELECT p.id, p.author_id, p.author_type, p.content, p.attached_pets, 
 		       p.attachments, p.tags, p.status, p.scheduled_at, p.created_at, p.updated_at,
 		       u.name, u.email, u.avatar,
+		       o.name as org_name, o.short_name as org_short_name, o.logo as org_logo,
 		       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count
 		FROM posts p
 		LEFT JOIN users u ON p.author_id = u.id AND p.author_type = 'user'
+		LEFT JOIN organizations o ON p.author_id = o.id AND p.author_type = 'organization'
 		WHERE p.id = ? AND p.is_deleted = 0
 	`
 
