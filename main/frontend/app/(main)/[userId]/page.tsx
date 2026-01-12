@@ -19,6 +19,7 @@ import {
 import Image from 'next/image';
 import PostComments from '../../components/shared/PostComments';
 import PostCard from '../../components/posts/PostCard';
+import CreatePost from '../../components/posts/CreatePost';
 import MediaGallery from '../../components/profile/MediaGallery';
 import MediaStats from '../../components/profile/MediaStats';
 import AddPetModal from '../../components/profile/AddPetModal';
@@ -275,6 +276,11 @@ export default function UserProfilePage() {
             <div className="p-4">
               {activeTab === 'posts' && (
                 <div className="space-y-2.5">
+                  {/* Форма создания поста (только для своего профиля) */}
+                  {isOwnProfile && (
+                    <CreatePost onPostCreated={loadPosts} />
+                  )}
+
                   {loading ? (
                     <div className="flex justify-center py-8">
                       <div className="animate-spin rounded-full h-8 w-8 border-b-2" style={{ borderColor: '#1B76FF' }}></div>

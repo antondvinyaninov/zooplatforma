@@ -18,6 +18,7 @@ import {
 import { organizationsApi, Organization, OrganizationMember, getOrganizationTypeName } from '../../../../lib/organizations-api';
 import { postsApi, Post } from '../../../../lib/api';
 import PostCard from '../../../components/posts/PostCard';
+import CreatePost from '../../../components/posts/CreatePost';
 import YandexMap from '../../../components/shared/YandexMap';
 
 export default function OrganizationPage() {
@@ -318,24 +319,32 @@ export default function OrganizationPage() {
           )}
 
           {/* Посты организации */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Публикации</h2>
-            
-            {postsLoading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-              </div>
-            ) : posts.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>Пока нет публикаций</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {posts.map((post) => (
-                  <PostCard key={post.id} post={post} />
-                ))}
-              </div>
+          <div className="space-y-2.5">
+            {/* Форма создания поста (только для owner/admin с правом публикации) */}
+            {isOwnerOrAdmin() && (
+              <CreatePost onPostCreated={loadPosts} />
             )}
+
+            {/* Список постов */}
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h2 className="text-lg font-semibold text-gray-900 mb-4">Публикации</h2>
+              
+              {postsLoading ? (
+                <div className="flex justify-center py-8">
+                  <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                </div>
+              ) : posts.length === 0 ? (
+                <div className="text-center py-8 text-gray-500">
+                  <p>Пока нет публикаций</p>
+                </div>
+              ) : (
+                <div className="space-y-4">
+                  {posts.map((post) => (
+                    <PostCard key={post.id} post={post} />
+                  ))}
+                </div>
+              )}
+            </div>
           </div>
         </div>
 
