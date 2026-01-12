@@ -46,7 +46,8 @@ export default function NotificationsDropdown() {
         setUnreadCount(response.data.count);
       }
     } catch (error) {
-      console.error('Ошибка загрузки счетчика:', error);
+      // Тихо игнорируем ошибки сети - backend может быть временно недоступен
+      console.debug('Could not load unread count:', error);
     }
   };
 
@@ -58,7 +59,8 @@ export default function NotificationsDropdown() {
         setNotifications(response.data);
       }
     } catch (error) {
-      console.error('Ошибка загрузки уведомлений:', error);
+      // Тихо игнорируем ошибки сети
+      console.debug('Could not load notifications:', error);
     } finally {
       setLoading(false);
     }

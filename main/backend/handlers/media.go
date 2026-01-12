@@ -24,8 +24,8 @@ import (
 const (
 	MaxPhotoSize  = 10 * 1024 * 1024  // 10MB для фото
 	MaxVideoSize  = 100 * 1024 * 1024 // 100MB для видео
-	UploadDir     = "uploads"
-	OptimizeVideo = true // Включить оптимизацию видео
+	UploadDir     = "../../uploads"   // Относительно main/backend
+	OptimizeVideo = true              // Включить оптимизацию видео
 )
 
 type MediaHandler struct {
