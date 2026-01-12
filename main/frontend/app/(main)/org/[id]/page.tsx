@@ -34,7 +34,7 @@ export default function OrganizationPage() {
 
   // Проверка является ли пользователь owner/admin
   const isOwnerOrAdmin = () => {
-    if (!user) return false;
+    if (!user || membersLoading) return false;
     return members.some(m => m.user_id === user.id && ['owner', 'admin'].includes(m.role));
   };
 
@@ -45,6 +45,13 @@ export default function OrganizationPage() {
       loadPosts();
     }
   }, [params.id]);
+
+  // Логирование для отладки
+  useEffect(() => {
+    console.log('User:', user?.id);
+    console.log('Members:', members);
+    console.log('isOwnerOrAdmin:', isOwnerOrAdmin());
+  }, [user, members, membersLoading]);
 
   const loadOrganization = async () => {
     try {

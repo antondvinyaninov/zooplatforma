@@ -32,6 +32,16 @@
   - Решение: заменён на правильный callback `loadUserProfile`, который загружает посты через `postsApi.getUserPosts(userId)`
   - Файл: `main/frontend/app/(main)/[userId]/page.tsx`
 
+- **Исправлена проверка прав на странице организации**
+  - Проблема: компонент `CreatePost` не отображался на странице организации для owner/admin
+  - Причина: функция `isOwnerOrAdmin()` проверяла массив `members` до его загрузки
+  - Решение: 
+    - Добавлена проверка `membersLoading` в функцию `isOwnerOrAdmin()`
+    - Функция возвращает `false` пока идёт загрузка членов организации
+    - Добавлено логирование для отладки (user, members, isOwnerOrAdmin)
+  - Файл: `main/frontend/app/(main)/org/[id]/page.tsx`
+  - Теперь форма создания поста корректно отображается для owner и admin организации
+
 ### Added
 - **CreatePost на странице организации**
   - Форма создания поста добавлена на страницу организации `/org/[id]`
