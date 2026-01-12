@@ -59,6 +59,12 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const [showPetsModal, setShowPetsModal] = useState(false);
   const [selectedPets, setSelectedPets] = useState<number[]>([]);
   const [pets, setPets] = useState<any[]>([]); // Список питомцев пользователя
+  
+  // Организации для публикации
+  const [organizations, setOrganizations] = useState<any[]>([]);
+  const [selectedAuthor, setSelectedAuthor] = useState<'user' | 'organization'>('user');
+  const [selectedOrganizationId, setSelectedOrganizationId] = useState<number | null>(null);
+  const [showAuthorDropdown, setShowAuthorDropdown] = useState(false);
 
   const handleSubmit = async () => {
     if (!content.trim() && !pollData && uploadedMedia.length === 0) return;
@@ -75,6 +81,8 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
           file_name: media.file_name,
         })),
         tags: [],
+        author_type: selectedAuthor,
+        organization_id: selectedAuthor === 'organization' ? selectedOrganizationId : null,
       };
 
       // Add poll if exists
@@ -102,6 +110,8 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
       setScheduledDate(null);
       setScheduledTime('19:00');
       setSelectedPets([]);
+      setSelectedAuthor('user');
+      setSelectedOrganizationId(null);
       setShowModal(false);
       onPostCreated?.();
     } catch (error) {
@@ -299,6 +309,13 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
     }
   }, [showPetsModal]);
 
+  // Загрузка организаций при открытии модального окна
+  useEffect(() => {
+    if (showModal) {
+      loadOrganizations();
+    }
+  }, [showModal]);
+
   const loadPets = async () => {
     if (!user) return;
     
@@ -308,6 +325,16 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
     } catch (error) {
       console.error('Ошибка загрузки питомцев:', error);
       setPets([]);
+    }
+  };
+
+  const loadOrganizations = async () => {
+    try {
+      const response = await apiClient.get('/api/organizations/my');
+      setOrganizations(response.data?.organizations || []);
+    } catch (error) {
+      console.error('Ошибка загрузки организаций:', error);
+      setOrganizations([]);
     }
   };
 
@@ -502,15 +529,98 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
               <div className="flex items-start gap-3 mb-2">
                 {/* Avatar */}
                 <div className="w-9 h-9 rounded-full bg-gray-300 flex items-center justify-center text-white font-semibold flex-shrink-0 text-[14px] overflow-hidden">
-                  {user?.avatar ? (
-                    <img src={getMediaUrl(user.avatar) || ''} alt={user.name} className="w-full h-full object-cover" />
+                  {selectedAuthor === 'user' ? (
+                    user?.avatar ? (
+                      <img src={getMediaUrl(user.avatar) || ''} alt={user.name} className="w-full h-full object-cover" />
+                    ) : (
+                      <UserIcon className="w-5 h-5 text-gray-500" />
+                    )
                   ) : (
-                    <UserIcon className="w-5 h-5 text-gray-500" />
+                    organizations.find(org => org.id === selectedOrganizationId)?.logo ? (
+                      <img 
+                        src={getMediaUrl(organizations.find(org => org.id === selectedOrganizationId)?.logo) || ''} 
+                        alt="Organization" 
+                        className="w-full h-full object-cover" 
+                      />
+                    ) : (
+                      <UserIcon className="w-5 h-5 text-gray-500" />
+                    )
                   )}
                 </div>
                 <div className="flex-1">
-                  {/* Username */}
-                  <div className="font-semibold text-[15px] mb-1">{getFullName(user?.name || 'Пользователь', user?.last_name)}</div>
+                  {/* Author Selector Dropdown */}
+                  <div className="relative mb-1">
+                    <button
+                      onClick={() => setShowAuthorDropdown(!showAuthorDropdown)}
+                      className="flex items-center gap-1 font-semibold text-[15px] hover:bg-gray-100 px-2 py-1 rounded-md transition-colors"
+                    >
+                      {selectedAuthor === 'user' ? (
+                        getFullName(user?.name || 'Пользователь', user?.last_name)
+                      ) : (
+                        organizations.find(org => org.id === selectedOrganizationId)?.name || 'Организация'
+                      )}
+                      <svg className="w-4 h-4 text-gray-500" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                        <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M19 9l-7 7-7-7" />
+                      </svg>
+                    </button>
+
+                    {/* Dropdown Menu */}
+                    {showAuthorDropdown && (
+                      <div className="absolute top-full left-0 mt-1 bg-white border border-gray-200 rounded-lg shadow-lg z-50 min-w-[200px]">
+                        {/* От себя */}
+                        <button
+                          onClick={() => {
+                            setSelectedAuthor('user');
+                            setSelectedOrganizationId(null);
+                            setShowAuthorDropdown(false);
+                          }}
+                          className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2"
+                        >
+                          <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center overflow-hidden">
+                            {user?.avatar ? (
+                              <img src={getMediaUrl(user.avatar) || ''} alt={user.name} className="w-full h-full object-cover" />
+                            ) : (
+                              <UserIcon className="w-4 h-4 text-gray-500" />
+                            )}
+                          </div>
+                          <div>
+                            <div className="font-medium text-sm">{getFullName(user?.name || 'Пользователь', user?.last_name)}</div>
+                            <div className="text-xs text-gray-500">От себя</div>
+                          </div>
+                        </button>
+
+                        {/* Организации */}
+                        {organizations.length > 0 && (
+                          <>
+                            <div className="border-t border-gray-200 my-1"></div>
+                            {organizations.map((org) => (
+                              <button
+                                key={org.id}
+                                onClick={() => {
+                                  setSelectedAuthor('organization');
+                                  setSelectedOrganizationId(org.id);
+                                  setShowAuthorDropdown(false);
+                                }}
+                                className="w-full text-left px-4 py-2 hover:bg-gray-50 flex items-center gap-2"
+                              >
+                                <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center overflow-hidden">
+                                  {org.logo ? (
+                                    <img src={getMediaUrl(org.logo) || ''} alt={org.name} className="w-full h-full object-cover" />
+                                  ) : (
+                                    <UserIcon className="w-4 h-4 text-gray-500" />
+                                  )}
+                                </div>
+                                <div>
+                                  <div className="font-medium text-sm">{org.name}</div>
+                                  <div className="text-xs text-gray-500">Организация</div>
+                                </div>
+                              </button>
+                            ))}
+                          </>
+                        )}
+                      </div>
+                    )}
+                  </div>
                   
                   {/* Text Input - no border, just placeholder */}
                   <textarea

@@ -670,3 +670,75 @@ func RemoveMemberHandler(w http.ResponseWriter, r *http.Request) {
 
 	sendJSONSuccess(w, map[string]interface{}{"message": "Member removed successfully"})
 }
+
+// GetMyOrganizationsHandler возвращает организации пользователя где он owner или admin
+func GetMyOrganizationsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	userID := r.Context().Value("userID").(int)
+	if userID == 0 {
+		sendJSONError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	// Получаем организации где пользователь owner или admin с правом публикации
+	query := `
+		SELECT 
+			o.id, o.name, o.short_name, o.type, o.logo, o.bio,
+			om.role, om.can_post
+		FROM organizations o
+		INNER JOIN organization_members om ON o.id = om.organization_id
+		WHERE om.user_id = ? 
+		AND om.role IN ('owner', 'admin')
+		AND om.can_post = 1
+		ORDER BY o.name ASC
+	`
+
+	rows, err := database.DB.Query(query, userID)
+	if err != nil {
+		sendJSONError(w, http.StatusInternalServerError, "Failed to fetch organizations: "+err.Error())
+		return
+	}
+	defer rows.Close()
+
+	organizations := []map[string]interface{}{}
+	for rows.Next() {
+		var id int
+		var name, shortName, orgType string
+		var logo, bio sql.NullString
+		var role string
+		var canPost bool
+
+		if err := rows.Scan(&id, &name, &shortName, &orgType, &logo, &bio, &role, &canPost); err != nil {
+			sendJSONError(w, http.StatusInternalServerError, "Failed to scan organization: "+err.Error())
+			return
+		}
+
+		org := map[string]interface{}{
+			"id":         id,
+			"name":       name,
+			"short_name": shortName,
+			"type":       orgType,
+			"logo":       nil,
+			"bio":        nil,
+			"role":       role,
+			"can_post":   canPost,
+		}
+
+		if logo.Valid {
+			org["logo"] = logo.String
+		}
+		if bio.Valid {
+			org["bio"] = bio.String
+		}
+
+		organizations = append(organizations, org)
+	}
+
+	sendJSONSuccess(w, map[string]interface{}{
+		"organizations": organizations,
+	})
+}

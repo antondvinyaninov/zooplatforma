@@ -119,7 +119,8 @@ func main() {
 	}))))
 
 	// Organizations
-	http.HandleFunc("/api/organizations/all", enableCORS(handlers.GetAllOrganizationsHandler)) // Публичный endpoint
+	http.HandleFunc("/api/organizations/all", enableCORS(handlers.GetAllOrganizationsHandler))                          // Публичный endpoint
+	http.HandleFunc("/api/organizations/my", enableCORS(middleware.AuthMiddleware(handlers.GetMyOrganizationsHandler))) // Мои организации для публикации
 	http.HandleFunc("/api/organizations", enableCORS(middleware.AuthMiddleware(handlers.CreateOrganizationHandler)))
 	http.HandleFunc("/api/organizations/", enableCORS(middleware.AuthMiddleware(handlers.OrganizationHandler))) // GET и PUT для конкретной организации
 	http.HandleFunc("/api/organizations/user/", enableCORS(middleware.AuthMiddleware(handlers.GetUserOrganizationsHandler)))
