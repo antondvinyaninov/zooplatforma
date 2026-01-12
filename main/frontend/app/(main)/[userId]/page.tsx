@@ -22,6 +22,7 @@ import PostCard from '../../components/posts/PostCard';
 import MediaGallery from '../../components/profile/MediaGallery';
 import MediaStats from '../../components/profile/MediaStats';
 import AddPetModal from '../../components/profile/AddPetModal';
+import FriendButton from '../../components/profile/FriendButton';
 
 type TabType = 'posts' | 'media';
 
@@ -223,14 +224,17 @@ export default function UserProfilePage() {
                     <span className="sm:hidden">Редактировать</span>
                   </button>
                 ) : (
-                  <button 
-                    onClick={() => router.push(`/messenger?user=${userId}`)}
-                    className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors whitespace-nowrap"
-                    style={{ backgroundColor: '#1B76FF' }}
-                  >
-                    <ChatBubbleLeftIcon className="w-4 h-4" />
-                    <span>Написать</span>
-                  </button>
+                  <div className="flex items-center gap-2">
+                    <FriendButton userId={userId} currentUserId={currentUser?.id || 0} />
+                    <button 
+                      onClick={() => router.push(`/messenger?user=${userId}`)}
+                      className="flex items-center gap-2 px-3 sm:px-4 py-2 rounded-lg text-white text-sm font-medium transition-colors whitespace-nowrap"
+                      style={{ backgroundColor: '#1B76FF' }}
+                    >
+                      <ChatBubbleLeftIcon className="w-4 h-4" />
+                      <span>Написать</span>
+                    </button>
+                  </div>
                 )}
               </div>
             </div>

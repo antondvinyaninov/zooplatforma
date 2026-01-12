@@ -96,13 +96,19 @@ export class ApiClient {
     }
   }
 
-  async delete<T>(endpoint: string): Promise<ApiResponse<T>> {
+  async delete<T>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
     try {
-      const response = await fetch(`${this.baseUrl}${endpoint}`, {
+      const options: RequestInit = {
         method: 'DELETE',
         headers: this.getHeaders(),
         credentials: 'include', // Include cookies
-      });
+      };
+      
+      if (body) {
+        options.body = JSON.stringify(body);
+      }
+
+      const response = await fetch(`${this.baseUrl}${endpoint}`, options);
 
       return this.handleResponse<T>(response);
     } catch (error) {
@@ -340,6 +346,35 @@ export const petsApi = {
   delete: (id: number) => apiClient.delete<{ message: string }>(`/api/pets/${id}`),
 };
 
+// API методы для друзей
+export const friendsApi = {
+  // Получить список друзей
+  getFriends: () => apiClient.get<Friendship[]>('/api/friends'),
+  
+  // Получить входящие запросы в друзья
+  getRequests: () => apiClient.get<Friendship[]>('/api/friends/requests'),
+  
+  // Отправить запрос в друзья
+  sendRequest: (friendId: number) => 
+    apiClient.post<{ message: string }>('/api/friends/send', { friend_id: friendId }),
+  
+  // Принять запрос в друзья
+  acceptRequest: (friendshipId: number) =>
+    apiClient.post<{ message: string }>('/api/friends/accept', { friendship_id: friendshipId }),
+  
+  // Отклонить запрос в друзья
+  rejectRequest: (friendshipId: number) =>
+    apiClient.post<{ message: string }>('/api/friends/reject', { friendship_id: friendshipId }),
+  
+  // Удалить из друзей
+  removeFriend: (friendshipId: number) =>
+    apiClient.delete<{ message: string }>('/api/friends/remove', { friendship_id: friendshipId }),
+  
+  // Получить статус дружбы с пользователем
+  getStatus: (friendId: number) =>
+    apiClient.get<FriendshipStatus>(`/api/friends/status?friend_id=${friendId}`),
+};
+
 // Типы
 export interface User {
   id: number;
@@ -458,4 +493,21 @@ export interface Pet {
   contact_phone?: string;
   organization_id?: number;
   created_at: string;
+}
+
+// Типы для друзей
+export interface Friendship {
+  id: number;
+  user_id: number;
+  friend_id: number;
+  status: 'pending' | 'accepted' | 'rejected' | 'blocked';
+  created_at: string;
+  updated_at: string;
+  friend: User;
+}
+
+export interface FriendshipStatus {
+  id?: number;
+  status?: 'pending' | 'accepted' | 'rejected' | 'blocked' | 'none';
+  is_outgoing?: boolean;
 }
