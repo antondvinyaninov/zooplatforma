@@ -25,6 +25,13 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Исправлена ошибка callback в CreatePost на странице профиля**
+  - Проблема: `ReferenceError: loadPosts is not defined` на странице профиля пользователя
+  - В компоненте `CreatePost` использовался несуществующий callback `loadPosts`
+  - Решение: заменён на правильный callback `loadUserProfile`, который загружает посты через `postsApi.getUserPosts(userId)`
+  - Файл: `main/frontend/app/(main)/[userId]/page.tsx`
+
 ### Added
 - **CreatePost на странице организации**
   - Форма создания поста добавлена на страницу организации `/org/[id]`
