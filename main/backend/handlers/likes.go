@@ -95,3 +95,44 @@ func getLikeStatus(w http.ResponseWriter, _ *http.Request, postID int, userID in
 		"likes_count": likesCount,
 	})
 }
+
+// getLikers получает список пользователей, которые лайкнули пост
+func getLikers(w http.ResponseWriter, _ *http.Request, postID int) {
+	query := `
+		SELECT u.id, u.name, u.last_name, u.avatar
+		FROM likes l
+		JOIN users u ON l.user_id = u.id
+		WHERE l.post_id = ?
+		ORDER BY l.created_at DESC
+	`
+
+	rows, err := database.DB.Query(query, postID)
+	if err != nil {
+		sendErrorResponse(w, "Ошибка получения списка лайков: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	type Liker struct {
+		ID       int     `json:"id"`
+		Name     string  `json:"name"`
+		LastName *string `json:"last_name"`
+		Avatar   *string `json:"avatar"`
+	}
+
+	var likers []Liker
+	for rows.Next() {
+		var liker Liker
+		err := rows.Scan(&liker.ID, &liker.Name, &liker.LastName, &liker.Avatar)
+		if err != nil {
+			continue
+		}
+		likers = append(likers, liker)
+	}
+
+	if likers == nil {
+		likers = []Liker{}
+	}
+
+	sendSuccessResponse(w, likers)
+}

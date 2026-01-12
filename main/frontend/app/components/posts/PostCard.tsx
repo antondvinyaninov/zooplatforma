@@ -10,6 +10,7 @@ import PostComments from '../shared/PostComments';
 import PostModal from './PostModal';
 import PollDisplay from '../polls/PollDisplay';
 import PhotoGrid from './PhotoGrid';
+import LikersModal from './LikersModal';
 
 interface User {
   id: number;
@@ -84,6 +85,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
   const [likesCount, setLikesCount] = useState(0);
   const [commentsCount, setCommentsCount] = useState(post.comments_count || 0);
   const [showModal, setShowModal] = useState(false);
+  const [showLikersModal, setShowLikersModal] = useState(false);
 
   // Проверяем, открыт ли этот пост через URL
   useEffect(() => {
@@ -272,7 +274,17 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
           <svg className={`w-5 h-5 ${isLiked ? 'fill-current' : ''}`} fill={isLiked ? 'currentColor' : 'none'} stroke="currentColor" viewBox="0 0 24 24">
             <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M4.318 6.318a4.5 4.5 0 000 6.364L12 20.364l7.682-7.682a4.5 4.5 0 00-6.364-6.364L12 7.636l-1.318-1.318a4.5 4.5 0 00-6.364 0z" />
           </svg>
-          {likesCount > 0 && <span className="text-sm">{likesCount}</span>}
+          {likesCount > 0 && (
+            <span 
+              className="text-sm hover:underline cursor-pointer"
+              onClick={(e) => {
+                e.stopPropagation();
+                setShowLikersModal(true);
+              }}
+            >
+              {likesCount}
+            </span>
+          )}
         </button>
 
         <button 
@@ -304,6 +316,13 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
         isOpen={showModal}
         onClose={handleCloseModal}
         onCountChange={(count) => setCommentsCount(count)}
+      />
+
+      {/* Likers Modal */}
+      <LikersModal
+        postId={post.id}
+        isOpen={showLikersModal}
+        onClose={() => setShowLikersModal(false)}
       />
     </div>
   );

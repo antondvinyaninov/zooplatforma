@@ -315,6 +315,9 @@ export const postsApi = {
   
   getLikeStatus: (postId: number) => 
     apiClient.get<{ liked: boolean; likes_count: number }>(`/api/posts/${postId}/like`),
+  
+  getLikers: (postId: number) =>
+    apiClient.get<Array<{ id: number; name: string; last_name?: string; avatar?: string }>>(`/api/posts/${postId}/likers`),
 };
 
 // API методы для комментариев

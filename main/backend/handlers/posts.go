@@ -51,6 +51,24 @@ func PostHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Проверяем, это запрос на список лайкнувших?
+	if strings.HasSuffix(path, "/likers") {
+		postIDStr := strings.TrimSuffix(path, "/likers")
+		postID, err := strconv.Atoi(postIDStr)
+		if err != nil {
+			sendErrorResponse(w, "Неверный ID поста", http.StatusBadRequest)
+			return
+		}
+
+		if r.Method != http.MethodGet {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			return
+		}
+
+		getLikers(w, r, postID)
+		return
+	}
+
 	// Обычная обработка поста
 	id, err := strconv.Atoi(path)
 	if err != nil {
