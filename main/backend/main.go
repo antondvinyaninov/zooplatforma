@@ -105,6 +105,19 @@ func main() {
 	http.HandleFunc("/api/friends/remove", enableCORS(middleware.AuthMiddleware(handlers.RemoveFriendHandler)))
 	http.HandleFunc("/api/friends/status", enableCORS(middleware.AuthMiddleware(handlers.GetFriendshipStatusHandler)))
 
+	// Notifications
+	notificationsHandler := &handlers.NotificationsHandler{DB: database.DB}
+	http.HandleFunc("/api/notifications", enableCORS(middleware.AuthMiddleware(notificationsHandler.GetNotifications)))
+	http.HandleFunc("/api/notifications/unread", enableCORS(middleware.AuthMiddleware(notificationsHandler.GetUnreadCount)))
+	http.HandleFunc("/api/notifications/read-all", enableCORS(middleware.AuthMiddleware(notificationsHandler.MarkAllAsRead)))
+	http.Handle("/api/notifications/", enableCORS(middleware.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "PUT" {
+			notificationsHandler.MarkAsRead(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))))
+
 	// Organizations
 	http.HandleFunc("/api/organizations/all", enableCORS(handlers.GetAllOrganizationsHandler)) // Публичный endpoint
 	http.HandleFunc("/api/organizations", enableCORS(middleware.AuthMiddleware(handlers.CreateOrganizationHandler)))

@@ -375,6 +375,23 @@ export const friendsApi = {
     apiClient.get<FriendshipStatus>(`/api/friends/status?friend_id=${friendId}`),
 };
 
+// API методы для уведомлений
+export const notificationsApi = {
+  // Получить список уведомлений
+  getAll: () => apiClient.get<Notification[]>('/api/notifications'),
+  
+  // Получить количество непрочитанных
+  getUnreadCount: () => apiClient.get<{ count: number }>('/api/notifications/unread'),
+  
+  // Отметить уведомление как прочитанное
+  markAsRead: (notificationId: number) =>
+    apiClient.put<{ message: string }>(`/api/notifications/${notificationId}`, {}),
+  
+  // Отметить все как прочитанные
+  markAllAsRead: () =>
+    apiClient.post<{ message: string }>('/api/notifications/read-all', {}),
+};
+
 // Типы
 export interface User {
   id: number;
@@ -510,4 +527,18 @@ export interface FriendshipStatus {
   id?: number;
   status?: 'pending' | 'accepted' | 'rejected' | 'blocked' | 'none';
   is_outgoing?: boolean;
+}
+
+// Типы для уведомлений
+export interface Notification {
+  id: number;
+  user_id: number;
+  type: 'comment' | 'like' | 'friend_request' | 'friend_accepted';
+  actor_id: number;
+  entity_type?: string;
+  entity_id?: number;
+  message: string;
+  is_read: boolean;
+  created_at: string;
+  actor?: User;
 }

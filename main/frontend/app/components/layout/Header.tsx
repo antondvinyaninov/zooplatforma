@@ -1,10 +1,11 @@
 'use client';
 
 import Image from 'next/image';
-import { MagnifyingGlassIcon, BellIcon } from '@heroicons/react/24/outline';
+import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import CityDetector from './CityDetector';
 import UserMenu from './UserMenu';
 import FriendRequestsDropdown from './FriendRequestsDropdown';
+import NotificationsDropdown from './NotificationsDropdown';
 
 export default function Header() {
   return (
@@ -50,12 +51,7 @@ export default function Header() {
             <FriendRequestsDropdown />
             
             {/* Notifications */}
-            <button className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
-              <BellIcon className="w-6 h-6" strokeWidth={2} />
-              <span className="absolute top-0 right-0 text-white text-[10px] rounded-full w-4 h-4 flex items-center justify-center font-bold" style={{ backgroundColor: '#FC2B2B' }}>
-                3
-              </span>
-            </button>
+            <NotificationsDropdown />
 
             {/* User Menu */}
             <UserMenu />
