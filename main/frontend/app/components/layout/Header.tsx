@@ -4,6 +4,7 @@ import Image from 'next/image';
 import { MagnifyingGlassIcon, BellIcon } from '@heroicons/react/24/outline';
 import CityDetector from './CityDetector';
 import UserMenu from './UserMenu';
+import FriendRequestsDropdown from './FriendRequestsDropdown';
 
 export default function Header() {
   return (
@@ -44,6 +45,9 @@ export default function Header() {
             <div className="hidden md:block">
               <CityDetector />
             </div>
+            
+            {/* Friend Requests */}
+            <FriendRequestsDropdown />
             
             {/* Notifications */}
             <button className="relative p-2 text-gray-500 hover:text-gray-700 hover:bg-gray-100 rounded-lg transition-colors">
