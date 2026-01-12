@@ -197,6 +197,28 @@ func createComment(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	// Создаем уведомление для автора поста
+	var postAuthorID int
+	var commenterLastName sql.NullString
+	err = database.DB.QueryRow(`
+		SELECT p.author_id, u.last_name 
+		FROM posts p 
+		JOIN users u ON u.id = ? 
+		WHERE p.id = ?
+	`, userID, postID).Scan(&postAuthorID, &commenterLastName)
+
+	if err == nil && postAuthorID != userID {
+		// Формируем имя комментатора
+		fullName := user.Name
+		if commenterLastName.Valid && commenterLastName.String != "" {
+			fullName += " " + commenterLastName.String
+		}
+
+		// Создаем уведомление
+		notifHandler := &NotificationsHandler{DB: database.DB}
+		notifHandler.NotifyComment(postAuthorID, userID, postID, fullName)
+	}
+
 	sendSuccessResponse(w, comment)
 }
 

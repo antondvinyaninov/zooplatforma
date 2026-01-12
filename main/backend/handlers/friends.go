@@ -58,6 +58,23 @@ func SendFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	id, _ := result.LastInsertId()
+
+	// Создаем уведомление для получателя запроса
+	var senderName, senderLastName string
+	err = database.DB.QueryRow(`
+		SELECT name, COALESCE(last_name, '') FROM users WHERE id = ?
+	`, userID).Scan(&senderName, &senderLastName)
+
+	if err == nil {
+		fullName := senderName
+		if senderLastName != "" {
+			fullName += " " + senderLastName
+		}
+
+		notifHandler := &NotificationsHandler{DB: database.DB}
+		notifHandler.NotifyFriendRequest(req.FriendID, userID, int(id), fullName)
+	}
+
 	sendSuccessResponse(w, map[string]interface{}{
 		"id":      id,
 		"status":  "pending",
@@ -100,6 +117,26 @@ func AcceptFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 	if rowsAffected == 0 {
 		sendErrorResponse(w, "Запрос не найден или уже обработан", http.StatusNotFound)
 		return
+	}
+
+	// Создаем уведомление для отправителя запроса
+	var senderID int
+	var acceptorName, acceptorLastName string
+	err = database.DB.QueryRow(`
+		SELECT f.user_id, u.name, COALESCE(u.last_name, '')
+		FROM friendships f
+		JOIN users u ON u.id = ?
+		WHERE f.id = ?
+	`, userID, req.FriendshipID).Scan(&senderID, &acceptorName, &acceptorLastName)
+
+	if err == nil {
+		fullName := acceptorName
+		if acceptorLastName != "" {
+			fullName += " " + acceptorLastName
+		}
+
+		notifHandler := &NotificationsHandler{DB: database.DB}
+		notifHandler.NotifyFriendAccepted(senderID, userID, req.FriendshipID, fullName)
 	}
 
 	sendSuccessResponse(w, map[string]string{

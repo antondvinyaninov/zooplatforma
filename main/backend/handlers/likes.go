@@ -2,6 +2,7 @@ package handlers
 
 import (
 	"database"
+	"database/sql"
 	"net/http"
 	"strconv"
 	"strings"
@@ -57,6 +58,28 @@ func toggleLike(w http.ResponseWriter, _ *http.Request, postID int, userID int) 
 		if err != nil {
 			sendErrorResponse(w, "Ошибка добавления лайка: "+err.Error(), http.StatusInternalServerError)
 			return
+		}
+
+		// Создаем уведомление для автора поста
+		var postAuthorID int
+		var likerName, likerLastName sql.NullString
+		err = database.DB.QueryRow(`
+			SELECT p.author_id, u.name, u.last_name 
+			FROM posts p 
+			JOIN users u ON u.id = ? 
+			WHERE p.id = ?
+		`, userID, postID).Scan(&postAuthorID, &likerName, &likerLastName)
+
+		if err == nil && postAuthorID != userID {
+			// Формируем имя лайкнувшего
+			fullName := likerName.String
+			if likerLastName.Valid && likerLastName.String != "" {
+				fullName += " " + likerLastName.String
+			}
+
+			// Создаем уведомление
+			notifHandler := &NotificationsHandler{DB: database.DB}
+			notifHandler.NotifyLike(postAuthorID, userID, postID, fullName)
 		}
 	}
 
