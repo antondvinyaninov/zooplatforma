@@ -9,6 +9,7 @@ import {
   XCircleIcon
 } from '@heroicons/react/24/outline';
 import { organizationsApi } from '@/lib/api';
+import YandexMap from '@/app/components/shared/YandexMap';
 
 interface DaDataSuggestion {
   value: string;
@@ -497,6 +498,19 @@ export default function CreateOrganizationPage() {
               </div>
             </div>
           </div>
+
+          {/* Карта (если есть адрес) */}
+          {formData.address_full && (
+            <div>
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Местоположение на карте</h3>
+              <YandexMap
+                address={formData.address_full}
+                organizationName={formData.name}
+                latitude={formData.geo_lat || undefined}
+                longitude={formData.geo_lon || undefined}
+              />
+            </div>
+          )}
 
           {/* Описание */}
           <div>
