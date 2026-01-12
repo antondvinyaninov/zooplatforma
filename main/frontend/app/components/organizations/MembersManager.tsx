@@ -6,8 +6,7 @@ import {
   UserMinusIcon, 
   PencilIcon,
   XMarkIcon,
-  MagnifyingGlassIcon,
-  CheckIcon
+  MagnifyingGlassIcon
 } from '@heroicons/react/24/outline';
 import { organizationsApi, usersApi } from '@/lib/api';
 
@@ -21,7 +20,7 @@ interface Member {
   can_edit: boolean;
   can_manage_members: boolean;
   joined_at: string;
-  user_name: string;
+  user_name?: string;
   user_avatar?: string;
 }
 
@@ -196,7 +195,7 @@ export default function MembersManager({ organizationId, members, currentUserId,
 
   // Удалить участника
   const handleRemoveMember = async (member: Member) => {
-    if (!confirm(`Удалить ${member.user_name} из организации?`)) {
+    if (!confirm(`Удалить ${member.user_name || 'пользователя'} из организации?`)) {
       return;
     }
 
@@ -246,17 +245,17 @@ export default function MembersManager({ organizationId, members, currentUserId,
               {member.user_avatar ? (
                 <img 
                   src={`http://localhost:8000${member.user_avatar}`}
-                  alt={member.user_name}
+                  alt={member.user_name || 'User'}
                   className="w-full h-full rounded-full object-cover"
                 />
               ) : (
-                member.user_name.charAt(0).toUpperCase()
+                (member.user_name || 'U').charAt(0).toUpperCase()
               )}
             </div>
 
             {/* Информация */}
             <div className="flex-1 min-w-0">
-              <div className="font-medium text-gray-900">{member.user_name}</div>
+              <div className="font-medium text-gray-900">{member.user_name || 'Пользователь'}</div>
               {member.position && (
                 <div className="text-sm text-gray-600">{member.position}</div>
               )}
@@ -453,14 +452,14 @@ export default function MembersManager({ organizationId, members, currentUserId,
                     {selectedMember.user_avatar ? (
                       <img 
                         src={`http://localhost:8000${selectedMember.user_avatar}`}
-                        alt={selectedMember.user_name}
+                        alt={selectedMember.user_name || 'User'}
                         className="w-full h-full rounded-full object-cover"
                       />
                     ) : (
-                      selectedMember.user_name.charAt(0).toUpperCase()
+                      (selectedMember.user_name || 'U').charAt(0).toUpperCase()
                     )}
                   </div>
-                  <div className="font-medium text-gray-900">{selectedMember.user_name}</div>
+                  <div className="font-medium text-gray-900">{selectedMember.user_name || 'Пользователь'}</div>
                 </div>
               </div>
 

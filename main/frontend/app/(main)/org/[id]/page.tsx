@@ -2,6 +2,7 @@
 
 import { useEffect, useState } from 'react';
 import { useParams, useRouter } from 'next/navigation';
+import { useAuth } from '../../../../contexts/AuthContext';
 import { 
   CalendarIcon, 
   MapPinIcon,
@@ -17,16 +18,24 @@ import {
 import { organizationsApi, Organization, OrganizationMember, getOrganizationTypeName } from '../../../../lib/organizations-api';
 import { postsApi, Post } from '../../../../lib/api';
 import PostCard from '../../../components/posts/PostCard';
+import YandexMap from '../../../components/shared/YandexMap';
 
 export default function OrganizationPage() {
   const params = useParams();
   const router = useRouter();
+  const { user } = useAuth(); // Используем useAuth вместо localStorage
   const [org, setOrg] = useState<Organization | null>(null);
   const [members, setMembers] = useState<OrganizationMember[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [membersLoading, setMembersLoading] = useState(true);
   const [postsLoading, setPostsLoading] = useState(true);
+
+  // Проверка является ли пользователь owner/admin
+  const isOwnerOrAdmin = () => {
+    if (!user) return false;
+    return members.some(m => m.user_id === user.id && ['owner', 'admin'].includes(m.role));
+  };
 
   useEffect(() => {
     if (params.id) {
@@ -76,6 +85,26 @@ export default function OrganizationPage() {
       console.error('Error loading posts:', error);
     } finally {
       setPostsLoading(false);
+    }
+  };
+
+  // Переход в систему управления в зависимости от типа организации
+  const handleGoToManagement = () => {
+    if (!org) return;
+
+    const managementUrls: Record<string, string> = {
+      shelter: `http://localhost:5100/dashboard?orgId=${org.id}`,
+      clinic: `http://localhost:6300/dashboard?orgId=${org.id}`,
+      store: `http://localhost:7100/dashboard?orgId=${org.id}`, // Пока не создан
+      foundation: `http://localhost:7200/dashboard?orgId=${org.id}`, // Пока не создан
+      kennel: `http://localhost:7300/dashboard?orgId=${org.id}`, // Пока не создан
+    };
+
+    const url = managementUrls[org.type];
+    if (url) {
+      window.open(url, '_blank');
+    } else {
+      alert('Система управления для этого типа организации пока не доступна');
     }
   };
 
@@ -231,21 +260,25 @@ export default function OrganizationPage() {
               )}
               
               {org.address_full && (
-                <div className="flex items-start gap-3">
-                  <MapPinIcon className="w-5 h-5 text-gray-400 mt-0.5" />
-                  <div>
+                <div className="flex flex-col gap-3">
+                  <div className="flex items-start gap-3">
+                    <MapPinIcon className="w-5 h-5 text-gray-400 mt-0.5" />
                     <div className="text-gray-700">{org.address_full}</div>
-                    {(org.geo_lat && org.geo_lon) && (
-                      <a 
-                        href={`https://yandex.ru/maps/?pt=${org.geo_lon},${org.geo_lat}&z=16&l=map`}
-                        target="_blank"
-                        rel="noopener noreferrer"
-                        className="text-sm text-blue-500 hover:text-blue-600 mt-1 inline-block"
-                      >
-                        Показать на карте
-                      </a>
-                    )}
                   </div>
+                  
+                  {/* Компактная карта */}
+                  {(org.geo_lat && org.geo_lon) && (
+                    <div className="mt-3">
+                      <YandexMap
+                        address={org.address_full}
+                        organizationName={org.name}
+                        latitude={org.geo_lat}
+                        longitude={org.geo_lon}
+                        zoom={15}
+                        height="250px"
+                      />
+                    </div>
+                  )}
                 </div>
               )}
             </div>
@@ -308,6 +341,29 @@ export default function OrganizationPage() {
 
         {/* Right Column - Sidebar */}
         <div className="space-y-2.5">
+          {/* Управление организацией (только для owner/admin) */}
+          {isOwnerOrAdmin() && (
+            <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+              <h3 className="text-lg font-semibold text-gray-900 mb-4">Управление</h3>
+              <div className="space-y-2">
+                <button
+                  onClick={() => handleGoToManagement()}
+                  className="w-full px-4 py-2.5 bg-blue-500 hover:bg-blue-600 text-white rounded-lg font-medium transition-colors flex items-center justify-center gap-2"
+                >
+                  <BuildingOfficeIcon className="w-5 h-5" />
+                  Система управления
+                </button>
+                
+                <button
+                  onClick={() => router.push(`/org/${org.id}/edit`)}
+                  className="w-full px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+                >
+                  Редактировать профиль
+                </button>
+              </div>
+            </div>
+          )}
+
           {/* Информация */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
             <h3 className="text-lg font-semibold text-gray-900 mb-4">Информация</h3>

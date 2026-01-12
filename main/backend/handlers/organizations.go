@@ -81,12 +81,20 @@ func CreateOrganizationHandler(w http.ResponseWriter, r *http.Request) {
 	sendJSONSuccess(w, map[string]interface{}{"id": orgID})
 }
 
+// OrganizationHandler обрабатывает запросы к конкретной организации (GET, PUT)
+func OrganizationHandler(w http.ResponseWriter, r *http.Request) {
+	switch r.Method {
+	case http.MethodGet:
+		GetOrganizationHandler(w, r)
+	case http.MethodPut:
+		UpdateOrganizationHandler(w, r)
+	default:
+		sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+	}
+}
+
 // GetOrganizationHandler получает организацию по ID
 func GetOrganizationHandler(w http.ResponseWriter, r *http.Request) {
-	if r.Method != http.MethodGet {
-		sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
-		return
-	}
 
 	// Извлекаем ID из URL
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
@@ -387,13 +395,13 @@ func GetOrganizationMembersHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Извлекаем ID из URL
+	// Извлекаем ID из URL: /api/organizations/members/{id}
 	parts := strings.Split(strings.Trim(r.URL.Path, "/"), "/")
 	if len(parts) < 4 {
 		sendJSONError(w, http.StatusBadRequest, "Invalid URL")
 		return
 	}
-	orgID := parts[len(parts)-2] // .../organizations/{id}/members
+	orgID := parts[len(parts)-1] // Последняя часть - это ID
 
 	query := `
 		SELECT 

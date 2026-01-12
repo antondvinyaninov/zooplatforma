@@ -8,6 +8,7 @@ interface YandexMapProps {
   latitude?: number;
   longitude?: number;
   zoom?: number;
+  height?: string;
 }
 
 declare global {
@@ -22,7 +23,8 @@ export default function YandexMap({
   organizationName,
   latitude,
   longitude,
-  zoom = 16 
+  zoom = 16,
+  height = '400px'
 }: YandexMapProps) {
   const mapRef = useRef<HTMLDivElement>(null);
   const mapInstanceRef = useRef<any>(null);
@@ -168,7 +170,7 @@ export default function YandexMap({
   }, [address, organizationName, latitude, longitude, zoom]);
 
   return (
-    <div className="relative w-full h-[400px]">
+    <div className="relative w-full" style={{ height }}>
       {/* Div для карты - всегда присутствует */}
       <div 
         ref={mapRef} 

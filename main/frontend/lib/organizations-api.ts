@@ -181,7 +181,7 @@ export const organizationsApi = {
 
   // Получить участников организации
   async getMembers(orgId: number) {
-    const response = await fetch(`${API_URL}/api/organizations/${orgId}/members`, {
+    const response = await fetch(`${API_URL}/api/organizations/members/${orgId}`, {
       credentials: 'include',
     });
     return response.json();
@@ -209,6 +209,53 @@ export const organizationsApi = {
       method: 'POST',
       credentials: 'include',
       body: formData,
+    });
+    return response.json();
+  },
+
+  // Подать заявку на вступление
+  async requestJoin(orgId: number) {
+    const response = await fetch(`${API_URL}/api/organizations/${orgId}/join-request`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+    });
+    return response.json();
+  },
+
+  // Добавить участника
+  async addMember(orgId: number, userId: number, role: string, position?: string) {
+    const response = await fetch(`${API_URL}/api/organizations/${orgId}/members`, {
+      method: 'POST',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ user_id: userId, role, position }),
+    });
+    return response.json();
+  },
+
+  // Обновить участника
+  async updateMember(memberId: number, role: string, position?: string) {
+    const response = await fetch(`${API_URL}/api/organizations/members/${memberId}`, {
+      method: 'PUT',
+      headers: {
+        'Content-Type': 'application/json',
+      },
+      credentials: 'include',
+      body: JSON.stringify({ role, position }),
+    });
+    return response.json();
+  },
+
+  // Удалить участника
+  async removeMember(memberId: number) {
+    const response = await fetch(`${API_URL}/api/organizations/members/${memberId}`, {
+      method: 'DELETE',
+      credentials: 'include',
     });
     return response.json();
   },

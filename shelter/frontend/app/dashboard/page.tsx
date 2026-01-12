@@ -47,6 +47,14 @@ export default function ShelterDashboard() {
     if (savedTab) {
       setActiveTab(savedTab);
     }
+    
+    // Проверяем параметр orgId в URL
+    const urlParams = new URLSearchParams(window.location.search);
+    const orgId = urlParams.get('orgId');
+    if (orgId) {
+      // Сохраняем выбранную организацию
+      localStorage.setItem('selectedOrganizationId', orgId);
+    }
   }, []);
 
   useEffect(() => {

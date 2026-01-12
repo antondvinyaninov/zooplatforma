@@ -41,6 +41,7 @@ export default function OrganizationsPage() {
   const [filterCity, setFilterCity] = useState<string>('all');
   const [citiesData, setCitiesData] = useState<CitiesData>({ regions: [] });
   const [userCity, setUserCity] = useState<string | null>(null);
+  const [autoFilterDisabled, setAutoFilterDisabled] = useState(false); // Флаг отключения автофильтра
   const isAutoSettingRef = useRef(false); // Используем ref вместо state
 
   // Определяем город пользователя
@@ -90,7 +91,7 @@ export default function OrganizationsPage() {
 
   // Автоматически устанавливаем регион по городу пользователя
   useEffect(() => {
-    if (userCity && citiesData.regions.length > 0 && filterRegion === 'all') {
+    if (userCity && citiesData.regions.length > 0 && filterRegion === 'all' && !autoFilterDisabled) {
       // Ищем регион пользователя в справочнике
       for (const region of citiesData.regions) {
         if (region.cities.includes(userCity)) {
@@ -100,7 +101,7 @@ export default function OrganizationsPage() {
         }
       }
     }
-  }, [userCity, citiesData, filterRegion]);
+  }, [userCity, citiesData, filterRegion, autoFilterDisabled]);
 
   // Автоматически устанавливаем город после установки региона
   useEffect(() => {
@@ -161,6 +162,7 @@ export default function OrganizationsPage() {
     const matchesType = filterType === 'all' || org.type === filterType;
     const matchesRegion = filterRegion === 'all' || org.address_region === filterRegion;
     const matchesCity = filterCity === 'all' || org.address_city === filterCity;
+    
     return matchesSearch && matchesType && matchesRegion && matchesCity;
   });
 
@@ -381,7 +383,13 @@ export default function OrganizationsPage() {
                 <label className="block text-sm text-gray-600 mb-1.5">Регион</label>
                 <select
                   value={filterRegion}
-                  onChange={(e) => setFilterRegion(e.target.value)}
+                  onChange={(e) => {
+                    setFilterRegion(e.target.value);
+                    // Если пользователь вручную выбрал "Все регионы", отключаем автофильтр
+                    if (e.target.value === 'all') {
+                      setAutoFilterDisabled(true);
+                    }
+                  }}
                   className="w-full px-3 py-2 border border-gray-200 rounded-lg focus:outline-none focus:ring-2 focus:ring-blue-500 text-sm"
                 >
                   <option value="all">Все регионы</option>
