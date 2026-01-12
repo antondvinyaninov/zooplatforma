@@ -464,3 +464,201 @@ func sendJSONError(w http.ResponseWriter, status int, message string) {
 		"error":   message,
 	})
 }
+
+// AddMemberHandler добавляет участника в организацию
+func AddMemberHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPost {
+		sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	userID := r.Context().Value("userID").(int)
+	if userID == 0 {
+		sendJSONError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	var req struct {
+		OrganizationID int    `json:"organization_id"`
+		UserID         int    `json:"user_id"`
+		Role           string `json:"role"`
+		Position       string `json:"position"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendJSONError(w, http.StatusBadRequest, "Invalid request: "+err.Error())
+		return
+	}
+
+	// Проверяем права доступа (только owner и admin могут добавлять)
+	var canManage bool
+	err := database.DB.QueryRow(`
+		SELECT can_manage_members FROM organization_members
+		WHERE organization_id = ? AND user_id = ?
+	`, req.OrganizationID, userID).Scan(&canManage)
+
+	if err == sql.ErrNoRows || !canManage {
+		sendJSONError(w, http.StatusForbidden, "You don't have permission to manage members")
+		return
+	}
+
+	// Проверяем, что пользователь еще не является участником
+	var exists bool
+	err = database.DB.QueryRow(`
+		SELECT EXISTS(SELECT 1 FROM organization_members WHERE organization_id = ? AND user_id = ?)
+	`, req.OrganizationID, req.UserID).Scan(&exists)
+
+	if err != nil {
+		sendJSONError(w, http.StatusInternalServerError, "Database error: "+err.Error())
+		return
+	}
+
+	if exists {
+		sendJSONError(w, http.StatusBadRequest, "User is already a member")
+		return
+	}
+
+	// Устанавливаем права в зависимости от роли
+	canPost := req.Role == "owner" || req.Role == "admin" || req.Role == "moderator"
+	canEdit := req.Role == "owner" || req.Role == "admin"
+	canManageMembers := req.Role == "owner" || req.Role == "admin"
+
+	// Добавляем участника
+	_, err = database.DB.Exec(`
+		INSERT INTO organization_members (organization_id, user_id, role, position, can_post, can_edit, can_manage_members)
+		VALUES (?, ?, ?, ?, ?, ?, ?)
+	`, req.OrganizationID, req.UserID, req.Role, req.Position, canPost, canEdit, canManageMembers)
+
+	if err != nil {
+		sendJSONError(w, http.StatusInternalServerError, "Failed to add member: "+err.Error())
+		return
+	}
+
+	sendJSONSuccess(w, map[string]interface{}{"message": "Member added successfully"})
+}
+
+// UpdateMemberHandler обновляет роль участника
+func UpdateMemberHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodPUT {
+		sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	userID := r.Context().Value("userID").(int)
+	if userID == 0 {
+		sendJSONError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	var req struct {
+		MemberID int    `json:"member_id"`
+		Role     string `json:"role"`
+		Position string `json:"position"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendJSONError(w, http.StatusBadRequest, "Invalid request: "+err.Error())
+		return
+	}
+
+	// Получаем organization_id участника
+	var orgID int
+	err := database.DB.QueryRow("SELECT organization_id FROM organization_members WHERE id = ?", req.MemberID).Scan(&orgID)
+	if err == sql.ErrNoRows {
+		sendJSONError(w, http.StatusNotFound, "Member not found")
+		return
+	}
+
+	// Проверяем права доступа
+	var canManage bool
+	err = database.DB.QueryRow(`
+		SELECT can_manage_members FROM organization_members
+		WHERE organization_id = ? AND user_id = ?
+	`, orgID, userID).Scan(&canManage)
+
+	if err == sql.ErrNoRows || !canManage {
+		sendJSONError(w, http.StatusForbidden, "You don't have permission to manage members")
+		return
+	}
+
+	// Устанавливаем права в зависимости от роли
+	canPost := req.Role == "owner" || req.Role == "admin" || req.Role == "moderator"
+	canEdit := req.Role == "owner" || req.Role == "admin"
+	canManageMembers := req.Role == "owner" || req.Role == "admin"
+
+	// Обновляем участника
+	_, err = database.DB.Exec(`
+		UPDATE organization_members 
+		SET role = ?, position = ?, can_post = ?, can_edit = ?, can_manage_members = ?
+		WHERE id = ?
+	`, req.Role, req.Position, canPost, canEdit, canManageMembers, req.MemberID)
+
+	if err != nil {
+		sendJSONError(w, http.StatusInternalServerError, "Failed to update member: "+err.Error())
+		return
+	}
+
+	sendJSONSuccess(w, map[string]interface{}{"message": "Member updated successfully"})
+}
+
+// RemoveMemberHandler удаляет участника из организации
+func RemoveMemberHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodDelete {
+		sendJSONError(w, http.StatusMethodNotAllowed, "Method not allowed")
+		return
+	}
+
+	userID := r.Context().Value("userID").(int)
+	if userID == 0 {
+		sendJSONError(w, http.StatusUnauthorized, "Unauthorized")
+		return
+	}
+
+	var req struct {
+		MemberID int `json:"member_id"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		sendJSONError(w, http.StatusBadRequest, "Invalid request: "+err.Error())
+		return
+	}
+
+	// Получаем информацию об участнике
+	var orgID, memberUserID int
+	var memberRole string
+	err := database.DB.QueryRow(`
+		SELECT organization_id, user_id, role FROM organization_members WHERE id = ?
+	`, req.MemberID).Scan(&orgID, &memberUserID, &memberRole)
+
+	if err == sql.ErrNoRows {
+		sendJSONError(w, http.StatusNotFound, "Member not found")
+		return
+	}
+
+	// Нельзя удалить owner
+	if memberRole == "owner" {
+		sendJSONError(w, http.StatusForbidden, "Cannot remove organization owner")
+		return
+	}
+
+	// Проверяем права доступа
+	var canManage bool
+	err = database.DB.QueryRow(`
+		SELECT can_manage_members FROM organization_members
+		WHERE organization_id = ? AND user_id = ?
+	`, orgID, userID).Scan(&canManage)
+
+	if err == sql.ErrNoRows || !canManage {
+		sendJSONError(w, http.StatusForbidden, "You don't have permission to manage members")
+		return
+	}
+
+	// Удаляем участника
+	_, err = database.DB.Exec("DELETE FROM organization_members WHERE id = ?", req.MemberID)
+	if err != nil {
+		sendJSONError(w, http.StatusInternalServerError, "Failed to remove member: "+err.Error())
+		return
+	}
+
+	sendJSONSuccess(w, map[string]interface{}{"message": "Member removed successfully"})
+}

@@ -418,6 +418,29 @@ export const organizationsApi = {
   // Получить участников организации
   getMembers: (organizationId: number) =>
     apiClient.get<any[]>(`/api/organizations/members/${organizationId}`),
+  
+  // Добавить участника
+  addMember: (organizationId: number, userId: number, role: string, position?: string) =>
+    apiClient.post<{ message: string }>('/api/organizations/members/add', {
+      organization_id: organizationId,
+      user_id: userId,
+      role,
+      position: position || '',
+    }),
+  
+  // Обновить участника
+  updateMember: (memberId: number, role: string, position?: string) =>
+    apiClient.put<{ message: string }>('/api/organizations/members/update', {
+      member_id: memberId,
+      role,
+      position: position || '',
+    }),
+  
+  // Удалить участника
+  removeMember: (memberId: number) =>
+    apiClient.delete<{ message: string }>('/api/organizations/members/remove', {
+      member_id: memberId,
+    }),
 };
 
 // Типы

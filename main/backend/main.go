@@ -124,6 +124,9 @@ func main() {
 	http.HandleFunc("/api/organizations/", enableCORS(handlers.GetOrganizationHandler)) // Публичный для просмотра
 	http.HandleFunc("/api/organizations/user/", enableCORS(middleware.AuthMiddleware(handlers.GetUserOrganizationsHandler)))
 	http.HandleFunc("/api/organizations/members/", enableCORS(middleware.AuthMiddleware(handlers.GetOrganizationMembersHandler)))
+	http.HandleFunc("/api/organizations/members/add", enableCORS(middleware.AuthMiddleware(handlers.AddMemberHandler)))
+	http.HandleFunc("/api/organizations/members/update", enableCORS(middleware.AuthMiddleware(handlers.UpdateMemberHandler)))
+	http.HandleFunc("/api/organizations/members/remove", enableCORS(middleware.AuthMiddleware(handlers.RemoveMemberHandler)))
 
 	// Messenger (личные чаты 1-1)
 	http.HandleFunc("/api/chats", enableCORS(middleware.AuthMiddleware(handlers.GetChatsHandler(database.DB))))
