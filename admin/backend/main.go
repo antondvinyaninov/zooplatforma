@@ -93,6 +93,11 @@ func main() {
 	http.HandleFunc("/api/admin/stats/overview", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminStatsOverviewHandler)))
 	http.HandleFunc("/api/admin/logs", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminLogsHandler)))
 
+	// Organizations moderation
+	http.HandleFunc("/api/admin/organizations", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminOrganizationsHandler)))
+	http.HandleFunc("/api/admin/organizations/", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminVerifyOrganizationHandler)))
+	http.HandleFunc("/api/admin/organizations/stats", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminOrganizationStatsHandler)))
+
 	port := ":9000"
 	fmt.Printf("🔐 Admin Panel API starting on port %s\n", port)
 	fmt.Println("📊 Dashboard: http://localhost:4000")

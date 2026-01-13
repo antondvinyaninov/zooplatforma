@@ -30,63 +30,78 @@ func CatalogHandler(w http.ResponseWriter, r *http.Request) {
 	urgentFilter := queryParams.Get("urgent")
 	speciesFilter := queryParams.Get("species")
 	searchFilter := queryParams.Get("search")
+	organizationFilter := queryParams.Get("organization")          // Фильтр по типу организации (shelter, vet_clinic и т.д.)
+	fromOrganizationFilter := queryParams.Get("from_organization") // Фильтр "только из организаций" (true/false)
 
-	log.Printf("🔍 Filters: status=%s, city=%s, region=%s, urgent=%s, species=%s, search=%s",
-		statusFilter, cityFilter, regionFilter, urgentFilter, speciesFilter, searchFilter)
+	log.Printf("🔍 Filters: status=%s, city=%s, region=%s, urgent=%s, species=%s, search=%s, organization=%s, from_organization=%s",
+		statusFilter, cityFilter, regionFilter, urgentFilter, speciesFilter, searchFilter, organizationFilter, fromOrganizationFilter)
 
-	// Строим динамический SQL запрос
+	// Строим динамический SQL запрос с JOIN к organizations
 	query := `
 		SELECT 
-			id, user_id, name, species, breed, gender, birth_date, color, size, weight,
-			chip_number, tattoo_number, ear_tag_number, passport_number,
-			is_sterilized, sterilization_date, is_vaccinated,
-			health_notes, character_traits, special_needs,
-			status, status_updated_at, photo, photos, story,
-			created_at, updated_at,
-			distinctive_marks, owner_name, owner_address, owner_phone, owner_email,
-			blood_type, allergies, chronic_diseases, current_medications,
-			pedigree_number, registration_org,
-			curator_id, curator_name, curator_phone, location, foster_address, shelter_name,
-			city, region, urgent, contact_name, contact_phone
-		FROM pets
-		WHERE status IN ('looking_for_home', 'lost', 'found', 'needs_help')
+			p.id, p.user_id, p.name, p.species, p.breed, p.gender, p.birth_date, p.color, p.size, p.weight,
+			p.chip_number, p.tattoo_number, p.ear_tag_number, p.passport_number,
+			p.is_sterilized, p.sterilization_date, p.is_vaccinated,
+			p.health_notes, p.character_traits, p.special_needs,
+			p.status, p.status_updated_at, p.photo, p.photos, p.story,
+			p.created_at, p.updated_at,
+			p.distinctive_marks, p.owner_name, p.owner_address, p.owner_phone, p.owner_email,
+			p.blood_type, p.allergies, p.chronic_diseases, p.current_medications,
+			p.pedigree_number, p.registration_org,
+			p.curator_id, p.curator_name, p.curator_phone, p.location, p.foster_address, p.shelter_name,
+			p.city, p.region, p.urgent, p.contact_name, p.contact_phone,
+			p.organization_id, o.name as organization_name, o.type as organization_type
+		FROM pets p
+		LEFT JOIN organizations o ON p.organization_id = o.id
+		WHERE p.status IN ('looking_for_home', 'lost', 'found', 'needs_help')
 	`
 
 	// Добавляем фильтры
 	var args []interface{}
 
 	if statusFilter != "" {
-		query += " AND status = ?"
+		query += " AND p.status = ?"
 		args = append(args, statusFilter)
 	}
 
 	if cityFilter != "" {
-		query += " AND city = ?"
+		query += " AND p.city = ?"
 		args = append(args, cityFilter)
 	}
 
 	if regionFilter != "" {
-		query += " AND region = ?"
+		query += " AND p.region = ?"
 		args = append(args, regionFilter)
 	}
 
 	if urgentFilter == "true" {
-		query += " AND urgent = 1"
+		query += " AND p.urgent = 1"
 	}
 
 	if speciesFilter != "" {
-		query += " AND species = ?"
+		query += " AND p.species = ?"
 		args = append(args, speciesFilter)
 	}
 
 	if searchFilter != "" {
-		query += " AND (name LIKE ? OR breed LIKE ?)"
+		query += " AND (p.name LIKE ? OR p.breed LIKE ?)"
 		searchPattern := "%" + searchFilter + "%"
 		args = append(args, searchPattern, searchPattern)
 	}
 
+	// Фильтр по типу организации
+	if organizationFilter != "" {
+		query += " AND o.type = ?"
+		args = append(args, organizationFilter)
+	}
+
+	// Фильтр "только из организаций"
+	if fromOrganizationFilter == "true" {
+		query += " AND p.organization_id IS NOT NULL"
+	}
+
 	// Сортировка: срочные первые, потом новые
-	query += " ORDER BY urgent DESC, created_at DESC"
+	query += " ORDER BY p.urgent DESC, p.created_at DESC"
 
 	log.Printf("🔍 Executing catalog query with %d filters...", len(args))
 	rows, err := database.DB.Query(query, args...)
@@ -101,6 +116,7 @@ func CatalogHandler(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var pet Pet
 		var sterilizationDate, statusUpdatedAt *string
+		var organizationName, organizationType *string
 
 		err := rows.Scan(
 			&pet.ID, &pet.UserID, &pet.Name, &pet.Species, &pet.Breed, &pet.Gender,
@@ -115,6 +131,7 @@ func CatalogHandler(w http.ResponseWriter, r *http.Request) {
 			&pet.PedigreeNumber, &pet.RegistrationOrg,
 			&pet.CuratorID, &pet.CuratorName, &pet.CuratorPhone, &pet.Location, &pet.FosterAddress, &pet.ShelterName,
 			&pet.City, &pet.Region, &pet.Urgent, &pet.ContactName, &pet.ContactPhone,
+			&pet.OrganizationID, &organizationName, &organizationType,
 		)
 		if err != nil {
 			log.Printf("❌ Error scanning catalog pet: %v", err)
@@ -123,8 +140,10 @@ func CatalogHandler(w http.ResponseWriter, r *http.Request) {
 
 		pet.SterilizationDate = sterilizationDate
 		pet.StatusUpdatedAt = statusUpdatedAt
+		pet.OrganizationName = organizationName
+		pet.OrganizationType = organizationType
 
-		log.Printf("✅ Found pet: ID=%d, Name=%s, Status=%s", pet.ID, pet.Name, pet.Status)
+		log.Printf("✅ Found pet: ID=%d, Name=%s, Status=%s, Org=%v", pet.ID, pet.Name, pet.Status, organizationName)
 		pets = append(pets, pet)
 	}
 
@@ -209,12 +228,14 @@ type Pet struct {
 	CardPhotos          string `json:"card_photos,omitempty"`
 	CardIsPublished     bool   `json:"card_is_published"`
 	// Поля для каталога (миграция 020, 023)
-	City           string `json:"city,omitempty"`
-	Region         string `json:"region,omitempty"`
-	Urgent         bool   `json:"urgent"`
-	ContactName    string `json:"contact_name,omitempty"`
-	ContactPhone   string `json:"contact_phone,omitempty"`
-	OrganizationID *int   `json:"organization_id,omitempty"`
+	City             string  `json:"city,omitempty"`
+	Region           string  `json:"region,omitempty"`
+	Urgent           bool    `json:"urgent"`
+	ContactName      string  `json:"contact_name,omitempty"`
+	ContactPhone     string  `json:"contact_phone,omitempty"`
+	OrganizationID   *int    `json:"organization_id,omitempty"`
+	OrganizationName *string `json:"organization_name,omitempty"`
+	OrganizationType *string `json:"organization_type,omitempty"`
 }
 
 // PetSummary представляет краткую информацию о питомце (для постов)
@@ -315,6 +336,12 @@ func PetDetailHandler(w http.ResponseWriter, r *http.Request) {
 	// Проверяем /summary endpoint
 	if len(parts) > 1 && parts[1] == "summary" {
 		getPetSummary(w, r, id)
+		return
+	}
+
+	// Проверяем /organization endpoint
+	if len(parts) > 1 && parts[1] == "organization" {
+		SetPetOrganizationHandler(w, r)
 		return
 	}
 

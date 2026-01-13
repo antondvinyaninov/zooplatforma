@@ -16,6 +16,7 @@ import {
   XMarkIcon,
   ChevronLeftIcon,
   DocumentDuplicateIcon,
+  BuildingOfficeIcon,
 } from '@heroicons/react/24/outline';
 import styles from './page.module.css';
 import StatsWidget from './components/widgets/StatsWidget';
@@ -28,7 +29,7 @@ export default function AdminDashboard() {
   const [users, setUsers] = useState<User[]>([]);
   const [posts, setPosts] = useState<Post[]>([]);
   const [logs, setLogs] = useState<Log[]>([]);
-  const [activeTab, setActiveTab] = useState<'users' | 'posts' | 'stats' | 'logs'>('stats');
+  const [activeTab, setActiveTab] = useState<'users' | 'posts' | 'stats' | 'logs' | 'organizations'>('stats');
   const [isClient, setIsClient] = useState(false);
   const [loading, setLoading] = useState(true);
   const [error, setError] = useState('');
@@ -40,7 +41,7 @@ export default function AdminDashboard() {
   // Инициализация из localStorage после монтирования
   useEffect(() => {
     setIsClient(true);
-    const savedTab = localStorage.getItem('adminActiveTab') as 'users' | 'posts' | 'stats' | 'logs' | null;
+    const savedTab = localStorage.getItem('adminActiveTab') as 'users' | 'posts' | 'stats' | 'logs' | 'organizations' | null;
     if (savedTab) {
       setActiveTab(savedTab);
     }
@@ -285,6 +286,19 @@ export default function AdminDashboard() {
               >
                 <DocumentDuplicateIcon />
                 {!sidebarCollapsed && <span className={styles.navLabel}>Логирование</span>}
+              </button>
+              <button
+                className={`${styles.navItem} ${activeTab === 'organizations' ? styles.navItemActive : ''}`}
+                onClick={() => {
+                  setActiveTab('organizations');
+                  localStorage.setItem('adminActiveTab', 'organizations');
+                  // Редирект на отдельную страницу
+                  window.location.href = '/organizations';
+                }}
+                title="Организации"
+              >
+                <BuildingOfficeIcon />
+                {!sidebarCollapsed && <span className={styles.navLabel}>Организации</span>}
               </button>
             </nav>
           ) : (

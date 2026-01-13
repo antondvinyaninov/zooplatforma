@@ -2,6 +2,7 @@
 
 import { useState, useEffect } from 'react';
 import { MagnifyingGlassIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import { getFavorites, addFavorite, removeFavorite } from '@/lib/favorites-api';
 
 interface Pet {
   id: number;
@@ -18,6 +19,9 @@ interface Pet {
   contact_name?: string;
   contact_phone?: string;
   story?: string;
+  organization_id?: number;
+  organization_name?: string;
+  organization_type?: string;
 }
 
 export default function CatalogPage() {
@@ -26,9 +30,15 @@ export default function CatalogPage() {
   const [searchQuery, setSearchQuery] = useState('');
   const [filterStatus, setFilterStatus] = useState<string>('all');
   const [filterSpecies, setFilterSpecies] = useState<string>('all');
+  const [filterOrganization, setFilterOrganization] = useState<string>('all');
+  const [filterFromOrganization, setFilterFromOrganization] = useState<boolean>(false);
+  const [copiedPetId, setCopiedPetId] = useState<number | null>(null);
+  const [favoritePetIds, setFavoritePetIds] = useState<Set<number>>(new Set());
+  const [favoriteLoading, setFavoriteLoading] = useState<number | null>(null);
 
   useEffect(() => {
     loadPets();
+    loadFavorites();
   }, []);
 
   const loadPets = async () => {
@@ -51,13 +61,25 @@ export default function CatalogPage() {
     }
   };
 
+  const loadFavorites = async () => {
+    try {
+      const favorites = await getFavorites();
+      const petIds = new Set(favorites.map(f => f.pet_id));
+      setFavoritePetIds(petIds);
+    } catch (error) {
+      console.error('Error loading favorites:', error);
+    }
+  };
+
   const filteredPets = pets.filter(pet => {
     const matchesSearch = pet.name.toLowerCase().includes(searchQuery.toLowerCase()) ||
                          pet.breed?.toLowerCase().includes(searchQuery.toLowerCase());
     const matchesStatus = filterStatus === 'all' || pet.status === filterStatus;
     const matchesSpecies = filterSpecies === 'all' || pet.species === filterSpecies;
+    const matchesOrganization = filterOrganization === 'all' || pet.organization_type === filterOrganization;
+    const matchesFromOrganization = !filterFromOrganization || pet.organization_id !== undefined;
     
-    return matchesSearch && matchesStatus && matchesSpecies;
+    return matchesSearch && matchesStatus && matchesSpecies && matchesOrganization && matchesFromOrganization;
   });
 
   const getAge = (birthDate?: string) => {
@@ -74,6 +96,48 @@ export default function CatalogPage() {
       return `${months} ${months === 1 ? 'месяц' : months < 5 ? 'месяца' : 'месяцев'}`;
     }
     return 'Новорождённый';
+  };
+
+  // Быстрые действия
+  const handleShare = async (petId: number) => {
+    const url = `${window.location.origin}/petid/${petId}`;
+    try {
+      await navigator.clipboard.writeText(url);
+      setCopiedPetId(petId);
+      setTimeout(() => setCopiedPetId(null), 2000);
+    } catch (err) {
+      console.error('Failed to copy:', err);
+    }
+  };
+
+  const handleFavorite = async (petId: number) => {
+    setFavoriteLoading(petId);
+    try {
+      const isFavorite = favoritePetIds.has(petId);
+      
+      if (isFavorite) {
+        await removeFavorite(petId);
+        setFavoritePetIds(prev => {
+          const newSet = new Set(prev);
+          newSet.delete(petId);
+          return newSet;
+        });
+      } else {
+        await addFavorite(petId);
+        setFavoritePetIds(prev => new Set(prev).add(petId));
+      }
+    } catch (error) {
+      console.error('Error toggling favorite:', error);
+      alert('Ошибка при добавлении в избранное. Возможно, вы не авторизованы.');
+    } finally {
+      setFavoriteLoading(null);
+    }
+  };
+
+  const handleMessage = (petId: number, contactPhone?: string) => {
+    // TODO: Открыть мессенджер с контактом
+    console.log('Open messenger for pet:', petId, 'contact:', contactPhone);
+    alert('Функция "Написать" будет реализована в следующей версии');
   };
 
   const statusLabels: Record<string, string> = {
@@ -140,10 +204,34 @@ export default function CatalogPage() {
             <option value="bird">Птицы</option>
             <option value="other">Другие</option>
           </select>
+
+          {/* Фильтр по типу организации */}
+          <select
+            value={filterOrganization}
+            onChange={(e) => setFilterOrganization(e.target.value)}
+            className="px-4 py-2.5 border border-gray-200 rounded-xl focus:outline-none focus:ring-2 focus:ring-blue-500 focus:border-transparent"
+          >
+            <option value="all">Все организации</option>
+            <option value="shelter">Приюты</option>
+            <option value="vet_clinic">Ветклиники</option>
+            <option value="foundation">Фонды</option>
+            <option value="kennel">Питомники</option>
+          </select>
         </div>
 
         <div className="mt-4 flex items-center justify-between text-sm text-gray-600">
-          <span>Найдено: {filteredPets.length} питомцев</span>
+          <div className="flex items-center gap-4">
+            <span>Найдено: {filteredPets.length} питомцев</span>
+            <label className="flex items-center gap-2 cursor-pointer">
+              <input
+                type="checkbox"
+                checked={filterFromOrganization}
+                onChange={(e) => setFilterFromOrganization(e.target.checked)}
+                className="w-4 h-4 text-blue-600 border-gray-300 rounded focus:ring-blue-500"
+              />
+              <span>Только из организаций</span>
+            </label>
+          </div>
         </div>
       </div>
 
@@ -235,11 +323,62 @@ export default function CatalogPage() {
                       📍 {pet.city || pet.region}
                     </div>
                   )}
+
+                  {/* Организация */}
+                  {pet.organization_name && (
+                    <div className="flex items-center gap-2 text-sm">
+                      <span className="inline-flex items-center px-2 py-1 rounded-lg bg-blue-50 text-blue-700 font-medium">
+                        🏢 {pet.organization_name}
+                      </span>
+                    </div>
+                  )}
                 </div>
 
                 {pet.story && (
                   <p className="text-sm text-gray-600 mb-4 line-clamp-2">{pet.story}</p>
                 )}
+
+                {/* Быстрые действия */}
+                <div className="flex items-center gap-2 mb-4 pt-4 border-t border-gray-100">
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleFavorite(pet.id);
+                    }}
+                    disabled={favoriteLoading === pet.id}
+                    className={`flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium rounded-lg transition-colors ${
+                      favoritePetIds.has(pet.id)
+                        ? 'text-red-700 bg-red-50 hover:bg-red-100'
+                        : 'text-gray-700 bg-gray-50 hover:bg-gray-100'
+                    } disabled:opacity-50 disabled:cursor-not-allowed`}
+                    title={favoritePetIds.has(pet.id) ? 'Удалить из избранного' : 'Добавить в избранное'}
+                  >
+                    {favoriteLoading === pet.id ? '⏳' : favoritePetIds.has(pet.id) ? '❤️' : '🤍'} 
+                    {favoritePetIds.has(pet.id) ? 'В избранном' : 'Избранное'}
+                  </button>
+                  <button
+                    onClick={(e) => {
+                      e.stopPropagation();
+                      handleShare(pet.id);
+                    }}
+                    className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-gray-700 bg-gray-50 hover:bg-gray-100 rounded-lg transition-colors"
+                    title={copiedPetId === pet.id ? 'Ссылка скопирована!' : 'Поделиться'}
+                  >
+                    {copiedPetId === pet.id ? '✓ Скопировано' : '📤 Поделиться'}
+                  </button>
+                  {pet.contact_phone && (
+                    <button
+                      onClick={(e) => {
+                        e.stopPropagation();
+                        handleMessage(pet.id, pet.contact_phone);
+                      }}
+                      className="flex-1 flex items-center justify-center gap-2 px-3 py-2 text-sm font-medium text-white bg-blue-600 hover:bg-blue-700 rounded-lg transition-colors"
+                      title="Написать"
+                    >
+                      💬 Написать
+                    </button>
+                  )}
+                </div>
 
                 {/* Контакты */}
                 {pet.contact_phone && (

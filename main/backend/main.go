@@ -136,6 +136,10 @@ func main() {
 	http.HandleFunc("/api/messages/send", enableCORS(middleware.AuthMiddleware(handlers.SendMessageHandler(database.DB))))
 	http.HandleFunc("/api/messages/unread", enableCORS(middleware.AuthMiddleware(handlers.GetUnreadCountHandler(database.DB))))
 
+	// Favorites (избранные питомцы)
+	http.HandleFunc("/api/favorites", enableCORS(middleware.AuthMiddleware(handlers.FavoritesHandler)))
+	http.HandleFunc("/api/favorites/", enableCORS(middleware.AuthMiddleware(handlers.FavoriteDetailHandler)))
+
 	// Media - более специфичные роуты должны быть первыми
 	mediaHandler := handlers.NewMediaHandler(database.DB)
 	http.HandleFunc("/api/media/upload", enableCORS(middleware.AuthMiddleware(mediaHandler.UploadMedia)))
