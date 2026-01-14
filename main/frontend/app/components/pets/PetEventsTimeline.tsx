@@ -10,20 +10,17 @@ import {
   deathReasonLabels,
   PetEventType 
 } from '../../../lib/petid-api';
-import { PlusIcon, FunnelIcon } from '@heroicons/react/24/outline';
-import AddEventModal from './AddEventModal';
+import { FunnelIcon } from '@heroicons/react/24/outline';
 
 interface PetEventsTimelineProps {
   petId: number;
-  isOwner: boolean;
 }
 
-export default function PetEventsTimeline({ petId, isOwner }: PetEventsTimelineProps) {
+export default function PetEventsTimeline({ petId }: PetEventsTimelineProps) {
   const [events, setEvents] = useState<PetEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTypes, setSelectedTypes] = useState<PetEventType[]>([]);
   const [showFilters, setShowFilters] = useState(false);
-  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     loadEvents();
@@ -170,44 +167,24 @@ export default function PetEventsTimeline({ petId, isOwner }: PetEventsTimelineP
   }
 
   return (
-    <>
-      <AddEventModal
-        petId={petId}
-        isOpen={showAddModal}
-        onClose={() => setShowAddModal(false)}
-        onSuccess={loadEvents}
-      />
-      
-      <div className="space-y-4">
-        {/* Header with filters */}
+    <div className="space-y-4">
+      {/* Header with filters */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <h2 className="text-lg font-semibold text-gray-900">История событий</h2>
         
-        <div className="flex gap-2">
-          <button
-            onClick={() => setShowFilters(!showFilters)}
-            className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-colors ${
-              selectedTypes.length > 0
-                ? 'bg-blue-50 border-blue-200 text-blue-700'
-                : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
-            }`}
-          >
-            <FunnelIcon className="w-5 h-5" />
-            <span className="text-sm font-medium">
-              Фильтры {selectedTypes.length > 0 && `(${selectedTypes.length})`}
-            </span>
-          </button>
-          
-          {isOwner && (
-            <button
-              onClick={() => setShowAddModal(true)}
-              className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
-            >
-              <PlusIcon className="w-5 h-5" />
-              <span className="text-sm font-medium">Добавить событие</span>
-            </button>
-          )}
-        </div>
+        <button
+          onClick={() => setShowFilters(!showFilters)}
+          className={`flex items-center gap-2 px-4 py-2 rounded-lg border-2 transition-colors ${
+            selectedTypes.length > 0
+              ? 'bg-blue-50 border-blue-200 text-blue-700'
+              : 'bg-white border-gray-200 text-gray-700 hover:border-gray-300'
+          }`}
+        >
+          <FunnelIcon className="w-5 h-5" />
+          <span className="text-sm font-medium">
+            Фильтры {selectedTypes.length > 0 && `(${selectedTypes.length})`}
+          </span>
+        </button>
       </div>
 
       {/* Filters */}
@@ -258,7 +235,7 @@ export default function PetEventsTimeline({ petId, isOwner }: PetEventsTimelineP
           
           {/* Events */}
           <div className="space-y-6">
-            {filteredEvents.map((event, index) => (
+            {filteredEvents.map((event) => (
               <div key={event.id} className="relative flex gap-4">
                 {/* Icon */}
                 <div className={`flex-shrink-0 w-12 h-12 rounded-full border-4 border-white flex items-center justify-center text-xl z-10 ${
@@ -314,7 +291,6 @@ export default function PetEventsTimeline({ petId, isOwner }: PetEventsTimelineP
           </div>
         </div>
       )}
-      </div>
-    </>
+    </div>
   );
 }

@@ -26,7 +26,7 @@
 ## [Unreleased]
 
 ### Added
-- **Модальное окно добавления события питомца (AddEventModal)**
+- **Модальное окно добавления события питомца в Owner и Volunteer кабинетах**
   - Форма создания события с выбором типа (10 типов: общее, вакцинация, лечение, смена владельца, потеря, находка, смерть, приют, усыновление, документ)
   - Динамические поля в зависимости от типа события:
     - Вакцинация: название вакцины, серия, дата следующей вакцинации
@@ -37,20 +37,24 @@
     - Приют/Усыновление: название приюта, номер договора
   - Валидация обязательных полей (тип события, дата)
   - Автоматическая перезагрузка timeline после успешного добавления
-  - Файл: `main/frontend/app/components/pets/AddEventModal.tsx`
-  - Файл: `petbase/frontend/app/components/pets/AddEventModal.tsx` (копия для ЗооБазы)
+  - Файл: `owner/frontend/app/components/pets/AddEventModal.tsx`
+  - Файл: `volunteer/frontend/app/components/pets/AddEventModal.tsx`
+  - Файл: `petbase/frontend/app/components/pets/AddEventModal.tsx`
   - API: POST /api/petid/:id/events
 
 ### Changed
-- **Компонент PetEventsTimeline обновлён**
-  - Удалён пропс `onAddEvent` - теперь модальное окно управляется внутри компонента
-  - Добавлен state `showAddModal` для управления видимостью модального окна
-  - Кнопка "Добавить событие" теперь открывает модальное окно AddEventModal
+- **PetEventsTimeline в Main теперь только для просмотра (read-only)**
+  - Убрана кнопка "Добавить событие" - это административная функция
+  - Убран пропс `isOwner` - больше не нужен
+  - Убран импорт AddEventModal
+  - Теперь только красивый timeline для всех пользователей
   - Файл: `main/frontend/app/components/pets/PetEventsTimeline.tsx`
-- **Страница питомца обновлена**
-  - Убран пропс `onAddEvent` из PetEventsTimeline
-  - Упрощена интеграция - модальное окно теперь внутри компонента timeline
   - Файл: `main/frontend/app/(main)/pets/[id]/page.tsx`
+- **Архитектурное решение: разделение функционала по кабинетам**
+  - Main (социальная сеть) - только просмотр истории событий
+  - Owner (кабинет владельца) - добавление событий своих питомцев
+  - Volunteer (кабинет волонтёра) - добавление событий приютских питомцев
+  - PetBase (ЗооБаза) - центральное хранилище данных
 
 ### Fixed
 - **CORS для PetBase frontend**

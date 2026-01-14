@@ -422,8 +422,7 @@ export default function PetPage() {
                 </>
               ) : (
                 <PetEventsTimeline 
-                  petId={pet.id} 
-                  isOwner={currentUserId === pet.user_id}
+                  petId={pet.id}
                 />
               )}
             </div>
