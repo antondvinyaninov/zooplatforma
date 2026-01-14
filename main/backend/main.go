@@ -20,6 +20,7 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 		allowedOrigins := map[string]bool{
 			"http://localhost:3000": true, // Main frontend
 			"http://localhost:4000": true, // Admin frontend
+			"http://localhost:4100": true, // PetBase frontend
 		}
 
 		// Если origin не указан или не в списке разрешённых, используем дефолтный

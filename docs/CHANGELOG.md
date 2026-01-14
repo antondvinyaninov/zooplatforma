@@ -25,6 +25,16 @@
 
 ## [Unreleased]
 
+### Fixed
+- **CORS для PetBase frontend**
+  - Проблема: PetBase frontend (localhost:4100) не мог обращаться к Main API из-за CORS
+  - Ошибка: "Access-Control-Allow-Origin header has a value 'http://localhost:3000' that is not equal to the supplied origin"
+  - Решение: добавлен `http://localhost:4100` в список разрешённых origins
+  - Теперь PetBase frontend может использовать SSO авторизацию через Main API
+  - Файл: `main/backend/main.go`
+
+## [Unreleased]
+
 ### Added
 - **ЭТАП 7 - Спринт 7.1: База данных и API для истории событий питомцев**
   - **Миграция 032: Таблица `pet_events`**
