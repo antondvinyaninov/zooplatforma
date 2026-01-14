@@ -21,6 +21,7 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 			"http://localhost:3000": true, // Main frontend
 			"http://localhost:4000": true, // Admin frontend
 			"http://localhost:4100": true, // PetBase frontend
+			"http://localhost:6100": true, // Owner frontend
 		}
 
 		// Если origin не указан или не в списке разрешённых, используем дефолтный
