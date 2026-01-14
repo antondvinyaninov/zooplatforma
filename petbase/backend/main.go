@@ -98,6 +98,9 @@ func main() {
 	http.HandleFunc("/api/pets", enableCORS(middleware.RequireAuth(handlers.PetsHandler)))
 	http.HandleFunc("/api/pets/", enableCORS(middleware.RequireAuth(handlers.PetDetailHandler)))
 
+	// PetID Events routes - история событий питомцев
+	http.HandleFunc("/api/petid/", enableCORS(handlePetIDRoutes))
+
 	// Root route - должен быть последним!
 	http.HandleFunc("/", enableCORS(handleRoot))
 
@@ -136,6 +139,35 @@ func handleRoot(w http.ResponseWriter, r *http.Request) {
 func handleHealth(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 	fmt.Fprintf(w, `{"status": "ok", "service": "petbase"}`)
+}
+
+// handlePetIDRoutes обрабатывает роуты для PetID событий
+func handlePetIDRoutes(w http.ResponseWriter, r *http.Request) {
+	path := r.URL.Path
+
+	// /api/petid/:id/events - история событий
+	if strings.Contains(path, "/events") {
+		if r.Method == http.MethodGet {
+			handlers.GetPetEventsHandler(w, r)
+		} else if r.Method == http.MethodPost {
+			middleware.RequireAuth(handlers.CreatePetEventHandler)(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+
+	// /api/petid/:id/medical - медицинская история
+	if strings.Contains(path, "/medical") {
+		if r.Method == http.MethodGet {
+			handlers.GetPetMedicalHistoryHandler(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+		return
+	}
+
+	http.NotFound(w, r)
 }
 
 func createTables() error {
