@@ -6,10 +6,13 @@ import {
   CalendarIcon, 
   CheckCircleIcon,
   ShareIcon,
-  HeartIcon
+  HeartIcon,
+  ClockIcon,
+  PhotoIcon
 } from '@heroicons/react/24/outline';
 import { postsApi, Post, Pet } from '../../../../lib/api';
 import PostCard from '../../../components/posts/PostCard';
+import PetEventsTimeline from '../../../components/pets/PetEventsTimeline';
 
 export default function PetPage() {
   const params = useParams();
@@ -19,6 +22,7 @@ export default function PetPage() {
   const [loading, setLoading] = useState(true);
   const [postsLoading, setPostsLoading] = useState(true);
   const [currentUserId, setCurrentUserId] = useState<number | null>(null);
+  const [activeTab, setActiveTab] = useState<'posts' | 'events'>('posts');
 
   useEffect(() => {
     if (params.id) {
@@ -357,25 +361,76 @@ export default function PetPage() {
             </div>
           </div>
 
-          {/* Посты с этим питомцем */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
-            <h2 className="text-lg font-semibold text-gray-900 mb-4">Посты с {pet.name}</h2>
+          {/* Tabs */}
+          <div className="bg-white rounded-xl shadow-sm border border-gray-100">
+            {/* Tab Navigation */}
+            <div className="border-b border-gray-200">
+              <div className="flex">
+                <button
+                  onClick={() => setActiveTab('posts')}
+                  className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors relative ${
+                    activeTab === 'posts'
+                      ? 'text-blue-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <PhotoIcon className="w-5 h-5" />
+                  <span>Посты</span>
+                  {activeTab === 'posts' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
+                  )}
+                </button>
+                
+                <button
+                  onClick={() => setActiveTab('events')}
+                  className={`flex items-center gap-2 px-6 py-4 font-medium transition-colors relative ${
+                    activeTab === 'events'
+                      ? 'text-blue-600'
+                      : 'text-gray-600 hover:text-gray-900'
+                  }`}
+                >
+                  <ClockIcon className="w-5 h-5" />
+                  <span>История событий</span>
+                  {activeTab === 'events' && (
+                    <div className="absolute bottom-0 left-0 right-0 h-0.5 bg-blue-600"></div>
+                  )}
+                </button>
+              </div>
+            </div>
             
-            {postsLoading ? (
-              <div className="flex justify-center py-8">
-                <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
-              </div>
-            ) : posts.length === 0 ? (
-              <div className="text-center py-8 text-gray-500">
-                <p>Пока нет постов с этим питомцем</p>
-              </div>
-            ) : (
-              <div className="space-y-4">
-                {posts.map((post) => (
-                  <PostCard key={post.id} post={post} />
-                ))}
-              </div>
-            )}
+            {/* Tab Content */}
+            <div className="p-6">
+              {activeTab === 'posts' ? (
+                <>
+                  <h2 className="text-lg font-semibold text-gray-900 mb-4">Посты с {pet.name}</h2>
+                  
+                  {postsLoading ? (
+                    <div className="flex justify-center py-8">
+                      <div className="animate-spin rounded-full h-8 w-8 border-b-2 border-blue-500"></div>
+                    </div>
+                  ) : posts.length === 0 ? (
+                    <div className="text-center py-8 text-gray-500">
+                      <p>Пока нет постов с этим питомцем</p>
+                    </div>
+                  ) : (
+                    <div className="space-y-4">
+                      {posts.map((post) => (
+                        <PostCard key={post.id} post={post} />
+                      ))}
+                    </div>
+                  )}
+                </>
+              ) : (
+                <PetEventsTimeline 
+                  petId={pet.id} 
+                  isOwner={currentUserId === pet.user_id}
+                  onAddEvent={() => {
+                    // TODO: Открыть модальное окно добавления события
+                    console.log('Add event clicked');
+                  }}
+                />
+              )}
+            </div>
           </div>
         </div>
 
