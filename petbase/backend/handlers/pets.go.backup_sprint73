@@ -425,8 +425,7 @@ func getPet(w http.ResponseWriter, _ *http.Request, id int) {
 		       distinctive_marks, owner_name, owner_address, owner_phone, owner_email,
 		       blood_type, allergies, chronic_diseases, current_medications,
 		       pedigree_number, registration_org,
-		       curator_id, curator_name, curator_phone, location, foster_address, shelter_name,
-		       city, region, urgent, contact_name, contact_phone, organization_id
+		       curator_id, curator_name, curator_phone, location, foster_address, shelter_name
 		FROM pets
 		WHERE id = ?
 	`
@@ -444,7 +443,6 @@ func getPet(w http.ResponseWriter, _ *http.Request, id int) {
 		&pet.BloodType, &pet.Allergies, &pet.ChronicDiseases, &pet.CurrentMedications,
 		&pet.PedigreeNumber, &pet.RegistrationOrg,
 		&pet.CuratorID, &pet.CuratorName, &pet.CuratorPhone, &pet.Location, &pet.FosterAddress, &pet.ShelterName,
-		&pet.City, &pet.Region, &pet.Urgent, &pet.ContactName, &pet.ContactPhone, &pet.OrganizationID,
 	)
 
 	if err != nil {
@@ -703,7 +701,6 @@ func updatePet(w http.ResponseWriter, r *http.Request, id int) {
 			blood_type = ?, allergies = ?, chronic_diseases = ?, current_medications = ?,
 			pedigree_number = ?, registration_org = ?,
 			curator_id = ?, curator_name = ?, curator_phone = ?, location = ?, foster_address = ?, shelter_name = ?,
-			city = ?, region = ?, urgent = ?, contact_name = ?, contact_phone = ?, organization_id = ?,
 			updated_at = CURRENT_TIMESTAMP
 		WHERE id = ?
 	`
@@ -718,7 +715,6 @@ func updatePet(w http.ResponseWriter, r *http.Request, id int) {
 		req.BloodType, req.Allergies, req.ChronicDiseases, req.CurrentMedications,
 		req.PedigreeNumber, req.RegistrationOrg,
 		req.CuratorID, req.CuratorName, req.CuratorPhone, req.Location, req.FosterAddress, req.ShelterName,
-		req.City, req.Region, req.Urgent, req.ContactName, req.ContactPhone, req.OrganizationID,
 		id,
 	)
 
