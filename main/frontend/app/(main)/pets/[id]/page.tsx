@@ -191,7 +191,7 @@ export default function PetPage() {
                 <div className="flex gap-2">
                   {currentUserId === pet.user_id && (
                     <a
-                      href={`http://localhost:3001/pets/${pet.id}/edit`}
+                      href={`http://localhost:6100/pets/${pet.id}/edit`}
                       target="_blank"
                       rel="noopener noreferrer"
                       className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors font-medium"
