@@ -73,6 +73,11 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	id, _ := result.LastInsertId()
 
+	// Логируем регистрацию
+	ipAddress := r.RemoteAddr
+	userAgent := r.Header.Get("User-Agent")
+	CreateUserLog(database.DB, int(id), "register", "Пользователь зарегистрировался", ipAddress, userAgent)
+
 	// Получаем роли пользователя (по умолчанию только "user")
 	roles := getUserRoles(int(id))
 
@@ -200,6 +205,18 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Получаем user_id из токена перед удалением cookie
+	cookie, err := r.Cookie("auth_token")
+	if err == nil {
+		token, err := middleware.ParseToken(cookie.Value)
+		if err == nil {
+			// Логируем выход
+			ipAddress := r.RemoteAddr
+			userAgent := r.Header.Get("User-Agent")
+			CreateUserLog(database.DB, token.UserID, "logout", "Выход из системы", ipAddress, userAgent)
+		}
+	}
+
 	// Clear cookie (для всех поддоменов)
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
@@ -313,7 +330,9 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Логируем успешный вход
 	ipAddress := r.RemoteAddr
+	userAgent := r.Header.Get("User-Agent")
 	logSystemEvent("info", "auth", "login", "Пользователь вошел в систему", &user.ID, ipAddress)
+	CreateUserLog(database.DB, user.ID, "login", "Вход в систему", ipAddress, userAgent)
 
 	sendSuccess(w, models.AuthResponse{
 		User: models.UserResponse{

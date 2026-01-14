@@ -22,6 +22,16 @@ interface Message {
   read_at?: string;
   created_at: string;
   sender?: User;
+  attachments?: MessageAttachment[];
+}
+
+interface MessageAttachment {
+  id: number;
+  message_id: number;
+  file_path: string;
+  file_type: string;
+  file_size: number;
+  created_at: string;
 }
 
 interface Chat {
@@ -48,7 +58,10 @@ export default function MessengerPage() {
   const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
   const [sending, setSending] = useState(false);
+  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
+  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
   const messagesEndRef = useRef<HTMLDivElement>(null);
+  const fileInputRef = useRef<HTMLInputElement>(null);
 
   useEffect(() => {
     // Проверяем только на клиенте
@@ -173,7 +186,7 @@ export default function MessengerPage() {
   const sendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if (!newMessage.trim() || !selectedChat || sending) return;
+    if ((!newMessage.trim() && selectedFiles.length === 0) || !selectedChat || sending) return;
 
     const isNewChat = selectedChat.id === 0;
     const receiverId = selectedChat.other_user?.id;
@@ -185,22 +198,44 @@ export default function MessengerPage() {
 
     setSending(true);
     try {
-      const response = await fetch('http://localhost:8000/api/messages/send', {
-        method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
-        credentials: 'include',
-        body: JSON.stringify({
-          receiver_id: receiverId,
-          content: newMessage.trim(),
-        }),
-      });
+      let response;
+      
+      // Если есть файлы, отправляем через /api/messages/send-media
+      if (selectedFiles.length > 0) {
+        const formData = new FormData();
+        formData.append('receiver_id', receiverId.toString());
+        formData.append('content', newMessage.trim());
+        
+        selectedFiles.forEach(file => {
+          formData.append('media', file);
+        });
+
+        response = await fetch('http://localhost:8000/api/messages/send-media', {
+          method: 'POST',
+          credentials: 'include',
+          body: formData,
+        });
+      } else {
+        // Обычное текстовое сообщение
+        response = await fetch('http://localhost:8000/api/messages/send', {
+          method: 'POST',
+          headers: {
+            'Content-Type': 'application/json',
+          },
+          credentials: 'include',
+          body: JSON.stringify({
+            receiver_id: receiverId,
+            content: newMessage.trim(),
+          }),
+        });
+      }
 
       if (response.ok) {
         const message = await response.json();
         setMessages(prev => [...prev, message]);
         setNewMessage('');
+        setSelectedFiles([]);
+        setPreviewUrls([]);
         
         // Если это был новый чат, обновляем список чатов и выбираем созданный
         if (isNewChat) {
@@ -234,6 +269,42 @@ export default function MessengerPage() {
     } finally {
       setSending(false);
     }
+  };
+
+  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = Array.from(e.target.files || []);
+    
+    // Фильтруем только изображения и видео
+    const validFiles = files.filter(file => 
+      file.type.startsWith('image/') || file.type.startsWith('video/')
+    );
+
+    if (validFiles.length === 0) {
+      alert('Пожалуйста, выберите изображения или видео');
+      return;
+    }
+
+    // Ограничение: максимум 5 файлов
+    if (selectedFiles.length + validFiles.length > 5) {
+      alert('Максимум 5 файлов за раз');
+      return;
+    }
+
+    setSelectedFiles(prev => [...prev, ...validFiles]);
+
+    // Создаем preview URLs
+    validFiles.forEach(file => {
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreviewUrls(prev => [...prev, reader.result as string]);
+      };
+      reader.readAsDataURL(file);
+    });
+  };
+
+  const removeFile = (index: number) => {
+    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
+    setPreviewUrls(prev => prev.filter((_, i) => i !== index));
   };
 
   const formatTime = (dateString: string) => {
@@ -376,7 +447,35 @@ export default function MessengerPage() {
                             : 'bg-gray-100 text-gray-900'
                         }`}
                       >
-                        <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                        {/* Attachments */}
+                        {message.attachments && message.attachments.length > 0 && (
+                          <div className="mb-2 space-y-2">
+                            {message.attachments.map((attachment, idx) => (
+                              <div key={idx}>
+                                {attachment.file_type === 'image' ? (
+                                  <img
+                                    src={`http://localhost:8000${attachment.file_path}`}
+                                    alt="Изображение"
+                                    className="rounded-lg max-w-full h-auto cursor-pointer"
+                                    onClick={() => window.open(`http://localhost:8000${attachment.file_path}`, '_blank')}
+                                  />
+                                ) : attachment.file_type === 'video' ? (
+                                  <video
+                                    src={`http://localhost:8000${attachment.file_path}`}
+                                    controls
+                                    className="rounded-lg max-w-full h-auto"
+                                  />
+                                ) : null}
+                              </div>
+                            ))}
+                          </div>
+                        )}
+                        
+                        {/* Text content */}
+                        {message.content && (
+                          <p className="whitespace-pre-wrap break-words">{message.content}</p>
+                        )}
+                        
                         <div
                           className={`text-xs mt-1 ${
                             isMyMessage ? 'text-blue-100' : 'text-gray-500'
@@ -394,7 +493,50 @@ export default function MessengerPage() {
 
             {/* Форма отправки */}
             <form onSubmit={sendMessage} className="p-4 border-t border-gray-200">
+              {/* Preview выбранных файлов */}
+              {previewUrls.length > 0 && (
+                <div className="mb-3 flex gap-2 flex-wrap">
+                  {previewUrls.map((url, index) => (
+                    <div key={index} className="relative">
+                      <img
+                        src={url}
+                        alt={`Preview ${index + 1}`}
+                        className="w-20 h-20 object-cover rounded-lg"
+                      />
+                      <button
+                        type="button"
+                        onClick={() => removeFile(index)}
+                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
+                      >
+                        ×
+                      </button>
+                    </div>
+                  ))}
+                </div>
+              )}
+
               <div className="flex gap-2">
+                {/* Кнопка загрузки файлов */}
+                <input
+                  ref={fileInputRef}
+                  type="file"
+                  accept="image/*,video/*"
+                  multiple
+                  onChange={handleFileSelect}
+                  className="hidden"
+                />
+                <button
+                  type="button"
+                  onClick={() => fileInputRef.current?.click()}
+                  className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"
+                  disabled={sending}
+                  title="Прикрепить фото или видео"
+                >
+                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
+                  </svg>
+                </button>
+
                 <input
                   type="text"
                   value={newMessage}
@@ -405,7 +547,7 @@ export default function MessengerPage() {
                 />
                 <button
                   type="submit"
-                  disabled={!newMessage.trim() || sending}
+                  disabled={(!newMessage.trim() && selectedFiles.length === 0) || sending}
                   className="px-6 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
                 >
                   {sending ? 'Отправка...' : 'Отправить'}

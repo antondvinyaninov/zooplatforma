@@ -16,6 +16,7 @@ import {
   HeartIcon,
   ChatBubbleLeftIcon
 } from '@heroicons/react/24/outline';
+import { CheckBadgeIcon } from '@heroicons/react/24/solid';
 import Image from 'next/image';
 import PostComments from '../../components/shared/PostComments';
 import PostCard from '../../components/posts/PostCard';
@@ -24,7 +25,7 @@ import MediaGallery from '../../components/profile/MediaGallery';
 import MediaStats from '../../components/profile/MediaStats';
 import AddPetModal from '../../components/profile/AddPetModal';
 import FriendButton from '../../components/profile/FriendButton';
-import FriendsList from '../../components/profile/FriendsList';
+import FriendsListWidget from '../../components/profile/FriendsListWidget';
 
 type TabType = 'posts' | 'media';
 
@@ -65,18 +66,13 @@ export default function UserProfilePage() {
 
     setLoading(true);
     try {
-      // Если это свой профиль, используем данные из контекста
-      if (isOwnProfile && currentUser) {
-        setProfileUser(currentUser);
+      // Всегда загружаем свежие данные с сервера для актуальной информации (верификация, и т.д.)
+      const userResponse = await usersApi.getById(userId);
+      if (userResponse.success && userResponse.data) {
+        setProfileUser(userResponse.data);
       } else {
-        // Загружаем данные другого пользователя
-        const userResponse = await usersApi.getById(userId);
-        if (userResponse.success && userResponse.data) {
-          setProfileUser(userResponse.data);
-        } else {
-          router.push('/');
-          return;
-        }
+        router.push('/');
+        return;
       }
 
       // Загружаем посты и питомцев
@@ -202,7 +198,15 @@ export default function UserProfilePage() {
             <div className="flex-1 w-full min-w-0">
               <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
-                  <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{profile.name}</h1>
+                  <div className="flex items-center gap-2">
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{profile.name}</h1>
+                    {profileUser.verified && (
+                      <CheckBadgeIcon 
+                        className="w-6 h-6 text-blue-500 flex-shrink-0" 
+                        title="Проверенный пользователь"
+                      />
+                    )}
+                  </div>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1 text-xs sm:text-sm text-gray-600">
                     <div className="flex items-center gap-1">
                       <MapPinIcon className="w-4 h-4 flex-shrink-0" />
@@ -337,7 +341,7 @@ export default function UserProfilePage() {
 
           {/* Друзья */}
           <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
-            {userId && <FriendsList userId={userId} limit={6} />}
+            {userId && <FriendsListWidget userId={userId} limit={6} />}
           </div>
 
           {/* Мои питомцы */}
@@ -365,16 +369,31 @@ export default function UserProfilePage() {
             ) : (
               <div className="grid grid-cols-3 gap-3">
                 {pets.map((pet) => (
-                  <div key={pet.id} className="aspect-square rounded-lg bg-gray-200 flex flex-col items-center justify-center overflow-hidden p-2">
+                  <button
+                    key={pet.id}
+                    onClick={() => router.push(`/pets/${pet.id}`)}
+                    className="aspect-square rounded-lg bg-gray-200 flex flex-col items-center justify-center overflow-hidden p-2 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer relative group"
+                  >
                     {pet.photo ? (
-                      <Image src={pet.photo} alt={pet.name} fill className="object-cover" />
+                      <div className="relative w-full h-full">
+                        <img 
+                          src={getMediaUrl(pet.photo) || pet.photo} 
+                          alt={pet.name} 
+                          className="w-full h-full object-cover"
+                        />
+                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-end justify-center pb-2">
+                          <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
+                            {pet.name}
+                          </span>
+                        </div>
+                      </div>
                     ) : (
                       <>
                         <span className="text-3xl mb-1">🐕</span>
-                        <span className="text-xs text-gray-600 text-center">{pet.name}</span>
+                        <span className="text-xs text-gray-600 text-center font-medium">{pet.name}</span>
                       </>
                     )}
-                  </div>
+                  </button>
                 ))}
               </div>
             )}

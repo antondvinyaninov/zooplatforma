@@ -219,6 +219,11 @@ func createComment(w http.ResponseWriter, r *http.Request) {
 		notifHandler.NotifyComment(postAuthorID, userID, postID, fullName)
 	}
 
+	// Логируем создание комментария
+	ipAddress := r.RemoteAddr
+	userAgent := r.Header.Get("User-Agent")
+	CreateUserLog(database.DB, userID, "comment_create", "Создан комментарий к посту", ipAddress, userAgent)
+
 	sendSuccessResponse(w, comment)
 }
 

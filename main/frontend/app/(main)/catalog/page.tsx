@@ -251,6 +251,7 @@ export default function CatalogPage() {
           {filteredPets.map((pet) => (
             <div
               key={pet.id}
+              onClick={() => window.location.href = `/pets/${pet.id}`}
               className="bg-white rounded-2xl overflow-hidden shadow-sm border border-gray-100 hover:shadow-xl hover:border-blue-200 transition-all duration-300 cursor-pointer group"
             >
               {/* Фото */}

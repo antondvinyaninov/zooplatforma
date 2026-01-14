@@ -92,7 +92,7 @@ export default function AdminLayout({
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
                   >
                     <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 flex-shrink-0">
-                      <span className="text-sm font-medium">{adminUser.email.charAt(0).toUpperCase()}</span>
+                      <span className="text-sm font-medium">{adminUser?.email?.charAt(0).toUpperCase() || 'A'}</span>
                     </div>
                     <span className="text-xs text-gray-400">▼</span>
                   </button>
@@ -101,11 +101,11 @@ export default function AdminLayout({
                     <div className="absolute right-0 top-[calc(100%+8px)] w-[280px] bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-[1000]">
                       <div className="p-4 border-b border-gray-200 flex items-center gap-3">
                         <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 flex-shrink-0">
-                          <span className="text-sm font-medium">{adminUser.email.charAt(0).toUpperCase()}</span>
+                          <span className="text-sm font-medium">{adminUser?.email?.charAt(0).toUpperCase() || 'A'}</span>
                         </div>
                         <div className="flex-1">
-                          <div className="text-sm font-medium text-gray-900 mb-0.5">{adminUser.email}</div>
-                          <div className="text-xs text-gray-600">{adminUser.role}</div>
+                          <div className="text-sm font-medium text-gray-900 mb-0.5">{adminUser?.email || 'Admin'}</div>
+                          <div className="text-xs text-gray-600">{adminUser?.role || 'admin'}</div>
                         </div>
                       </div>
 

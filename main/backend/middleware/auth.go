@@ -3,6 +3,7 @@ package middleware
 import (
 	"backend/models"
 	"context"
+	"database"
 	"encoding/json"
 	"log"
 	"net/http"
@@ -85,8 +86,29 @@ func AuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
 		ctx := r.Context()
 		ctx = context.WithValue(ctx, "userID", int(userID))
 
+		// Обновляем активность пользователя
+		if database.DB != nil {
+			go updateUserActivity(int(userID), r.RemoteAddr, r.Header.Get("User-Agent"))
+		}
+
 		log.Printf("✅ Token valid, userID=%d, calling next handler\n", int(userID))
 		next(w, r.WithContext(ctx))
+	}
+}
+
+// updateUserActivity обновляет время последней активности пользователя
+func updateUserActivity(userID int, ipAddress, userAgent string) {
+	_, err := database.DB.Exec(`
+		INSERT INTO user_activity (user_id, last_seen, ip_address, user_agent)
+		VALUES (?, ?, ?, ?)
+		ON CONFLICT(user_id) DO UPDATE SET
+			last_seen = excluded.last_seen,
+			ip_address = excluded.ip_address,
+			user_agent = excluded.user_agent
+	`, userID, time.Now(), ipAddress, userAgent)
+
+	if err != nil {
+		log.Printf("⚠️  Failed to update user activity: %v", err)
 	}
 }
 

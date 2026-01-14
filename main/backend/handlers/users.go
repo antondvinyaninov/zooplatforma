@@ -33,10 +33,33 @@ func UserHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
+		// GET публичный - можно просматривать профили без авторизации
 		handleGetUser(w, r, id)
 	case http.MethodPut:
+		// PUT требует авторизации - проверяем токен
+		userID, ok := r.Context().Value("userID").(int)
+		if !ok {
+			sendError(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		// Можно редактировать только свой профиль
+		if userID != id {
+			sendError(w, "Forbidden", http.StatusForbidden)
+			return
+		}
 		handleUpdateUser(w, r, id)
 	case http.MethodDelete:
+		// DELETE требует авторизации
+		userID, ok := r.Context().Value("userID").(int)
+		if !ok {
+			sendError(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+		// Можно удалить только свой профиль
+		if userID != id {
+			sendError(w, "Forbidden", http.StatusForbidden)
+			return
+		}
 		handleDeleteUser(w, r, id)
 	default:
 		sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -44,7 +67,7 @@ func UserHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func handleGetUsers(w http.ResponseWriter, _ *http.Request) {
-	rows, err := database.DB.Query("SELECT id, name, last_name, email, avatar, created_at FROM users")
+	rows, err := database.DB.Query("SELECT id, name, last_name, email, avatar, created_at, verified, verified_at FROM users")
 	if err != nil {
 		sendError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -54,7 +77,7 @@ func handleGetUsers(w http.ResponseWriter, _ *http.Request) {
 	users := []models.User{}
 	for rows.Next() {
 		var user models.User
-		if err := rows.Scan(&user.ID, &user.Name, &user.LastName, &user.Email, &user.Avatar, &user.CreatedAt); err != nil {
+		if err := rows.Scan(&user.ID, &user.Name, &user.LastName, &user.Email, &user.Avatar, &user.CreatedAt, &user.Verified, &user.VerifiedAt); err != nil {
 			sendError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -66,8 +89,8 @@ func handleGetUsers(w http.ResponseWriter, _ *http.Request) {
 
 func handleGetUser(w http.ResponseWriter, _ *http.Request, id int) {
 	var user models.User
-	err := database.DB.QueryRow("SELECT id, name, last_name, email, avatar, bio, location, phone, created_at FROM users WHERE id = ?", id).
-		Scan(&user.ID, &user.Name, &user.LastName, &user.Email, &user.Avatar, &user.Bio, &user.Location, &user.Phone, &user.CreatedAt)
+	err := database.DB.QueryRow("SELECT id, name, last_name, email, avatar, bio, location, phone, created_at, verified, verified_at FROM users WHERE id = ?", id).
+		Scan(&user.ID, &user.Name, &user.LastName, &user.Email, &user.Avatar, &user.Bio, &user.Location, &user.Phone, &user.CreatedAt, &user.Verified, &user.VerifiedAt)
 
 	if err != nil {
 		sendError(w, "User not found", http.StatusNotFound)

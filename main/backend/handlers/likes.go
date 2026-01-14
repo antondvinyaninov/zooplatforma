@@ -36,7 +36,7 @@ func LikesHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // toggleLike добавляет или удаляет лайк
-func toggleLike(w http.ResponseWriter, _ *http.Request, postID int, userID int) {
+func toggleLike(w http.ResponseWriter, r *http.Request, postID int, userID int) {
 	// Проверяем, есть ли уже лайк
 	var exists bool
 	err := database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = ?)", userID, postID).Scan(&exists)
@@ -45,6 +45,9 @@ func toggleLike(w http.ResponseWriter, _ *http.Request, postID int, userID int) 
 		return
 	}
 
+	ipAddress := r.RemoteAddr
+	userAgent := r.Header.Get("User-Agent")
+
 	if exists {
 		// Удаляем лайк
 		_, err = database.DB.Exec("DELETE FROM likes WHERE user_id = ? AND post_id = ?", userID, postID)
@@ -52,6 +55,8 @@ func toggleLike(w http.ResponseWriter, _ *http.Request, postID int, userID int) 
 			sendErrorResponse(w, "Ошибка удаления лайка: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+		// Логируем удаление лайка
+		CreateUserLog(database.DB, userID, "like_remove", "Удалён лайк с поста", ipAddress, userAgent)
 	} else {
 		// Добавляем лайк
 		_, err = database.DB.Exec("INSERT INTO likes (user_id, post_id) VALUES (?, ?)", userID, postID)
@@ -59,6 +64,9 @@ func toggleLike(w http.ResponseWriter, _ *http.Request, postID int, userID int) 
 			sendErrorResponse(w, "Ошибка добавления лайка: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// Логируем добавление лайка
+		CreateUserLog(database.DB, userID, "like_add", "Добавлен лайк на пост", ipAddress, userAgent)
 
 		// Создаем уведомление для автора поста
 		var postAuthorID int

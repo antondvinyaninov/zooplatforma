@@ -5,6 +5,7 @@ import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
 import CityDetector from './CityDetector';
 import UserMenu from './UserMenu';
 import NotificationsDropdown from './NotificationsDropdown';
+import FriendsDropdown from './FriendsDropdown';
 
 export default function Header() {
   return (
@@ -45,6 +46,9 @@ export default function Header() {
             <div className="hidden md:block">
               <CityDetector />
             </div>
+            
+            {/* Friends */}
+            <FriendsDropdown />
             
             {/* Notifications */}
             <NotificationsDropdown />

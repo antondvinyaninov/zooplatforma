@@ -49,6 +49,11 @@ func UpdateProfileHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Логируем обновление профиля
+	ipAddress := r.RemoteAddr
+	userAgent := r.Header.Get("User-Agent")
+	CreateUserLog(database.DB, userID, "profile_update", "Обновление профиля", ipAddress, userAgent)
+
 	// Получаем обновленные данные пользователя
 	var user models.User
 	query = `SELECT id, name, last_name, email, bio, phone, location, avatar, cover_photo,

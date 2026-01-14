@@ -4,11 +4,18 @@ import (
 	"backend/models"
 	"database/sql"
 	"encoding/json"
+	"fmt"
+	"io"
 	"log"
+	"mime/multipart"
 	"net/http"
+	"os"
+	"path/filepath"
 	"strconv"
 	"strings"
 	"time"
+
+	"github.com/google/uuid"
 )
 
 // GetChatsHandler возвращает список диалогов пользователя
@@ -144,6 +151,12 @@ func GetChatMessagesHandler(db *sql.DB) http.HandlerFunc {
 				msg.Sender = sender
 			}
 
+			// Получаем attachments
+			attachments, err := getMessageAttachments(db, msg.ID)
+			if err == nil {
+				msg.Attachments = attachments
+			}
+
 			messages = append(messages, msg)
 		}
 
@@ -262,6 +275,150 @@ func GetUnreadCountHandler(db *sql.DB) http.HandlerFunc {
 	}
 }
 
+// SendMediaMessageHandler отправляет сообщение с медиа (фото/видео)
+func SendMediaMessageHandler(db *sql.DB) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		userID := r.Context().Value("userID").(int)
+
+		// Парсим multipart form
+		err := r.ParseMultipartForm(50 << 20) // 50 MB max
+		if err != nil {
+			http.Error(w, "Failed to parse form", http.StatusBadRequest)
+			return
+		}
+
+		// Получаем receiver_id
+		receiverIDStr := r.FormValue("receiver_id")
+		if receiverIDStr == "" {
+			http.Error(w, "Receiver ID is required", http.StatusBadRequest)
+			return
+		}
+
+		receiverID, err := strconv.Atoi(receiverIDStr)
+		if err != nil {
+			http.Error(w, "Invalid receiver ID", http.StatusBadRequest)
+			return
+		}
+
+		if receiverID == userID {
+			http.Error(w, "Cannot send message to yourself", http.StatusBadRequest)
+			return
+		}
+
+		// Получаем текст сообщения (опционально)
+		content := r.FormValue("content")
+
+		// Получаем файлы
+		files := r.MultipartForm.File["media"]
+		if len(files) == 0 {
+			http.Error(w, "At least one media file is required", http.StatusBadRequest)
+			return
+		}
+
+		// Проверяем, существует ли получатель
+		receiverExists, err := userExists(db, receiverID)
+		if err != nil || !receiverExists {
+			http.Error(w, "Receiver not found", http.StatusNotFound)
+			return
+		}
+
+		// Ищем или создаем чат
+		chatID, err := getOrCreateChat(db, userID, receiverID)
+		if err != nil {
+			log.Printf("❌ Error getting/creating chat: %v", err)
+			http.Error(w, "Failed to create chat", http.StatusInternalServerError)
+			return
+		}
+
+		// Создаем сообщение
+		result, err := db.Exec(`
+			INSERT INTO messages (chat_id, sender_id, receiver_id, content, created_at)
+			VALUES (?, ?, ?, ?, ?)
+		`, chatID, userID, receiverID, content, time.Now())
+
+		if err != nil {
+			log.Printf("❌ Error creating message: %v", err)
+			http.Error(w, "Failed to send message", http.StatusInternalServerError)
+			return
+		}
+
+		messageID, _ := result.LastInsertId()
+
+		// Сохраняем файлы и создаем attachments
+		var attachments []models.MessageAttachment
+		for _, fileHeader := range files {
+			file, err := fileHeader.Open()
+			if err != nil {
+				log.Printf("❌ Error opening file: %v", err)
+				continue
+			}
+			defer file.Close()
+
+			// Определяем тип файла
+			fileType := "image"
+			contentType := fileHeader.Header.Get("Content-Type")
+			if strings.HasPrefix(contentType, "video/") {
+				fileType = "video"
+			}
+
+			// Сохраняем файл
+			filePath, err := saveUploadedFile(file, fileHeader.Filename)
+			if err != nil {
+				log.Printf("❌ Error saving file: %v", err)
+				continue
+			}
+
+			// Создаем запись в БД
+			attachResult, err := db.Exec(`
+				INSERT INTO message_attachments (message_id, file_path, file_type, file_size, created_at)
+				VALUES (?, ?, ?, ?, ?)
+			`, messageID, filePath, fileType, fileHeader.Size, time.Now())
+
+			if err != nil {
+				log.Printf("❌ Error creating attachment: %v", err)
+				continue
+			}
+
+			attachID, _ := attachResult.LastInsertId()
+			attachments = append(attachments, models.MessageAttachment{
+				ID:        int(attachID),
+				MessageID: int(messageID),
+				FilePath:  filePath,
+				FileType:  fileType,
+				FileSize:  int(fileHeader.Size),
+				CreatedAt: time.Now(),
+			})
+		}
+
+		// Обновляем last_message в чате
+		_, err = db.Exec(`
+			UPDATE chats 
+			SET last_message_id = ?, last_message_at = ?
+			WHERE id = ?
+		`, messageID, time.Now(), chatID)
+
+		if err != nil {
+			log.Printf("⚠️ Warning: Failed to update chat last_message: %v", err)
+		}
+
+		// Получаем созданное сообщение
+		message, err := getMessageByID(db, int(messageID))
+		if err != nil {
+			log.Printf("❌ Error fetching created message: %v", err)
+			http.Error(w, "Message sent but failed to fetch", http.StatusInternalServerError)
+			return
+		}
+
+		// Добавляем attachments к сообщению
+		message.Attachments = attachments
+
+		log.Printf("✅ Media message sent: user %d -> user %d in chat %d (%d attachments)", userID, receiverID, chatID, len(attachments))
+
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(message)
+	}
+}
+
 // Вспомогательные функции
 
 func getOrCreateChat(db *sql.DB, user1ID, user2ID int) (int, error) {
@@ -325,7 +482,70 @@ func getMessageByID(db *sql.DB, messageID int) (*models.Message, error) {
 		msg.Sender = sender
 	}
 
+	// Получаем attachments
+	attachments, err := getMessageAttachments(db, messageID)
+	if err == nil {
+		msg.Attachments = attachments
+	}
+
 	return &msg, nil
+}
+
+func getMessageAttachments(db *sql.DB, messageID int) ([]models.MessageAttachment, error) {
+	rows, err := db.Query(`
+		SELECT id, message_id, file_path, file_type, file_size, created_at
+		FROM message_attachments
+		WHERE message_id = ?
+		ORDER BY created_at ASC
+	`, messageID)
+
+	if err != nil {
+		return nil, err
+	}
+	defer rows.Close()
+
+	var attachments []models.MessageAttachment
+	for rows.Next() {
+		var attachment models.MessageAttachment
+		err := rows.Scan(
+			&attachment.ID, &attachment.MessageID, &attachment.FilePath,
+			&attachment.FileType, &attachment.FileSize, &attachment.CreatedAt,
+		)
+		if err != nil {
+			log.Printf("⚠️ Error scanning attachment: %v", err)
+			continue
+		}
+		attachments = append(attachments, attachment)
+	}
+
+	return attachments, nil
+}
+
+func saveUploadedFile(file multipart.File, filename string) (string, error) {
+	// Генерируем уникальное имя файла
+	ext := filepath.Ext(filename)
+	newFilename := fmt.Sprintf("%s%s", uuid.New().String(), ext)
+
+	// Создаем папку для медиа сообщений
+	uploadDir := "../../uploads/messages"
+	if err := os.MkdirAll(uploadDir, 0755); err != nil {
+		return "", fmt.Errorf("failed to create directory: %v", err)
+	}
+
+	// Сохраняем файл
+	filePath := filepath.Join(uploadDir, newFilename)
+	dst, err := os.Create(filePath)
+	if err != nil {
+		return "", fmt.Errorf("failed to create file: %v", err)
+	}
+	defer dst.Close()
+
+	if _, err := io.Copy(dst, file); err != nil {
+		return "", fmt.Errorf("failed to save file: %v", err)
+	}
+
+	// Возвращаем относительный путь для URL
+	return fmt.Sprintf("/uploads/messages/%s", newFilename), nil
 }
 
 func getUnreadCount(db *sql.DB, chatID, userID int) (int, error) {

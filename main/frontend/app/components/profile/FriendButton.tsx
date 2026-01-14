@@ -1,9 +1,7 @@
 'use client';
 
 import { useState, useEffect } from 'react';
-import { UserPlusIcon, UserMinusIcon, CheckIcon, XMarkIcon, ClockIcon } from '@heroicons/react/24/outline';
 import { friendsApi, FriendshipStatus } from '@/lib/api';
-import { useToast } from '@/contexts/ToastContext';
 
 interface FriendButtonProps {
   userId: number;
@@ -13,94 +11,57 @@ interface FriendButtonProps {
 export default function FriendButton({ userId, currentUserId }: FriendButtonProps) {
   const [status, setStatus] = useState<FriendshipStatus>({ status: 'none' });
   const [loading, setLoading] = useState(false);
-  const { showToast } = useToast();
 
   useEffect(() => {
-    loadFriendshipStatus();
+    loadStatus();
   }, [userId]);
 
-  const loadFriendshipStatus = async () => {
-    try {
-      const response = await friendsApi.getStatus(userId);
-      if (response.success && response.data) {
-        setStatus(response.data);
-      }
-    } catch (error) {
-      console.error('Ошибка загрузки статуса дружбы:', error);
+  const loadStatus = async () => {
+    const result = await friendsApi.getStatus(userId);
+    if (result.success && result.data) {
+      setStatus(result.data);
     }
   };
 
   const handleSendRequest = async () => {
     setLoading(true);
-    try {
-      const response = await friendsApi.sendRequest(userId);
-      if (response.success) {
-        showToast('success', 'Запрос в друзья отправлен');
-        await loadFriendshipStatus();
-      } else {
-        showToast('error', response.error || 'Ошибка отправки запроса');
-      }
-    } catch (error) {
-      showToast('error', 'Ошибка отправки запроса');
-    } finally {
-      setLoading(false);
+    const result = await friendsApi.sendRequest(userId);
+    if (result.success) {
+      await loadStatus();
     }
+    setLoading(false);
   };
 
   const handleAcceptRequest = async () => {
     if (!status.id) return;
     setLoading(true);
-    try {
-      const response = await friendsApi.acceptRequest(status.id);
-      if (response.success) {
-        showToast('success', 'Запрос принят');
-        await loadFriendshipStatus();
-      } else {
-        showToast('error', response.error || 'Ошибка принятия запроса');
-      }
-    } catch (error) {
-      showToast('error', 'Ошибка принятия запроса');
-    } finally {
-      setLoading(false);
+    const result = await friendsApi.acceptRequest(status.id);
+    if (result.success) {
+      await loadStatus();
     }
+    setLoading(false);
   };
 
   const handleRejectRequest = async () => {
     if (!status.id) return;
     setLoading(true);
-    try {
-      const response = await friendsApi.rejectRequest(status.id);
-      if (response.success) {
-        showToast('success', 'Запрос отклонен');
-        await loadFriendshipStatus();
-      } else {
-        showToast('error', response.error || 'Ошибка отклонения запроса');
-      }
-    } catch (error) {
-      showToast('error', 'Ошибка отклонения запроса');
-    } finally {
-      setLoading(false);
+    const result = await friendsApi.rejectRequest(status.id);
+    if (result.success) {
+      await loadStatus();
     }
+    setLoading(false);
   };
 
   const handleRemoveFriend = async () => {
     if (!status.id) return;
-    if (!confirm('Вы уверены, что хотите удалить из друзей?')) return;
+    if (!confirm('Удалить из друзей?')) return;
     
     setLoading(true);
-    try {
-      const response = await friendsApi.removeFriend(status.id);
-      if (response.success) {
-        showToast('success', 'Удалено из друзей');
-        await loadFriendshipStatus();
-      } else {
-        showToast('error', response.error || 'Ошибка удаления из друзей');
-      }
-    } catch (error) {
-      showToast('error', 'Ошибка удаления из друзей');
-    } finally {
-      setLoading(false);
+    const result = await friendsApi.removeFriend(status.id);
+    if (result.success) {
+      await loadStatus();
     }
+    setLoading(false);
   };
 
   // Не показываем кнопку для своего профиля
@@ -108,54 +69,50 @@ export default function FriendButton({ userId, currentUserId }: FriendButtonProp
     return null;
   }
 
-  // Друзья
+  // Входящий запрос - показываем кнопки принять/отклонить
+  if (status.status === 'pending' && !status.is_outgoing) {
+    return (
+      <div className="flex gap-2">
+        <button
+          onClick={handleAcceptRequest}
+          disabled={loading}
+          className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
+        >
+          Принять
+        </button>
+        <button
+          onClick={handleRejectRequest}
+          disabled={loading}
+          className="px-4 py-2 bg-gray-300 text-gray-700 rounded-lg hover:bg-gray-400 disabled:opacity-50"
+        >
+          Отклонить
+        </button>
+      </div>
+    );
+  }
+
+  // Исходящий запрос - показываем "Запрос отправлен"
+  if (status.status === 'pending' && status.is_outgoing) {
+    return (
+      <button
+        disabled
+        className="px-4 py-2 bg-gray-300 text-gray-600 rounded-lg cursor-not-allowed"
+      >
+        Запрос отправлен
+      </button>
+    );
+  }
+
+  // Уже друзья - показываем кнопку удаления
   if (status.status === 'accepted') {
     return (
       <button
         onClick={handleRemoveFriend}
         disabled={loading}
-        className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
+        className="px-4 py-2 bg-red-500 text-white rounded-lg hover:bg-red-600 disabled:opacity-50"
       >
-        <CheckIcon className="w-5 h-5" />
-        <span>В друзьях</span>
+        Удалить из друзей
       </button>
-    );
-  }
-
-  // Исходящий запрос (ожидание)
-  if (status.status === 'pending' && status.is_outgoing) {
-    return (
-      <button
-        disabled
-        className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-500 rounded-lg cursor-not-allowed"
-      >
-        <ClockIcon className="w-5 h-5" />
-        <span>Запрос отправлен</span>
-      </button>
-    );
-  }
-
-  // Входящий запрос (нужно принять/отклонить)
-  if (status.status === 'pending' && !status.is_outgoing) {
-    return (
-      <div className="flex items-center gap-2">
-        <button
-          onClick={handleAcceptRequest}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
-        >
-          <CheckIcon className="w-5 h-5" />
-          <span>Принять</span>
-        </button>
-        <button
-          onClick={handleRejectRequest}
-          disabled={loading}
-          className="flex items-center gap-2 px-4 py-2 bg-gray-100 text-gray-700 rounded-lg hover:bg-gray-200 transition-colors disabled:opacity-50"
-        >
-          <XMarkIcon className="w-5 h-5" />
-          <span>Отклонить</span>
-        </button>
-      </div>
     );
   }
 
@@ -164,10 +121,9 @@ export default function FriendButton({ userId, currentUserId }: FriendButtonProp
     <button
       onClick={handleSendRequest}
       disabled={loading}
-      className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors disabled:opacity-50"
+      className="px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 disabled:opacity-50"
     >
-      <UserPlusIcon className="w-5 h-5" />
-      <span>Добавить в друзья</span>
+      Добавить в друзья
     </button>
   );
 }

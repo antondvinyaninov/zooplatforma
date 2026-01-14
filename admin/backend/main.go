@@ -23,11 +23,18 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 			"https://sadmin.zooplatforma.ru",
 		}
 
+		originAllowed := false
 		for _, allowed := range allowedOrigins {
 			if origin == allowed {
 				w.Header().Set("Access-Control-Allow-Origin", origin)
+				originAllowed = true
 				break
 			}
+		}
+
+		// Если origin не указан (например, curl), разрешаем
+		if !originAllowed && origin == "" {
+			w.Header().Set("Access-Control-Allow-Origin", "*")
 		}
 
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -97,6 +104,14 @@ func main() {
 	http.HandleFunc("/api/admin/organizations", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminOrganizationsHandler)))
 	http.HandleFunc("/api/admin/organizations/", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminVerifyOrganizationHandler)))
 	http.HandleFunc("/api/admin/organizations/stats", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminOrganizationStatsHandler)))
+
+	// Health check for all services
+	http.HandleFunc("/api/admin/health/services", enableCORS(middleware.SuperAdminMiddleware(handlers.HealthCheckHandler)))
+
+	// Moderation
+	http.HandleFunc("/api/admin/moderation/reports", enableCORS(middleware.SuperAdminMiddleware(handlers.GetReportsHandler(database.DB))))
+	http.HandleFunc("/api/admin/moderation/reports/", enableCORS(middleware.SuperAdminMiddleware(handlers.ReviewReportHandler(database.DB))))
+	http.HandleFunc("/api/admin/moderation/stats", enableCORS(middleware.SuperAdminMiddleware(handlers.GetModerationStatsHandler(database.DB))))
 
 	port := ":9000"
 	fmt.Printf("🔐 Admin Panel API starting on port %s\n", port)

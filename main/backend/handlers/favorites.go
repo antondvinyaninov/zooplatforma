@@ -61,7 +61,7 @@ func FavoriteDetailHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 // getFavorites получает список избранных питомцев пользователя
-func getFavorites(w http.ResponseWriter, r *http.Request, userID int) {
+func getFavorites(w http.ResponseWriter, _ *http.Request, userID int) {
 	query := `
 		SELECT f.id, f.user_id, f.pet_id, f.created_at
 		FROM favorites f
@@ -154,7 +154,7 @@ func addFavorite(w http.ResponseWriter, r *http.Request, userID int) {
 }
 
 // removeFavorite удаляет питомца из избранного
-func removeFavorite(w http.ResponseWriter, r *http.Request, userID int, petID int) {
+func removeFavorite(w http.ResponseWriter, _ *http.Request, userID int, petID int) {
 	result, err := database.DB.Exec(`
 		DELETE FROM favorites
 		WHERE user_id = ? AND pet_id = ?

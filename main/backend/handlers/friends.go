@@ -75,6 +75,11 @@ func SendFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 		notifHandler.NotifyFriendRequest(req.FriendID, userID, int(id), fullName)
 	}
 
+	// Логируем отправку запроса в друзья
+	ipAddress := r.RemoteAddr
+	userAgent := r.Header.Get("User-Agent")
+	CreateUserLog(database.DB, userID, "friend_request_send", "Отправлен запрос в друзья", ipAddress, userAgent)
+
 	sendSuccessResponse(w, map[string]interface{}{
 		"id":      id,
 		"status":  "pending",
@@ -138,6 +143,11 @@ func AcceptFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 		notifHandler := &NotificationsHandler{DB: database.DB}
 		notifHandler.NotifyFriendAccepted(senderID, userID, req.FriendshipID, fullName)
 	}
+
+	// Логируем принятие запроса в друзья
+	ipAddress := r.RemoteAddr
+	userAgent := r.Header.Get("User-Agent")
+	CreateUserLog(database.DB, userID, "friend_request_accept", "Принят запрос в друзья", ipAddress, userAgent)
 
 	sendSuccessResponse(w, map[string]string{
 		"message": "Запрос в друзья принят",

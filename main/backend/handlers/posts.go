@@ -3,6 +3,7 @@ package handlers
 import (
 	"backend/models"
 	"database"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 	"strconv"
@@ -13,8 +14,10 @@ import (
 func PostsHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodGet:
+		// GET публичный - можно просматривать ленту без авторизации
 		getAllPosts(w, r)
 	case http.MethodPost:
+		// POST требует авторизации - проверка внутри createPost
 		createPost(w, r)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -142,20 +145,39 @@ func getAllPosts(w http.ResponseWriter, r *http.Request) {
 	// Получаем userID из контекста (может быть 0 для неавторизованных)
 	userID, _ := r.Context().Value("userID").(int)
 
+	// Получаем параметры пагинации
+	limitStr := r.URL.Query().Get("limit")
+	limit := 20 // По умолчанию 20 постов
+	if limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 && parsedLimit <= 100 {
+			limit = parsedLimit
+		}
+	}
+
 	query := `
 		SELECT p.id, p.author_id, p.author_type, p.content, p.attached_pets, 
 		       p.attachments, p.tags, p.status, p.scheduled_at, p.created_at, p.updated_at,
 		       u.name, u.email, u.avatar,
 		       o.name as org_name, o.short_name as org_short_name, o.logo as org_logo,
-		       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count
+		       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count,
+		       CASE 
+		           WHEN p.author_type = 'user' AND EXISTS (
+		               SELECT 1 FROM friendships f 
+		               WHERE ((f.user_id = ? AND f.friend_id = p.author_id) 
+		                   OR (f.friend_id = ? AND f.user_id = p.author_id))
+		                   AND f.status = 'accepted'
+		           ) THEN 1
+		           ELSE 0
+		       END as is_friend
 		FROM posts p
 		LEFT JOIN users u ON p.author_id = u.id AND p.author_type = 'user'
 		LEFT JOIN organizations o ON p.author_id = o.id AND p.author_type = 'organization'
 		WHERE p.is_deleted = 0 AND p.status = 'published'
-		ORDER BY p.created_at DESC
+		ORDER BY is_friend DESC, p.created_at DESC
+		LIMIT ?
 	`
 
-	rows, err := database.DB.Query(query)
+	rows, err := database.DB.Query(query, userID, userID, limit)
 	if err != nil {
 		sendErrorResponse(w, "Ошибка получения постов: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -164,11 +186,73 @@ func getAllPosts(w http.ResponseWriter, r *http.Request) {
 
 	var posts []models.Post
 	for rows.Next() {
-		post, err := scanPost(rows)
+		var post models.Post
+		var user models.User
+		var attachedPetsJSON, attachmentsJSON, tagsJSON string
+		var userName, userEmail, userAvatar *string
+		var orgName, orgShortName, orgLogo *string
+		var isFriend int
+
+		err := rows.Scan(
+			&post.ID, &post.AuthorID, &post.AuthorType, &post.Content,
+			&attachedPetsJSON, &attachmentsJSON, &tagsJSON,
+			&post.Status, &post.ScheduledAt,
+			&post.CreatedAt, &post.UpdatedAt,
+			&userName, &userEmail, &userAvatar,
+			&orgName, &orgShortName, &orgLogo,
+			&post.CommentsCount,
+			&isFriend,
+		)
 		if err != nil {
 			sendErrorResponse(w, "Ошибка чтения данных: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// Десериализуем JSON массивы
+		json.Unmarshal([]byte(attachedPetsJSON), &post.AttachedPets)
+		json.Unmarshal([]byte(attachmentsJSON), &post.Attachments)
+		json.Unmarshal([]byte(tagsJSON), &post.Tags)
+
+		// Инициализируем пустые массивы если nil
+		if post.AttachedPets == nil {
+			post.AttachedPets = []int{}
+		}
+		if post.Attachments == nil {
+			post.Attachments = []models.Attachment{}
+		}
+		if post.Tags == nil {
+			post.Tags = []string{}
+		}
+
+		// Добавляем данные автора если это user
+		if post.AuthorType == "user" && userName != nil {
+			user.ID = post.AuthorID
+			user.Name = *userName
+			if userEmail != nil {
+				user.Email = *userEmail
+			}
+			if userAvatar != nil {
+				user.Avatar = *userAvatar
+			}
+			post.User = &user
+		}
+
+		// Добавляем данные организации если это organization
+		if post.AuthorType == "organization" && orgName != nil {
+			org := models.Organization{
+				ID:        post.AuthorID,
+				Name:      *orgName,
+				ShortName: orgShortName,
+				Logo:      orgLogo,
+			}
+			post.Organization = &org
+		}
+
+		// Загружаем данные прикреплённых питомцев - будет загружено batch'ем позже
+		// if len(post.AttachedPets) > 0 && len(post.AttachedPets) <= 5 {
+		// 	post.Pets = loadPetsForPost(post.AttachedPets)
+		// }
+
 		posts = append(posts, post)
 	}
 
@@ -176,8 +260,14 @@ func getAllPosts(w http.ResponseWriter, r *http.Request) {
 		posts = []models.Post{}
 	}
 
-	// Загружаем опросы для всех постов
-	posts = loadPollsForPosts(posts, userID)
+	// ✅ ОПТИМИЗАЦИЯ: Загружаем питомцев одним запросом для всех постов
+	posts = loadPetsForPostsBatch(posts)
+
+	// ✅ ОПТИМИЗАЦИЯ: Загружаем опросы одним запросом для всех постов
+	includePolls := r.URL.Query().Get("include_polls")
+	if includePolls == "true" {
+		posts = loadPollsForPostsBatch(posts, userID)
+	}
 
 	sendSuccessResponse(w, posts)
 }
@@ -465,6 +555,15 @@ func createPost(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Логируем создание поста
+	ipAddress := r.RemoteAddr
+	userAgent := r.Header.Get("User-Agent")
+	details := "Создан пост"
+	if authorType == "organization" {
+		details = "Создан пост от имени организации"
+	}
+	CreateUserLog(database.DB, userID, "post_create", details, ipAddress, userAgent)
+
 	sendSuccessResponse(w, post)
 }
 
@@ -664,7 +763,16 @@ func loadPetsForPost(petIDs []int) []models.Pet {
 
 	// Создаём плейсхолдеры для IN запроса
 	placeholders := strings.Repeat("?,", len(petIDs)-1) + "?"
-	query := `SELECT id, user_id, name, species, photo, created_at FROM pets WHERE id IN (` + placeholders + `)`
+	query := `
+		SELECT 
+			p.id, p.user_id, p.name, p.species, p.breed, p.gender, p.birth_date, 
+			p.color, p.size, p.photo, p.status, p.city, p.region, p.urgent, p.story,
+			p.organization_id, o.name as organization_name, o.type as organization_type,
+			p.created_at
+		FROM pets p
+		LEFT JOIN organizations o ON p.organization_id = o.id
+		WHERE p.id IN (` + placeholders + `)
+	`
 
 	// Конвертируем []int в []interface{} для Exec
 	args := make([]interface{}, len(petIDs))
@@ -681,7 +789,26 @@ func loadPetsForPost(petIDs []int) []models.Pet {
 	var pets []models.Pet
 	for rows.Next() {
 		var pet models.Pet
-		rows.Scan(&pet.ID, &pet.UserID, &pet.Name, &pet.Species, &pet.Photo, &pet.CreatedAt)
+		var organizationName, organizationType sql.NullString
+
+		err := rows.Scan(
+			&pet.ID, &pet.UserID, &pet.Name, &pet.Species, &pet.Breed, &pet.Gender, &pet.BirthDate,
+			&pet.Color, &pet.Size, &pet.Photo, &pet.Status, &pet.City, &pet.Region, &pet.Urgent, &pet.Story,
+			&pet.OrganizationID, &organizationName, &organizationType,
+			&pet.CreatedAt,
+		)
+
+		if err != nil {
+			continue
+		}
+
+		if organizationName.Valid {
+			pet.OrganizationName = organizationName.String
+		}
+		if organizationType.Valid {
+			pet.OrganizationType = organizationType.String
+		}
+
 		pets = append(pets, pet)
 	}
 

@@ -42,6 +42,7 @@ export default function Sidebar() {
     { name: 'Мессенджер', href: '/messenger', icon: ChatBubbleLeftIcon, badge: unreadCount > 0 ? unreadCount.toString() : undefined },
     { name: 'Организации', href: '/org', icon: BuildingOfficeIcon },
     { name: 'Каталог', href: '/catalog', icon: RectangleStackIcon },
+    { name: 'Избранное', href: '/favorites', icon: HeartIcon },
     { name: 'Сервисы', href: '/services', icon: Cog6ToothIcon },
   ];
   return (

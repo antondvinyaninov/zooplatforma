@@ -15,7 +15,15 @@ import (
 func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
-		if origin == "" {
+
+		// Разрешённые origins
+		allowedOrigins := map[string]bool{
+			"http://localhost:3000": true, // Main frontend
+			"http://localhost:4000": true, // Admin frontend
+		}
+
+		// Если origin не указан или не в списке разрешённых, используем дефолтный
+		if origin == "" || !allowedOrigins[origin] {
 			origin = "http://localhost:3000"
 		}
 
@@ -64,20 +72,22 @@ func main() {
 	http.HandleFunc("/api/auth/me", enableCORS(handlers.MeHandler))
 	http.HandleFunc("/api/auth/verify", enableCORS(handlers.VerifyTokenHandler))
 
+	// Public user profile endpoint
+	http.HandleFunc("/api/users/", enableCORS(handlers.UserHandler)) // Публичный просмотр профилей пользователей
+
 	// Protected routes
 	http.HandleFunc("/api/users", enableCORS(middleware.AuthMiddleware(handlers.UsersHandler)))
-	http.HandleFunc("/api/users/", enableCORS(middleware.AuthMiddleware(handlers.UserHandler)))
 	http.HandleFunc("/api/profile", enableCORS(middleware.AuthMiddleware(handlers.UpdateProfileHandler)))
 	http.HandleFunc("/api/profile/avatar", enableCORS(middleware.AuthMiddleware(handlers.UploadAvatarHandler)))
 	http.HandleFunc("/api/profile/avatar/delete", enableCORS(middleware.AuthMiddleware(handlers.DeleteAvatarHandler)))
 	http.HandleFunc("/api/profile/cover", enableCORS(middleware.AuthMiddleware(handlers.UploadCoverPhotoHandler)))
 	http.HandleFunc("/api/profile/cover/delete", enableCORS(middleware.AuthMiddleware(handlers.DeleteCoverPhotoHandler)))
 	http.HandleFunc("/api/posts/drafts", enableCORS(middleware.AuthMiddleware(handlers.DraftsHandler)))
-	http.HandleFunc("/api/posts", enableCORS(middleware.AuthMiddleware(handlers.PostsHandler)))
+	http.HandleFunc("/api/posts/user/", enableCORS(handlers.UserPostsHandler))                 // Публичный endpoint для просмотра постов пользователя
+	http.HandleFunc("/api/posts/pet/", enableCORS(handlers.PetPostsHandler))                   // Публичный endpoint для просмотра постов питомца
+	http.HandleFunc("/api/posts/organization/", enableCORS(handlers.OrganizationPostsHandler)) // Публичный endpoint для просмотра постов организации
+	http.HandleFunc("/api/posts", enableCORS(handlers.PostsHandler))                           // GET публичный, POST требует авторизации (проверка внутри handler)
 	http.HandleFunc("/api/posts/", enableCORS(middleware.AuthMiddleware(handlers.PostHandler)))
-	http.HandleFunc("/api/posts/user/", enableCORS(middleware.AuthMiddleware(handlers.UserPostsHandler)))
-	http.HandleFunc("/api/posts/pet/", enableCORS(middleware.AuthMiddleware(handlers.PetPostsHandler)))
-	http.HandleFunc("/api/posts/organization/", enableCORS(middleware.AuthMiddleware(handlers.OrganizationPostsHandler)))
 
 	// Comments
 	http.HandleFunc("/api/comments/post/", enableCORS(middleware.AuthMiddleware(handlers.CommentsHandler)))
@@ -88,8 +98,8 @@ func main() {
 
 	// Pets
 	http.HandleFunc("/api/pets", enableCORS(middleware.AuthMiddleware(handlers.PetsHandler)))
+	http.HandleFunc("/api/pets/user/", enableCORS(handlers.UserPetsHandler)) // Публичный endpoint для просмотра питомцев
 	http.HandleFunc("/api/pets/", enableCORS(middleware.AuthMiddleware(handlers.PetHandler)))
-	http.HandleFunc("/api/pets/user/", enableCORS(middleware.AuthMiddleware(handlers.UserPetsHandler)))
 
 	// Pet Announcements
 	http.HandleFunc("/api/announcements", enableCORS(middleware.AuthMiddleware(handlers.AnnouncementsHandler)))
@@ -134,11 +144,40 @@ func main() {
 	http.HandleFunc("/api/chats", enableCORS(middleware.AuthMiddleware(handlers.GetChatsHandler(database.DB))))
 	http.HandleFunc("/api/chats/", enableCORS(middleware.AuthMiddleware(handlers.GetChatMessagesHandler(database.DB))))
 	http.HandleFunc("/api/messages/send", enableCORS(middleware.AuthMiddleware(handlers.SendMessageHandler(database.DB))))
+	http.HandleFunc("/api/messages/send-media", enableCORS(middleware.AuthMiddleware(handlers.SendMediaMessageHandler(database.DB))))
 	http.HandleFunc("/api/messages/unread", enableCORS(middleware.AuthMiddleware(handlers.GetUnreadCountHandler(database.DB))))
 
 	// Favorites (избранные питомцы)
 	http.HandleFunc("/api/favorites", enableCORS(middleware.AuthMiddleware(handlers.FavoritesHandler)))
 	http.HandleFunc("/api/favorites/", enableCORS(middleware.AuthMiddleware(handlers.FavoriteDetailHandler)))
+
+	// Roles (система ролей)
+	http.HandleFunc("/api/roles/available", enableCORS(middleware.AuthMiddleware(handlers.GetAllRolesHandler(database.DB))))
+	http.HandleFunc("/api/roles/user/", enableCORS(middleware.AuthMiddleware(handlers.GetUserRolesHandler(database.DB))))
+	http.HandleFunc("/api/roles/grant", enableCORS(middleware.AuthMiddleware(handlers.GrantRoleHandler(database.DB))))
+	http.HandleFunc("/api/roles/revoke", enableCORS(middleware.AuthMiddleware(handlers.RevokeRoleHandler(database.DB))))
+
+	// Verification (верификация пользователей)
+	http.HandleFunc("/api/verification/verify", enableCORS(middleware.AuthMiddleware(handlers.VerifyUserHandler(database.DB))))
+	http.HandleFunc("/api/verification/unverify", enableCORS(middleware.AuthMiddleware(handlers.UnverifyUserHandler(database.DB))))
+	http.HandleFunc("/api/verification/status/", enableCORS(handlers.GetUserVerificationStatusHandler(database.DB)))
+	http.HandleFunc("/api/users/verified", enableCORS(handlers.GetVerifiedUsersHandler(database.DB)))
+
+	// Admin Logs (логи действий администраторов)
+	http.HandleFunc("/api/admin/logs", enableCORS(middleware.AuthMiddleware(handlers.AdminLogsHandler)))
+	http.HandleFunc("/api/admin/logs/stats", enableCORS(middleware.AuthMiddleware(handlers.GetAdminLogStats)))
+
+	// User Activity (отслеживание активности пользователей)
+	http.HandleFunc("/api/activity/update", enableCORS(middleware.AuthMiddleware(handlers.UpdateUserActivityHandler(database.DB))))
+	http.HandleFunc("/api/activity/online", enableCORS(handlers.GetOnlineUsersCountHandler(database.DB)))
+	http.HandleFunc("/api/activity/stats", enableCORS(handlers.GetUserActivityStatsHandler(database.DB)))
+
+	// User Logs (логи действий пользователей)
+	http.HandleFunc("/api/users/logs/", enableCORS(middleware.AuthMiddleware(handlers.GetUserLogsHandler(database.DB))))
+	http.HandleFunc("/api/users/storage/", enableCORS(middleware.AuthMiddleware(handlers.GetUserStorageStatsHandler(database.DB))))
+
+	// Reports (система жалоб)
+	http.HandleFunc("/api/reports", enableCORS(middleware.AuthMiddleware(handlers.CreateReportHandler)))
 
 	// Media - более специфичные роуты должны быть первыми
 	mediaHandler := handlers.NewMediaHandler(database.DB)

@@ -194,7 +194,7 @@ export default function NotificationsDropdown() {
               </div>
             ) : (
               <div className="divide-y divide-gray-100">
-                {notifications.map((notification) => (
+                {notifications.slice(0, 5).map((notification) => (
                   <div
                     key={notification.id}
                     onClick={() => handleNotificationClick(notification)}
@@ -232,6 +232,21 @@ export default function NotificationsDropdown() {
               </div>
             )}
           </div>
+
+          {/* Footer - Show All Button */}
+          {notifications.length > 0 && (
+            <div className="px-4 py-3 border-t border-gray-200">
+              <button
+                onClick={() => {
+                  setIsOpen(false);
+                  router.push('/notifications');
+                }}
+                className="w-full text-center text-sm font-medium text-blue-600 hover:text-blue-700 transition-colors"
+              >
+                Показать все уведомления
+              </button>
+            </div>
+          )}
         </div>
       )}
     </div>

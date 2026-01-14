@@ -18,13 +18,31 @@ export default function PetPage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [loading, setLoading] = useState(true);
   const [postsLoading, setPostsLoading] = useState(true);
+  const [currentUserId, setCurrentUserId] = useState<number | null>(null);
 
   useEffect(() => {
     if (params.id) {
       loadPet();
       loadPosts();
+      loadCurrentUser();
     }
   }, [params.id]);
+
+  const loadCurrentUser = async () => {
+    try {
+      const response = await fetch('http://localhost:8000/api/auth/me', {
+        credentials: 'include',
+      });
+      if (response.ok) {
+        const result = await response.json();
+        if (result.success && result.data) {
+          setCurrentUserId(result.data.id);
+        }
+      }
+    } catch (error) {
+      console.error('Error loading current user:', error);
+    }
+  };
 
   const loadPet = async () => {
     try {
@@ -167,6 +185,14 @@ export default function PetPage() {
 
                 {/* Actions */}
                 <div className="flex gap-2">
+                  {currentUserId === pet.user_id && (
+                    <button
+                      onClick={() => router.push(`/pets/${pet.id}/edit`)}
+                      className="px-4 py-2 rounded-lg bg-blue-500 text-white hover:bg-blue-600 transition-colors font-medium"
+                    >
+                      Редактировать
+                    </button>
+                  )}
                   <button className="p-2 rounded-lg bg-gray-100 hover:bg-gray-200 transition-colors">
                     <ShareIcon className="w-5 h-5 text-gray-600" />
                   </button>
@@ -184,22 +210,40 @@ export default function PetPage() {
       <div className="grid grid-cols-1 lg:grid-cols-3 gap-2.5">
         {/* Left Column - Main Content */}
         <div className="lg:col-span-2 space-y-2.5">
-          {/* Фото питомца */}
-          <div className="bg-white rounded-xl shadow-sm border border-gray-100 overflow-hidden">
-            <div className="w-full h-96 bg-gradient-to-br from-blue-100 to-purple-100">
-              {pet.photo ? (
-                <img 
-                  src={`http://localhost:8000${pet.photo}`}
-                  alt={pet.name}
-                  className="w-full h-full object-cover"
-                />
-              ) : (
-                <div className="w-full h-full flex items-center justify-center text-gray-400 text-9xl">
-                  🐾
-                </div>
-              )}
-            </div>
-          </div>
+          {/* Фотогалерея */}
+          {(() => {
+            try {
+              const photosArray = pet.photos ? JSON.parse(pet.photos as string) : [];
+              if (Array.isArray(photosArray) && photosArray.length > 0) {
+                return (
+                  <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
+                    <h2 className="text-lg font-semibold text-gray-900 mb-4">Фотогалерея</h2>
+                    <div className="grid grid-cols-2 md:grid-cols-3 gap-4">
+                      {photosArray.map((photo: string, index: number) => (
+                        <div key={index} className="aspect-square rounded-lg overflow-hidden border border-gray-200 bg-gray-100">
+                          <img
+                            src={photo.startsWith('data:') || photo.startsWith('http') ? photo : `http://localhost:8000${photo}`}
+                            alt={`${pet.name} - фото ${index + 1}`}
+                            className="w-full h-full object-cover cursor-pointer hover:opacity-90 transition-opacity"
+                            onClick={() => {
+                              // TODO: Открыть фото в полноэкранном режиме
+                            }}
+                            onError={(e) => {
+                              console.error('Error loading image:', photo.substring(0, 50));
+                              e.currentTarget.src = 'data:image/svg+xml,%3Csvg xmlns="http://www.w3.org/2000/svg" width="100" height="100"%3E%3Crect fill="%23ddd" width="100" height="100"/%3E%3Ctext fill="%23999" x="50%25" y="50%25" text-anchor="middle" dy=".3em"%3EФото%3C/text%3E%3C/svg%3E';
+                            }}
+                          />
+                        </div>
+                      ))}
+                    </div>
+                  </div>
+                );
+              }
+            } catch (e) {
+              console.error('Error parsing photos:', e);
+            }
+            return null;
+          })()}
 
           {/* О питомце */}
           <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
