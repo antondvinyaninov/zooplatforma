@@ -11,18 +11,19 @@ import {
   PetEventType 
 } from '../../../lib/petid-api';
 import { PlusIcon, FunnelIcon } from '@heroicons/react/24/outline';
+import AddEventModal from './AddEventModal';
 
 interface PetEventsTimelineProps {
   petId: number;
   isOwner: boolean;
-  onAddEvent?: () => void;
 }
 
-export default function PetEventsTimeline({ petId, isOwner, onAddEvent }: PetEventsTimelineProps) {
+export default function PetEventsTimeline({ petId, isOwner }: PetEventsTimelineProps) {
   const [events, setEvents] = useState<PetEvent[]>([]);
   const [loading, setLoading] = useState(true);
   const [selectedTypes, setSelectedTypes] = useState<PetEventType[]>([]);
   const [showFilters, setShowFilters] = useState(false);
+  const [showAddModal, setShowAddModal] = useState(false);
 
   useEffect(() => {
     loadEvents();
@@ -169,8 +170,16 @@ export default function PetEventsTimeline({ petId, isOwner, onAddEvent }: PetEve
   }
 
   return (
-    <div className="space-y-4">
-      {/* Header with filters */}
+    <>
+      <AddEventModal
+        petId={petId}
+        isOpen={showAddModal}
+        onClose={() => setShowAddModal(false)}
+        onSuccess={loadEvents}
+      />
+      
+      <div className="space-y-4">
+        {/* Header with filters */}
       <div className="flex flex-col sm:flex-row justify-between items-start sm:items-center gap-3">
         <h2 className="text-lg font-semibold text-gray-900">История событий</h2>
         
@@ -191,7 +200,7 @@ export default function PetEventsTimeline({ petId, isOwner, onAddEvent }: PetEve
           
           {isOwner && (
             <button
-              onClick={onAddEvent}
+              onClick={() => setShowAddModal(true)}
               className="flex items-center gap-2 px-4 py-2 bg-blue-500 text-white rounded-lg hover:bg-blue-600 transition-colors"
             >
               <PlusIcon className="w-5 h-5" />
@@ -305,6 +314,7 @@ export default function PetEventsTimeline({ petId, isOwner, onAddEvent }: PetEve
           </div>
         </div>
       )}
-    </div>
+      </div>
+    </>
   );
 }

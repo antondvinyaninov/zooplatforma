@@ -399,6 +399,7 @@ func getAllPets(w http.ResponseWriter, _ *http.Request) {
 			&pet.BloodType, &pet.Allergies, &pet.ChronicDiseases, &pet.CurrentMedications,
 			&pet.PedigreeNumber, &pet.RegistrationOrg,
 			&pet.CuratorID, &pet.CuratorName, &pet.CuratorPhone, &pet.Location, &pet.FosterAddress, &pet.ShelterName,
+			&pet.City, &pet.Region, &pet.Urgent, &pet.ContactName, &pet.ContactPhone, &pet.OrganizationID,
 		)
 		if err != nil {
 			sendError(w, "Failed to scan pet: "+err.Error(), http.StatusInternalServerError)
@@ -493,7 +494,8 @@ func getPetsByUser(w http.ResponseWriter, _ *http.Request, userIDStr string) {
 		       distinctive_marks, owner_name, owner_address, owner_phone, owner_email,
 		       blood_type, allergies, chronic_diseases, current_medications,
 		       pedigree_number, registration_org,
-		       curator_id, curator_name, curator_phone, location, foster_address, shelter_name
+		       curator_id, curator_name, curator_phone, location, foster_address, shelter_name,
+		       city, region, urgent, contact_name, contact_phone, organization_id
 		FROM pets
 		WHERE user_id = ?
 		ORDER BY created_at DESC
@@ -521,6 +523,7 @@ func getPetsByUser(w http.ResponseWriter, _ *http.Request, userIDStr string) {
 			&pet.BloodType, &pet.Allergies, &pet.ChronicDiseases, &pet.CurrentMedications,
 			&pet.PedigreeNumber, &pet.RegistrationOrg,
 			&pet.CuratorID, &pet.CuratorName, &pet.CuratorPhone, &pet.Location, &pet.FosterAddress, &pet.ShelterName,
+			&pet.City, &pet.Region, &pet.Urgent, &pet.ContactName, &pet.ContactPhone, &pet.OrganizationID,
 		)
 		if err != nil {
 			sendError(w, "Failed to scan pet: "+err.Error(), http.StatusInternalServerError)
@@ -547,7 +550,8 @@ func getPetsByStatus(w http.ResponseWriter, _ *http.Request, status string) {
 		       distinctive_marks, owner_name, owner_address, owner_phone, owner_email,
 		       blood_type, allergies, chronic_diseases, current_medications,
 		       pedigree_number, registration_org,
-		       curator_id, curator_name, curator_phone, location, foster_address, shelter_name
+		       curator_id, curator_name, curator_phone, location, foster_address, shelter_name,
+		       city, region, urgent, contact_name, contact_phone, organization_id
 		FROM pets
 		WHERE status = ?
 		ORDER BY created_at DESC
@@ -575,6 +579,7 @@ func getPetsByStatus(w http.ResponseWriter, _ *http.Request, status string) {
 			&pet.BloodType, &pet.Allergies, &pet.ChronicDiseases, &pet.CurrentMedications,
 			&pet.PedigreeNumber, &pet.RegistrationOrg,
 			&pet.CuratorID, &pet.CuratorName, &pet.CuratorPhone, &pet.Location, &pet.FosterAddress, &pet.ShelterName,
+			&pet.City, &pet.Region, &pet.Urgent, &pet.ContactName, &pet.ContactPhone, &pet.OrganizationID,
 		)
 		if err != nil {
 			sendError(w, "Failed to scan pet: "+err.Error(), http.StatusInternalServerError)

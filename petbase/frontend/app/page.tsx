@@ -141,16 +141,33 @@ export default function PetBaseDashboard() {
       }
     } else if (activeTab === 'pets') {
       // Загружаем питомцев
-      // Временно для разработки: используем X-User-ID заголовок
-      // TODO: Заменить на JWT токен после внедрения полной аутентификации
-      const response = await fetch('http://localhost:8100/api/pets', {
-        headers: {
-          'X-User-ID': '1', // Временно: ID администратора
-        },
-      });
-      const result = await response.json();
-      if (result.success) {
-        setPets(result.data || []);
+      // Получаем текущего пользователя из Main API
+      try {
+        const meResponse = await fetch('http://localhost:8000/api/auth/me', {
+          credentials: 'include',
+        });
+        
+        if (meResponse.ok) {
+          const meResult = await meResponse.json();
+          if (meResult.success && meResult.data) {
+            const userId = meResult.data.id;
+            
+            // Загружаем питомцев пользователя
+            const response = await fetch('http://localhost:8100/api/pets', {
+              headers: {
+                'X-User-ID': userId.toString(),
+              },
+              credentials: 'include',
+            });
+            const result = await response.json();
+            if (result.success) {
+              setPets(result.data || []);
+            }
+          }
+        }
+      } catch (error) {
+        console.error('Error loading pets:', error);
+        setPets([]);
       }
     } else if (activeTab === 'stats') {
       // Загружаем все для статистики

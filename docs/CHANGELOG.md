@@ -25,13 +25,58 @@
 
 ## [Unreleased]
 
+### Added
+- **Модальное окно добавления события питомца (AddEventModal)**
+  - Форма создания события с выбором типа (10 типов: общее, вакцинация, лечение, смена владельца, потеря, находка, смерть, приют, усыновление, документ)
+  - Динамические поля в зависимости от типа события:
+    - Вакцинация: название вакцины, серия, дата следующей вакцинации
+    - Лечение: название препарата, дозировка
+    - Смена владельца: предыдущий/новый владелец, причина передачи
+    - Потеря/Находка: место, обстоятельства, контактное лицо, телефон
+    - Смерть: причина смерти (выбор из списка)
+    - Приют/Усыновление: название приюта, номер договора
+  - Валидация обязательных полей (тип события, дата)
+  - Автоматическая перезагрузка timeline после успешного добавления
+  - Файл: `main/frontend/app/components/pets/AddEventModal.tsx`
+  - Файл: `petbase/frontend/app/components/pets/AddEventModal.tsx` (копия для ЗооБазы)
+  - API: POST /api/petid/:id/events
+
+### Changed
+- **Компонент PetEventsTimeline обновлён**
+  - Удалён пропс `onAddEvent` - теперь модальное окно управляется внутри компонента
+  - Добавлен state `showAddModal` для управления видимостью модального окна
+  - Кнопка "Добавить событие" теперь открывает модальное окно AddEventModal
+  - Файл: `main/frontend/app/components/pets/PetEventsTimeline.tsx`
+- **Страница питомца обновлена**
+  - Убран пропс `onAddEvent` из PetEventsTimeline
+  - Упрощена интеграция - модальное окно теперь внутри компонента timeline
+  - Файл: `main/frontend/app/(main)/pets/[id]/page.tsx`
+
 ### Fixed
 - **CORS для PetBase frontend**
   - Проблема: PetBase frontend (localhost:4100) не мог обращаться к Main API из-за CORS
+  - Решение: добавлен `http://localhost:4100` в список allowedOrigins в Main backend
+  - Файл: `main/backend/main.go`
+- **Загрузка питомцев в PetBase frontend**
+  - Проблема: GET /api/pets возвращал 500 ошибку из-за несоответствия полей в SELECT и Scan
+  - Причина: в функциях `getPetsByUser` и `getPetsByStatus` отсутствовали поля каталога (city, region, urgent, contact_name, contact_phone, organization_id)
+  - Решение: добавлены поля каталога в SELECT запросы и Scan для обеих функций
+  - Файл: `petbase/backend/handlers/pets.go`
+- **Хардкод user_id в PetBase frontend**
+  - Проблема: использовался хардкод `'X-User-ID': '1'` вместо реального user_id
+  - Решение: добавлен запрос к `/api/auth/me` для получения user_id из SSO сессии
+  - Файл: `petbase/frontend/app/page.tsx`
   - Ошибка: "Access-Control-Allow-Origin header has a value 'http://localhost:3000' that is not equal to the supplied origin"
   - Решение: добавлен `http://localhost:4100` в список разрешённых origins
   - Теперь PetBase frontend может использовать SSO авторизацию через Main API
   - Файл: `main/backend/main.go`
+
+- **Загрузка питомцев в PetBase frontend**
+  - Проблема: GET /api/pets возвращал 500 ошибку из-за хардкода user_id
+  - Было: использовался хардкод `'X-User-ID': '1'`
+  - Стало: получаем реальный user_id из `/api/auth/me` (SSO сессия)
+  - Теперь каждый пользователь видит только своих питомцев
+  - Файл: `petbase/frontend/app/page.tsx`
 
 ## [Unreleased]
 

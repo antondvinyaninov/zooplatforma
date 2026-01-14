@@ -424,10 +424,6 @@ export default function PetPage() {
                 <PetEventsTimeline 
                   petId={pet.id} 
                   isOwner={currentUserId === pet.user_id}
-                  onAddEvent={() => {
-                    // TODO: Открыть модальное окно добавления события
-                    console.log('Add event clicked');
-                  }}
                 />
               )}
             </div>
