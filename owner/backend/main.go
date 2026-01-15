@@ -109,10 +109,33 @@ func main() {
 	db := database.DB
 	authMiddleware := middleware.AuthMiddleware(db)
 
-	// Owner endpoints
-	http.Handle("/api/my-pets", enableCORSHandler(authMiddleware(http.HandlerFunc(handlers.GetMyPets(db)))))
-	http.Handle("/api/pets/events", enableCORSHandler(authMiddleware(http.HandlerFunc(handlers.GetPetEvents(db)))))
+	// Owner endpoints - прямые запросы к базе данных
+	http.Handle("/api/pets", enableCORSHandler(authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == "GET" {
+			handlers.GetMyPets(db)(w, r)
+		} else if r.Method == "POST" {
+			handlers.CreatePet(db)(w, r)
+		} else {
+			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		}
+	}))))
+	http.Handle("/api/pets/", enableCORSHandler(authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("🔀 Route /api/pets/ - Method: %s, Path: %s", r.Method, r.URL.Path)
+		// Проверяем, это запрос на загрузку фото или получение питомца
+		if strings.HasSuffix(r.URL.Path, "/photo") && r.Method == "POST" {
+			log.Printf("📸 Routing to UploadPetPhoto handler")
+			handlers.UploadPetPhoto(db)(w, r)
+		} else {
+			log.Printf("🐾 Routing to GetPet handler")
+			handlers.GetPet(db)(w, r)
+		}
+	}))))
 	http.Handle("/api/profile", enableCORSHandler(authMiddleware(http.HandlerFunc(handlers.GetProfile(db)))))
+	http.Handle("/api/breeds", enableCORSHandler(authMiddleware(http.HandlerFunc(handlers.GetBreeds(db)))))
+
+	// Static files - раздача загруженных файлов из общей папки
+	http.Handle("/uploads/", enableCORSHandler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("../../uploads")))))
+	log.Println("📁 Static files: /uploads/ -> ../../uploads")
 
 	// Root route - должен быть последним!
 	http.HandleFunc("/", enableCORS(handleRoot))
@@ -155,6 +178,47 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 }
 
 func createTables() error {
+	db := database.DB
+
+	// Create treatments table
+	query := `
+	CREATE TABLE IF NOT EXISTS treatments (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		pet_id INTEGER NOT NULL,
+		user_id INTEGER NOT NULL,
+		date DATETIME NOT NULL,
+		medication TEXT NOT NULL,
+		dosage TEXT NOT NULL,
+		next_date DATETIME,
+		notes TEXT,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		updated_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_treatments_pet_id ON treatments(pet_id);
+	CREATE INDEX IF NOT EXISTS idx_treatments_user_id ON treatments(user_id);
+	CREATE INDEX IF NOT EXISTS idx_treatments_next_date ON treatments(next_date);
+	CREATE INDEX IF NOT EXISTS idx_treatments_date ON treatments(date);
+	`
+
+	if _, err := db.Exec(query); err != nil {
+		return fmt.Errorf("failed to create treatments table: %w", err)
+	}
+
+	// Create trigger for updated_at
+	triggerQuery := `
+	CREATE TRIGGER IF NOT EXISTS update_treatments_timestamp 
+	AFTER UPDATE ON treatments
+	FOR EACH ROW
+	BEGIN
+		UPDATE treatments SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+	END;
+	`
+
+	if _, err := db.Exec(triggerQuery); err != nil {
+		return fmt.Errorf("failed to create treatments trigger: %w", err)
+	}
+
 	log.Println("✅ Owner tables created successfully")
 	return nil
 }

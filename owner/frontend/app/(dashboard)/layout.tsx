@@ -44,13 +44,19 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       });
 
       if (!meResponse.ok) {
-        router.push('/auth');
+        // Используем window.location для полного редиректа (избегаем цикла)
+        if (typeof window !== 'undefined') {
+          window.location.href = '/auth';
+        }
         return;
       }
 
       const meResult = await meResponse.json();
       if (!meResult.success) {
-        router.push('/auth');
+        // Используем window.location для полного редиректа (избегаем цикла)
+        if (typeof window !== 'undefined') {
+          window.location.href = '/auth';
+        }
         return;
       }
 
@@ -61,7 +67,10 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       });
     } catch (error) {
       console.error('Auth check failed:', error);
-      router.push('/auth');
+      // Используем window.location для полного редиректа (избегаем цикла)
+      if (typeof window !== 'undefined') {
+        window.location.href = '/auth';
+      }
     } finally {
       setLoading(false);
     }

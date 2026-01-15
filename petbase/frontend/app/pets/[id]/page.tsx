@@ -78,7 +78,7 @@ export default function PetDetailPage() {
   const [pet, setPet] = useState<Pet | null>(null);
   const [owner, setOwner] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
-  const [activeSection, setActiveSection] = useState<'info' | 'owner' | 'identification' | 'pedigree' | 'medical' | 'history'>('info');
+  const [activeSection, setActiveSection] = useState<'info' | 'owner' | 'identification' | 'pedigree' | 'medical' | 'history' | 'photos'>('info');
 
   const tabs: AdminTab[] = [
     { id: 'stats', label: 'Статистика', icon: <ChartBarIcon className="w-5 h-5" /> },
@@ -352,6 +352,16 @@ export default function PetDetailPage() {
                 }`}
               >
                 📜 История
+              </button>
+              <button
+                onClick={() => setActiveSection('photos')}
+                className={`px-6 py-3 rounded-lg font-medium transition-colors whitespace-nowrap ${
+                  activeSection === 'photos'
+                    ? 'bg-white text-blue-600 shadow-sm'
+                    : 'text-gray-600 hover:text-gray-900 hover:bg-gray-100'
+                }`}
+              >
+                📸 Фото
               </button>
             </div>
           </div>
@@ -1147,6 +1157,49 @@ export default function PetDetailPage() {
                         </p>
                       </div>
                     </div>
+                  </div>
+                </div>
+              </div>
+            )}
+
+            {/* Фото */}
+            {activeSection === 'photos' && (
+              <div className="space-y-6">
+                <h2 className="text-2xl font-bold text-gray-900 mb-6">Фотография питомца</h2>
+                
+                {/* Основное фото */}
+                <div className="bg-gradient-to-br from-pink-50 to-rose-50 rounded-lg p-6 border-2 border-pink-200">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <span className="text-2xl mr-2">📸</span>
+                    Основное фото
+                  </h3>
+                  <div className="flex justify-center">
+                    {pet.photo ? (
+                      <img
+                        src={`http://localhost:8100${pet.photo}`}
+                        alt={pet.name}
+                        className="w-full max-w-md rounded-2xl object-cover shadow-lg"
+                      />
+                    ) : (
+                      <div className="w-full max-w-md aspect-square rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                        <div className="text-center">
+                          <div className="text-6xl mb-2">📷</div>
+                          <p className="text-gray-500">Фото не загружено</p>
+                        </div>
+                      </div>
+                    )}
+                  </div>
+                </div>
+
+                {/* Дополнительные фото */}
+                <div className="bg-gray-50 rounded-lg p-6">
+                  <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center">
+                    <span className="text-2xl mr-2">🖼️</span>
+                    Галерея фотографий
+                  </h3>
+                  <div className="text-sm text-gray-600 text-center py-8">
+                    <div className="text-4xl mb-2">📷</div>
+                    <div>Галерея фотографий будет доступна в следующих версиях</div>
                   </div>
                 </div>
               </div>

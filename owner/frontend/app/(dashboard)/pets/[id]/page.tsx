@@ -198,7 +198,7 @@ export default function ViewPetPage() {
             <div className="relative group">
               {pet.photo ? (
                 <img
-                  src={pet.photo}
+                  src={`http://localhost:8400${pet.photo}`}
                   alt={pet.name}
                   className="w-40 h-40 rounded-3xl object-cover border-4 border-white shadow-2xl group-hover:scale-105 transition-transform duration-300"
                 />
@@ -364,6 +364,19 @@ export default function ViewPetPage() {
             <div className="flex items-center justify-center gap-2">
               <span className="text-xl">📖</span>
               <span>История</span>
+            </div>
+          </button>
+          <button
+            onClick={() => setActiveTab('photos')}
+            className={`flex-1 min-w-fit px-6 py-4 font-semibold text-sm transition-all ${
+              activeTab === 'photos'
+                ? 'bg-gradient-to-r from-pink-500 to-rose-500 text-white shadow-lg'
+                : 'text-gray-600 hover:bg-gray-50 hover:text-gray-900'
+            }`}
+          >
+            <div className="flex items-center justify-center gap-2">
+              <span className="text-xl">📸</span>
+              <span>Фото</span>
             </div>
           </button>
         </div>
@@ -760,6 +773,177 @@ export default function ViewPetPage() {
           )}
         </>
       )}
+
+      {activeTab === 'photos' && (
+        <PhotoUploadTab petId={pet.id} currentPhoto={pet.photo} onPhotoUpdate={loadPet} />
+      )}
+    </div>
+  );
+}
+
+// Компонент для загрузки фото
+function PhotoUploadTab({ petId, currentPhoto, onPhotoUpdate }: { petId: number; currentPhoto?: string; onPhotoUpdate: () => void }) {
+  const [uploading, setUploading] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [preview, setPreview] = useState<string | null>(null);
+
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const file = e.target.files?.[0];
+    if (!file) return;
+
+    console.log('📸 [Frontend] File selected:', file.name, 'size:', file.size, 'type:', file.type);
+
+    // Валидация
+    if (!file.type.startsWith('image/')) {
+      console.error('❌ [Frontend] Invalid file type:', file.type);
+      setError('Пожалуйста, выберите изображение');
+      return;
+    }
+
+    if (file.size > 10 * 1024 * 1024) {
+      console.error('❌ [Frontend] File too large:', file.size);
+      setError('Размер файла не должен превышать 10 МБ');
+      return;
+    }
+
+    setError(null);
+    setUploading(true);
+
+    try {
+      console.log('📸 [Frontend] Creating preview...');
+      // Создаём preview
+      const reader = new FileReader();
+      reader.onloadend = () => {
+        setPreview(reader.result as string);
+        console.log('✅ [Frontend] Preview created');
+      };
+      reader.readAsDataURL(file);
+
+      // Загружаем файл
+      console.log('📸 [Frontend] Creating FormData...');
+      const formData = new FormData();
+      formData.append('photo', file);
+      console.log('📸 [Frontend] FormData created, uploading to:', `http://localhost:8400/api/pets/${petId}/photo`);
+
+      const response = await fetch(`http://localhost:8400/api/pets/${petId}/photo`, {
+        method: 'POST',
+        body: formData,
+        credentials: 'include',
+      });
+
+      console.log('📸 [Frontend] Response status:', response.status, response.statusText);
+      console.log('📸 [Frontend] Response headers:', Object.fromEntries(response.headers.entries()));
+
+      if (response.ok) {
+        const data = await response.json();
+        console.log('✅ [Frontend] Upload successful:', data);
+        // Обновляем данные питомца
+        onPhotoUpdate();
+        setError(null);
+      } else {
+        const errorText = await response.text();
+        console.error('❌ [Frontend] Upload failed:', response.status, errorText);
+        const errorData = JSON.parse(errorText || '{}');
+        setError(errorData.error || 'Не удалось загрузить фото');
+        setPreview(null);
+      }
+    } catch (err) {
+      console.error('❌ [Frontend] Upload error:', err);
+      setError('Ошибка при загрузке фото');
+      setPreview(null);
+    } finally {
+      setUploading(false);
+    }
+  };
+
+  return (
+    <div className="bg-white rounded-2xl shadow-lg overflow-hidden">
+      <div className="bg-gradient-to-r from-pink-50 to-rose-50 px-6 py-4 border-b border-gray-100">
+        <h2 className="text-2xl font-bold text-gray-900 flex items-center gap-2">
+          <span className="text-2xl">📸</span>
+          Фотография питомца
+        </h2>
+      </div>
+      
+      <div className="p-6">
+        {/* Текущее фото */}
+        <div className="mb-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4">Текущее фото</h3>
+          <div className="flex justify-center">
+            {currentPhoto || preview ? (
+              <img
+                src={preview || (currentPhoto ? `http://localhost:8400${currentPhoto}` : '')}
+                alt="Фото питомца"
+                className="w-64 h-64 rounded-2xl object-cover shadow-lg"
+              />
+            ) : (
+              <div className="w-64 h-64 rounded-2xl bg-gradient-to-br from-gray-100 to-gray-200 flex items-center justify-center">
+                <div className="text-center">
+                  <div className="text-6xl mb-2">📷</div>
+                  <p className="text-gray-500">Фото не загружено</p>
+                </div>
+              </div>
+            )}
+          </div>
+        </div>
+
+        {/* Форма загрузки */}
+        <div className="border-2 border-dashed border-gray-300 rounded-xl p-8 text-center hover:border-blue-400 transition-colors">
+          <input
+            type="file"
+            id="photo-upload"
+            accept="image/*"
+            onChange={handleFileSelect}
+            disabled={uploading}
+            className="hidden"
+          />
+          <label
+            htmlFor="photo-upload"
+            className={`cursor-pointer ${uploading ? 'opacity-50 cursor-not-allowed' : ''}`}
+          >
+            <div className="text-6xl mb-4">📤</div>
+            <h3 className="text-xl font-semibold text-gray-900 mb-2">
+              {uploading ? 'Загрузка...' : 'Загрузить новое фото'}
+            </h3>
+            <p className="text-gray-600 mb-4">
+              Нажмите или перетащите файл сюда
+            </p>
+            <p className="text-sm text-gray-500">
+              Поддерживаются: JPG, PNG, WEBP (макс. 10 МБ)
+            </p>
+          </label>
+        </div>
+
+        {/* Ошибка */}
+        {error && (
+          <div className="mt-4 bg-red-50 border border-red-200 rounded-lg p-4 text-red-700">
+            {error}
+          </div>
+        )}
+
+        {/* Подсказки */}
+        <div className="mt-6 bg-blue-50 border border-blue-200 rounded-lg p-4">
+          <h4 className="font-semibold text-blue-900 mb-2">💡 Советы для лучшего фото:</h4>
+          <ul className="text-sm text-blue-800 space-y-1">
+            <li>• Фотографируйте при хорошем освещении</li>
+            <li>• Питомец должен быть в фокусе</li>
+            <li>• Избегайте размытых изображений</li>
+            <li>• Лучше всего подходят портретные фото</li>
+          </ul>
+        </div>
+
+        {/* Галерея фотографий */}
+        <div className="mt-6 bg-gray-50 rounded-lg p-6">
+          <h3 className="text-lg font-semibold text-gray-900 mb-4 flex items-center gap-2">
+            <span className="text-2xl">🖼️</span>
+            Галерея фотографий
+          </h3>
+          <div className="text-sm text-gray-600 text-center py-8">
+            <div className="text-4xl mb-2">📷</div>
+            <div>Галерея фотографий будет доступна в следующих версиях</div>
+          </div>
+        </div>
+      </div>
     </div>
   );
 }

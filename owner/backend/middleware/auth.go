@@ -69,6 +69,9 @@ func ValidateToken(tokenString string) (int, error) {
 func AuthMiddleware(db interface{}) func(http.Handler) http.Handler {
 	return func(next http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+			log.Printf("🔐 Auth check for %s %s", r.Method, r.URL.Path)
+			log.Printf("   Cookies: %v", r.Cookies())
+
 			cookie, err := r.Cookie("auth_token")
 			if err != nil {
 				log.Printf("❌ Cookie not found: %v\n", err)
@@ -77,6 +80,8 @@ func AuthMiddleware(db interface{}) func(http.Handler) http.Handler {
 				w.Write([]byte(`{"success": false, "error": "Unauthorized: no auth token"}`))
 				return
 			}
+
+			log.Printf("🍪 Found cookie: %s (length: %d)", cookie.Name, len(cookie.Value))
 
 			userID, err := ValidateToken(cookie.Value)
 			if err != nil {

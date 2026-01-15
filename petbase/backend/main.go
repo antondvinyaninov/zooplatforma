@@ -103,6 +103,10 @@ func main() {
 	// PetID Events routes - история событий питомцев
 	http.HandleFunc("/api/petid/", enableCORS(handlePetIDRoutes))
 
+	// Static files - раздача загруженных файлов
+	http.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("../../uploads"))))
+	log.Println("📁 Static files: /uploads/ -> ../../uploads")
+
 	// Root route - должен быть последним!
 	http.HandleFunc("/", enableCORS(handleRoot))
 
