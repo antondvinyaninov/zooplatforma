@@ -24,6 +24,8 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 		allowedOrigins := map[string]bool{
 			"http://localhost:3000": true, // Основной сайт (development)
 			"http://localhost:4100": true, // ЗооБаза Frontend (development)
+			"http://localhost:6100": true, // Кабинет владельца (development)
+			"http://localhost:6200": true, // Кабинет волонтёра (development)
 		}
 
 		// Добавляем origins из .env

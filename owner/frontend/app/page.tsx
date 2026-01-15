@@ -27,7 +27,7 @@ export default function Home() {
       }
 
       // Если авторизован - переходим в дашборд
-      router.push('/pets');
+      router.push('/overview');
     } catch (error) {
       console.error('Failed to check auth:', error);
       router.push('/auth');
