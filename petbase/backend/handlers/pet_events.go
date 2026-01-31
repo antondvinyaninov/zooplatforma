@@ -354,3 +354,70 @@ func nullInt(i int) interface{} {
 	}
 	return i
 }
+
+// CreatePetEventSimpleHandler - создание события через POST /api/pet-events
+// Используется клиниками для создания событий
+func CreatePetEventSimpleHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("📝 CreatePetEventSimpleHandler called: %s %s", r.Method, r.URL.Path)
+
+	if r.Method != http.MethodPost {
+		sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Парсим тело запроса
+	var req struct {
+		PetID       int     `json:"pet_id"`
+		EventType   string  `json:"event_type"`
+		EventDate   string  `json:"event_date"`
+		Description string  `json:"description"`
+		ClinicID    *int    `json:"clinic_id"`
+		VetID       *int    `json:"vet_id"`
+		Notes       *string `json:"notes"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		log.Printf("❌ Invalid request body: %v", err)
+		sendError(w, "Invalid request body", http.StatusBadRequest)
+		return
+	}
+
+	// Валидация
+	if req.PetID == 0 {
+		sendError(w, "Pet ID is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.EventType == "" {
+		sendError(w, "Event type is required", http.StatusBadRequest)
+		return
+	}
+
+	if req.EventDate == "" {
+		sendError(w, "Event date is required", http.StatusBadRequest)
+		return
+	}
+
+	// Создаём событие
+	result, err := database.DB.Exec(`
+		INSERT INTO pet_events (
+			pet_id, event_type, event_date, description,
+			clinic_id, vet_id, notes, created_at
+		) VALUES (?, ?, ?, ?, ?, ?, ?, datetime('now'))
+	`, req.PetID, req.EventType, req.EventDate, req.Description,
+		req.ClinicID, req.VetID, req.Notes)
+
+	if err != nil {
+		log.Printf("❌ Database error: %v", err)
+		sendError(w, "Failed to create event", http.StatusInternalServerError)
+		return
+	}
+
+	eventID, _ := result.LastInsertId()
+	log.Printf("✅ Event created: id=%d, pet_id=%d, type=%s", eventID, req.PetID, req.EventType)
+
+	sendSuccess(w, map[string]interface{}{
+		"id":      eventID,
+		"message": "Event created successfully",
+	})
+}

@@ -100,6 +100,11 @@ export interface CreatePetData {
   sex: Pet['sex'];
   color: string;
   weight?: number;
+  chip_number?: string;
+  tattoo_number?: string;
+  passport_number?: string;
+  sterilized?: boolean;
+  sterilization_date?: string;
   special_marks?: string;
   character?: string;
   health_notes?: string;
@@ -109,6 +114,8 @@ export interface CreatePetData {
   emergency_phone?: string;
   insurance_company?: string;
   insurance_policy?: string;
+  city?: string;
+  region?: string;
 }
 
 export interface CreateTreatmentData {

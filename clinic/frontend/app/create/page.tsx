@@ -23,7 +23,7 @@ export default function CreateClinic() {
 
   const checkAuth = async () => {
     try {
-      const meResponse = await fetch('http://localhost:8000/api/auth/me', {
+      const meResponse = await fetch('http://localhost:7100/api/auth/me', {
         method: 'GET',
         credentials: 'include',
       });

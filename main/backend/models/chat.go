@@ -1,6 +1,8 @@
 package models
 
-import "time"
+import (
+	"time"
+)
 
 // Chat представляет диалог между двумя пользователями
 type Chat struct {
@@ -26,7 +28,8 @@ type Message struct {
 	Content    string     `json:"content"`
 	IsRead     bool       `json:"is_read"`
 	ReadAt     *time.Time `json:"read_at"`
-	CreatedAt  time.Time  `json:"created_at"`
+	CreatedAt  *time.Time `json:"created_at"`       // Используем указатель для поддержки NULL
+	PetID      *int       `json:"pet_id,omitempty"` // ID животного если это сообщение с животным
 
 	// Дополнительные поля для UI
 	Sender      *User               `json:"sender,omitempty"`

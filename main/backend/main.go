@@ -10,7 +10,11 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+	"github.com/zooplatforma/pkg/clients"
 )
+
+// Global AuthClient
+var authClient *clients.AuthClient
 
 func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -21,15 +25,23 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 			"http://localhost:3000": true, // Main frontend
 			"http://localhost:4000": true, // Admin frontend
 			"http://localhost:4100": true, // PetBase frontend
+			"http://localhost:5100": true, // Shelter frontend
 			"http://localhost:6100": true, // Owner frontend
+			"http://localhost:6200": true, // Volunteer frontend
+			"http://localhost:6300": true, // Clinic frontend
 		}
 
-		// Если origin не указан или не в списке разрешённых, используем дефолтный
-		if origin == "" || !allowedOrigins[origin] {
-			origin = "http://localhost:3000"
+		// Если origin в списке разрешённых, используем его
+		if allowedOrigins[origin] {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+		} else if origin == "" {
+			// Если origin не указан, используем дефолтный
+			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:3000")
+		} else {
+			// Origin не разрешён - не устанавливаем заголовок
+			log.Printf("⚠️ Blocked request from unauthorized origin: %s", origin)
 		}
 
-		w.Header().Set("Access-Control-Allow-Origin", origin)
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
@@ -60,6 +72,14 @@ func main() {
 	// Initialize JWT Secret AFTER loading .env
 	middleware.InitJWTSecret()
 
+	// Initialize AuthClient
+	authServiceURL := os.Getenv("AUTH_SERVICE_URL")
+	if authServiceURL == "" {
+		authServiceURL = "http://localhost:7100"
+	}
+	authClient = clients.NewAuthClient(authServiceURL)
+	log.Printf("✅ AuthClient initialized: %s\n", authServiceURL)
+
 	// Initialize database
 	if err := database.InitDB(); err != nil {
 		log.Fatal("Failed to initialize database:", err)
@@ -88,8 +108,21 @@ func main() {
 	http.HandleFunc("/api/posts/user/", enableCORS(handlers.UserPostsHandler))                 // Публичный endpoint для просмотра постов пользователя
 	http.HandleFunc("/api/posts/pet/", enableCORS(handlers.PetPostsHandler))                   // Публичный endpoint для просмотра постов питомца
 	http.HandleFunc("/api/posts/organization/", enableCORS(handlers.OrganizationPostsHandler)) // Публичный endpoint для просмотра постов организации
-	http.HandleFunc("/api/posts", enableCORS(handlers.PostsHandler))                           // GET публичный, POST требует авторизации (проверка внутри handler)
-	http.HandleFunc("/api/posts/", enableCORS(middleware.AuthMiddleware(handlers.PostHandler)))
+	// /api/posts - GET с опциональной авторизацией, POST требует авторизации
+	http.HandleFunc("/api/posts", enableCORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodPost {
+			middleware.AuthMiddleware(http.HandlerFunc(handlers.PostsHandler)).ServeHTTP(w, r)
+		} else {
+			middleware.OptionalAuthMiddleware(http.HandlerFunc(handlers.PostsHandler)).ServeHTTP(w, r)
+		}
+	}))
+	http.HandleFunc("/api/posts/", enableCORS(func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodGet {
+			middleware.OptionalAuthMiddleware(http.HandlerFunc(handlers.PostHandler)).ServeHTTP(w, r)
+		} else {
+			middleware.AuthMiddleware(http.HandlerFunc(handlers.PostHandler)).ServeHTTP(w, r)
+		}
+	}))
 
 	// Comments
 	http.HandleFunc("/api/comments/post/", enableCORS(middleware.AuthMiddleware(handlers.CommentsHandler)))
@@ -100,8 +133,9 @@ func main() {
 
 	// Pets
 	http.HandleFunc("/api/pets", enableCORS(middleware.AuthMiddleware(handlers.PetsHandler)))
-	http.HandleFunc("/api/pets/user/", enableCORS(handlers.UserPetsHandler)) // Публичный endpoint для просмотра питомцев
-	http.HandleFunc("/api/pets/", enableCORS(middleware.AuthMiddleware(handlers.PetHandler)))
+	http.HandleFunc("/api/pets/user/", enableCORS(handlers.UserPetsHandler))       // Публичный endpoint для просмотра питомцев
+	http.HandleFunc("/api/pets/curated/", enableCORS(handlers.CuratedPetsHandler)) // Публичный endpoint для просмотра курируемых питомцев
+	http.HandleFunc("/api/pets/", enableCORS(handlers.PetHandlerWithConditionalAuth(middleware.AuthMiddleware)))
 
 	// Pet Announcements
 	http.HandleFunc("/api/announcements", enableCORS(middleware.AuthMiddleware(handlers.AnnouncementsHandler)))

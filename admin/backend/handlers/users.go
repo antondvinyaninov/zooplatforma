@@ -86,7 +86,7 @@ func AdminUserHandler(w http.ResponseWriter, r *http.Request) {
 	}
 }
 
-func getUserDetails(w http.ResponseWriter, r *http.Request, userID int) {
+func getUserDetails(w http.ResponseWriter, _ *http.Request, userID int) {
 	var name, email, bio, phone, location, createdAt string
 	err := database.DB.QueryRow(`
 		SELECT name, email, bio, phone, location, created_at

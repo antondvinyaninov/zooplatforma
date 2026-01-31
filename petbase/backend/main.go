@@ -7,15 +7,16 @@ import (
 	"net/http"
 	"os"
 	"petbase/handlers"
-	"petbase/middleware"
 	"strings"
 
 	"github.com/joho/godotenv"
+	"github.com/zooplatforma/pkg/middleware"
 )
 
+// enableCORS - для http.HandlerFunc
 func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("🌐 CORS: %s %s from origin: %s", r.Method, r.URL.Path, r.Header.Get("Origin"))
+		// Убрали verbose логирование для уменьшения шума в консоли
 
 		origin := r.Header.Get("Origin")
 
@@ -26,6 +27,7 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 			"http://localhost:4100": true, // ЗооБаза Frontend (development)
 			"http://localhost:6100": true, // Кабинет владельца (development)
 			"http://localhost:6200": true, // Кабинет волонтёра (development)
+			"http://localhost:6300": true, // Кабинет клиники (development)
 		}
 
 		// Добавляем origins из .env
@@ -42,7 +44,7 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 		} else if origin == "" {
 			// Если origin не указан, используем дефолтный
 			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4100")
-			log.Printf("⚠️ No origin, using default: http://localhost:4100")
+			// Убрали verbose логирование
 		} else {
 			// Origin не разрешён
 			log.Printf("❌ Blocked request from unauthorized origin: %s", origin)
@@ -51,7 +53,7 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 		}
 
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-ID")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-ID, X-Clinic-ID")
 		w.Header().Set("Access-Control-Allow-Credentials", "true")
 
 		if r.Method == "OPTIONS" {
@@ -60,9 +62,63 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 			return
 		}
 
-		log.Printf("➡️ Passing to handler: %s %s", r.Method, r.URL.Path)
+		// Убрали verbose логирование
 		next(w, r)
 	}
+}
+
+// enableCORSMiddleware - для http.Handler (используется с middleware chain)
+func enableCORSMiddleware(next http.Handler) http.Handler {
+	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		log.Printf("🌐 CORS Middleware: %s %s from origin: %s", r.Method, r.URL.Path, r.Header.Get("Origin"))
+
+		origin := r.Header.Get("Origin")
+
+		// Получаем разрешённые origins из переменной окружения
+		allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
+		allowedOrigins := map[string]bool{
+			"http://localhost:3000": true, // Основной сайт (development)
+			"http://localhost:4100": true, // ЗооБаза Frontend (development)
+			"http://localhost:6100": true, // Кабинет владельца (development)
+			"http://localhost:6200": true, // Кабинет волонтёра (development)
+			"http://localhost:6300": true, // Кабинет клиники (development)
+		}
+
+		// Добавляем origins из .env
+		if allowedOriginsEnv != "" {
+			for _, o := range strings.Split(allowedOriginsEnv, ",") {
+				allowedOrigins[strings.TrimSpace(o)] = true
+			}
+		}
+
+		// Проверяем, разрешён ли origin
+		if allowedOrigins[origin] {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			log.Printf("✅ Origin allowed: %s", origin)
+		} else if origin == "" {
+			// Если origin не указан, используем дефолтный
+			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:4100")
+			// Убрали verbose логирование
+		} else {
+			// Origin не разрешён
+			log.Printf("❌ Blocked request from unauthorized origin: %s", origin)
+			http.Error(w, "Forbidden origin", http.StatusForbidden)
+			return
+		}
+
+		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
+		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-ID, X-Clinic-ID")
+		w.Header().Set("Access-Control-Allow-Credentials", "true")
+
+		if r.Method == "OPTIONS" {
+			log.Printf("✅ OPTIONS request handled")
+			w.WriteHeader(http.StatusOK)
+			return
+		}
+
+		log.Printf("➡️ Passing to next middleware/handler: %s %s", r.Method, r.URL.Path)
+		next.ServeHTTP(w, r)
+	})
 }
 
 func main() {
@@ -97,18 +153,27 @@ func main() {
 
 	// Защищённые endpoints (требуют аутентификации)
 	// Pets routes - реальные питомцы пользователей
-	http.HandleFunc("/api/pets", enableCORS(middleware.RequireAuth(handlers.PetsHandler)))
-	http.HandleFunc("/api/pets/", enableCORS(middleware.RequireAuth(handlers.PetDetailHandler)))
+	http.HandleFunc("/api/pets/search", enableCORS(handlers.SearchPetsHandler))                                                // Поиск питомцев (без auth для клиник)
+	http.Handle("/api/pets/user/", middleware.OptionalAuthMiddleware(http.HandlerFunc(enableCORS(handlers.PetDetailHandler)))) // Получение питомцев пользователя (опциональная auth)
+
+	// ВАЖНО: Используем общий middleware из pkg, который работает с Auth Service (7100)
+	// Сначала CORS, потом Auth
+	// POST/PUT/DELETE требуют авторизацию, GET - опциональная
+	http.Handle("/api/pets", enableCORSMiddleware(middleware.AuthMiddleware(http.HandlerFunc(handlers.PetsHandler))))               // POST - создание (требует auth)
+	http.Handle("/api/pets/", enableCORSMiddleware(middleware.OptionalAuthMiddleware(http.HandlerFunc(handlers.PetDetailHandler)))) // GET - просмотр (опциональная auth)
 
 	// PetID Events routes - история событий питомцев
+	http.HandleFunc("/api/pet-events", enableCORS(handlers.CreatePetEventSimpleHandler)) // Создание события (для клиник)
 	http.HandleFunc("/api/petid/", enableCORS(handlePetIDRoutes))
 
-	// Static files - раздача загруженных файлов
-	http.Handle("/uploads/", http.StripPrefix("/uploads/", http.FileServer(http.Dir("../../uploads"))))
-	log.Println("📁 Static files: /uploads/ -> ../../uploads")
+	// Static files - раздача загруженных файлов с CORS
+	// Путь от petbase/backend/ к корневой папке uploads/
+	fileServer := http.FileServer(http.Dir("../../uploads"))
+	http.Handle("/uploads/", enableCORSMiddleware(http.StripPrefix("/uploads/", fileServer)))
+	log.Println("📁 Static files: /uploads/ -> ../../uploads (from petbase/backend/)")
 
-	// Root route - должен быть последним!
-	http.HandleFunc("/", enableCORS(handleRoot))
+	// Root route закомментирован - не нужен, мешает статическим файлам
+	// http.HandleFunc("/", enableCORS(handleRoot))
 
 	port := ":8100"
 	fmt.Printf("🐾 ЗооБаза API starting on port %s\n", port)
@@ -133,9 +198,15 @@ func getAllowedOrigins() string {
 }
 
 func handleRoot(w http.ResponseWriter, r *http.Request) {
-	// Только для корневого пути, не для всех остальных
+	// Только для корневого пути
+	// НЕ обрабатываем /uploads/ - это статические файлы
 	if r.URL.Path != "/" {
-		http.NotFound(w, r)
+		// Если это не корень и не начинается с /uploads/, возвращаем 404
+		if !strings.HasPrefix(r.URL.Path, "/uploads/") {
+			http.NotFound(w, r)
+			return
+		}
+		// Для /uploads/ пропускаем дальше (обработает FileServer)
 		return
 	}
 	w.Header().Set("Content-Type", "application/json")
@@ -153,11 +224,13 @@ func handlePetIDRoutes(w http.ResponseWriter, r *http.Request) {
 
 	// /api/petid/:id/events - история событий
 	if strings.Contains(path, "/events") {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			handlers.GetPetEventsHandler(w, r)
-		} else if r.Method == http.MethodPost {
-			middleware.RequireAuth(handlers.CreatePetEventHandler)(w, r)
-		} else {
+		case http.MethodPost:
+			// Используем AuthMiddleware для POST запросов
+			middleware.AuthMiddleware(http.HandlerFunc(handlers.CreatePetEventHandler)).ServeHTTP(w, r)
+		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 		return
@@ -165,9 +238,10 @@ func handlePetIDRoutes(w http.ResponseWriter, r *http.Request) {
 
 	// /api/petid/:id/medical - медицинская история
 	if strings.Contains(path, "/medical") {
-		if r.Method == http.MethodGet {
+		switch r.Method {
+		case http.MethodGet:
 			handlers.GetPetMedicalHistoryHandler(w, r)
-		} else {
+		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 		return

@@ -15,7 +15,7 @@ export default function AuthPage() {
   const checkAuth = async () => {
     try {
       // Проверяем, авторизован ли уже пользователь
-      const meResponse = await fetch('http://localhost:8000/api/auth/me', {
+      const meResponse = await fetch('http://localhost:7100/api/auth/me', {
         method: 'GET',
         credentials: 'include',
       });

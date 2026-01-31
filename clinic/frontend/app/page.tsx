@@ -7,7 +7,15 @@ export default function Home() {
   const router = useRouter();
 
   useEffect(() => {
-    router.push('/auth');
+    // Проверяем есть ли выбранная клиника
+    const clinicId = localStorage.getItem('selectedClinicId');
+    if (clinicId) {
+      // Если клиника выбрана - идём в dashboard
+      router.push('/overview');
+    } else {
+      // Если нет - на выбор клиники
+      router.push('/select');
+    }
   }, [router]);
 
   return (

@@ -37,7 +37,7 @@ export default function ShelterDashboard() {
   const [isClient, setIsClient] = useState(false);
   const [animals, setAnimals] = useState<ShelterAnimal[]>([]);
   const [loading, setLoading] = useState(true);
-  const [adminUser, setAdminUser] = useState<{ email: string; role: string } | null>(null);
+  const [adminUser, setAdminUser] = useState<{ email: string; name?: string; avatar?: string; role: string } | null>(null);
   const [stats, setStats] = useState({ total_animals: 0, adopted_this_month: 0, active_volunteers: 0, pending_requests: 0 });
   const [organization, setOrganization] = useState<{ name: string } | null>(null);
 
@@ -66,9 +66,9 @@ export default function ShelterDashboard() {
   const loadData = async () => {
     setLoading(true);
 
-    // Проверяем авторизацию через Admin API (SSO)
+    // Проверяем авторизацию через Main API (SSO)
     try {
-      const meResponse = await fetch('http://localhost:9000/api/admin/auth/me', {
+      const meResponse = await fetch('http://localhost:7100/api/auth/me', {
         method: 'GET',
         credentials: 'include',
       });
@@ -80,14 +80,7 @@ export default function ShelterDashboard() {
         return;
       }
 
-      // Проверяем роль (shelter_admin или выше)
-      const allowedRoles = ['shelter_admin', 'moderator', 'admin', 'superadmin'];
-      if (!allowedRoles.includes(meResult.data?.role)) {
-        router.push('/auth');
-        return;
-      }
-
-      setAdminUser(meResult.data);
+      setAdminUser(meResult.data.user);
 
       // Загружаем информацию о приюте
       const orgResult = await shelterApi.getOrganization();

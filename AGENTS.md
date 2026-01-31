@@ -46,8 +46,8 @@ This repository is a multi-service monorepo (Next.js + Go + shared TS + Expo). U
   - `./tests/performance-test.sh` (perf only)
   - `./tests/api-test.sh` (API only)
 - Planned unit tests (not always present):
-  - Go: `go test ./...` within a backend folder
-  - Frontend: `npm test` in a frontend folder (if configured)
+  - Go: `go test ./...` within a backend folder.
+  - Frontend: `npm test` in a frontend folder (if configured).
 
 ## 2) Code Style & Architecture Guidelines
 

@@ -21,7 +21,7 @@ interface AdminLayoutProps {
   activeTab: string;
   onTabChange: (tabId: string) => void;
   children: ReactNode;
-  adminUser?: { email: string; role: string } | null;
+  adminUser?: { email: string; name?: string; avatar?: string; role: string } | null;
   onLogout?: () => void;
   mainSiteUrl?: string;
 }
@@ -91,21 +91,37 @@ export default function AdminLayout({
                     className="flex items-center gap-2 px-2 py-1 bg-none border-none cursor-pointer rounded-lg transition-colors hover:bg-gray-100"
                     onClick={() => setUserMenuOpen(!userMenuOpen)}
                   >
-                    <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 flex-shrink-0">
-                      <span className="text-sm font-medium">{adminUser.email.charAt(0).toUpperCase()}</span>
-                    </div>
+                    {adminUser.avatar ? (
+                      <img 
+                        src={`http://localhost:8000${adminUser.avatar}`}
+                        alt={adminUser.name || adminUser.email}
+                        className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                      />
+                    ) : (
+                      <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 flex-shrink-0">
+                        <span className="text-sm font-medium">{adminUser.email?.charAt(0).toUpperCase() || '?'}</span>
+                      </div>
+                    )}
                     <span className="text-xs text-gray-400">▼</span>
                   </button>
 
                   {userMenuOpen && (
                     <div className="absolute right-0 top-[calc(100%+8px)] w-[280px] bg-white rounded-lg shadow-lg border border-gray-200 overflow-hidden z-[1000]">
                       <div className="p-4 border-b border-gray-200 flex items-center gap-3">
-                        <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 flex-shrink-0">
-                          <span className="text-sm font-medium">{adminUser.email.charAt(0).toUpperCase()}</span>
-                        </div>
+                        {adminUser.avatar ? (
+                          <img 
+                            src={`http://localhost:8000${adminUser.avatar}`}
+                            alt={adminUser.name || adminUser.email}
+                            className="w-8 h-8 rounded-full object-cover flex-shrink-0"
+                          />
+                        ) : (
+                          <div className="w-8 h-8 rounded-full bg-gray-200 flex items-center justify-center text-gray-600 flex-shrink-0">
+                            <span className="text-sm font-medium">{adminUser.email?.charAt(0).toUpperCase() || '?'}</span>
+                          </div>
+                        )}
                         <div className="flex-1">
-                          <div className="text-sm font-medium text-gray-900 mb-0.5">{adminUser.email}</div>
-                          <div className="text-xs text-gray-600">{adminUser.role}</div>
+                          <div className="text-sm font-medium text-gray-900 mb-0.5">{adminUser.name || adminUser.email || 'Unknown'}</div>
+                          <div className="text-xs text-gray-600">{adminUser.role || 'user'}</div>
                         </div>
                       </div>
 

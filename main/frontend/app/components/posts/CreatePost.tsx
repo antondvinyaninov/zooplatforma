@@ -23,11 +23,21 @@ import { useChunkedUpload, ChunkedUploadProgress } from '../../hooks/useChunkedU
 
 interface CreatePostProps {
   onPostCreated?: () => void;
+  editMode?: boolean;
+  editPost?: {
+    id: number;
+    content: string;
+    attached_pets?: number[];
+    attachments?: any[];
+    tags?: string[];
+    poll?: any;
+  };
+  onPostUpdated?: () => void;
 }
 
 type ReplySettingType = 'anyone' | 'followers' | 'following' | 'mentions';
 
-export default function CreatePost({ onPostCreated }: CreatePostProps) {
+export default function CreatePost({ onPostCreated, editMode = false, editPost, onPostUpdated }: CreatePostProps) {
   const { user } = useAuth();
   const { uploadMultiple, uploading, optimizing } = useMediaUpload();
   const { uploadFile: uploadChunked } = useChunkedUpload();
@@ -66,6 +76,24 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
   const [selectedOrganizationId, setSelectedOrganizationId] = useState<number | null>(null);
   const [showAuthorDropdown, setShowAuthorDropdown] = useState(false);
 
+  // Загружаем данные поста при редактировании
+  useEffect(() => {
+    if (editMode && editPost) {
+      setContent(editPost.content || '');
+      setSelectedPets(editPost.attached_pets || []);
+      if (editPost.attachments && editPost.attachments.length > 0) {
+        setUploadedMedia(editPost.attachments.map(att => ({
+          url: att.url,
+          media_type: att.type === 'video' ? 'video' : 'image',
+          file_name: att.file_name || '',
+          size: att.size || 0,
+        })));
+      }
+      // Открываем модальное окно сразу в режиме редактирования
+      setShowModal(true);
+    }
+  }, [editMode, editPost]);
+
   const handleSubmit = async () => {
     if (!content.trim() && !pollData && uploadedMedia.length === 0) return;
 
@@ -101,7 +129,15 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
         postData.status = 'published'; // Publish immediately
       }
 
-      await apiClient.post('/api/posts', postData);
+      if (editMode && editPost) {
+        // Режим редактирования - PUT запрос
+        await apiClient.put(`/api/posts/${editPost.id}`, postData);
+        onPostUpdated?.();
+      } else {
+        // Режим создания - POST запрос
+        await apiClient.post('/api/posts', postData);
+        onPostCreated?.();
+      }
 
       setContent('');
       setUploadedMedia([]);
@@ -113,9 +149,8 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
       setSelectedAuthor('user');
       setSelectedOrganizationId(null);
       setShowModal(false);
-      onPostCreated?.();
     } catch (error) {
-      console.error('Ошибка создания поста:', error);
+      console.error(editMode ? 'Ошибка обновления поста:' : 'Ошибка создания поста:', error);
     } finally {
       setIsSubmitting(false);
     }
@@ -309,17 +344,19 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
     }
   }, [showPetsModal]);
 
-  // Загрузка организаций при монтировании компонента
+  // Загрузка организаций при монтировании компонента (только если пользователь авторизован)
   useEffect(() => {
-    loadOrganizations();
-  }, []);
+    if (user) {
+      loadOrganizations();
+    }
+  }, [user]);
 
   // Также загружаем при открытии модального окна (для случая когда форма в модалке)
   useEffect(() => {
-    if (showModal) {
+    if (showModal && user) {
       loadOrganizations();
     }
-  }, [showModal]);
+  }, [showModal, user]);
 
   const loadPets = async () => {
     if (!user) return;
@@ -334,12 +371,21 @@ export default function CreatePost({ onPostCreated }: CreatePostProps) {
   };
 
   const loadOrganizations = async () => {
+    // Не загружаем если пользователь не авторизован
+    if (!user) {
+      setOrganizations([]);
+      return;
+    }
+
     try {
       const response = await apiClient.get('/api/organizations/my');
-      console.log('📋 Загружены организации:', response.data);
-      setOrganizations(response.data?.organizations || []);
+      if (response.success && response.data) {
+        setOrganizations(response.data?.organizations || []);
+      } else {
+        setOrganizations([]);
+      }
     } catch (error) {
-      console.error('Ошибка загрузки организаций:', error);
+      // Тихо игнорируем ошибки - организации опциональны
       setOrganizations([]);
     }
   };

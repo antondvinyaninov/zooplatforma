@@ -7,16 +7,16 @@ import (
 	"os"
 	"strings"
 	"volunteer/handlers"
-	"volunteer/middleware"
 
 	"database"
 
 	"github.com/joho/godotenv"
+	"github.com/zooplatforma/pkg/middleware"
 )
 
 func enableCORSHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("🌐 CORS: %s %s from origin: %s", r.Method, r.URL.Path, r.Header.Get("Origin"))
+		// Убрали verbose логирование для уменьшения шума в консоли
 
 		origin := r.Header.Get("Origin")
 		allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
@@ -36,7 +36,7 @@ func enableCORSHandler(next http.Handler) http.Handler {
 			log.Printf("✅ Origin allowed: %s", origin)
 		} else if origin == "" {
 			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:6200")
-			log.Printf("⚠️ No origin, using default: http://localhost:6200")
+			// Убрали verbose логирование
 		}
 
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -49,7 +49,7 @@ func enableCORSHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		log.Printf("➡️ Passing to handler: %s %s", r.Method, r.URL.Path)
+		// Убрали verbose логирование
 		next.ServeHTTP(w, r)
 	})
 }
@@ -87,9 +87,6 @@ func main() {
 		log.Println("Warning: .env file not found")
 	}
 
-	// Initialize JWT secret
-	middleware.InitJWTSecret()
-
 	// Initialize database
 	if err := database.InitDB(); err != nil {
 		log.Fatal("Failed to initialize database:", err)
@@ -102,12 +99,14 @@ func main() {
 
 	// Защищённые endpoints (требуют аутентификации)
 	db := database.DB
-	authMiddleware := middleware.AuthMiddleware(db)
 
 	// Volunteer endpoints
-	http.Handle("/api/my-tasks", enableCORSHandler(authMiddleware(http.HandlerFunc(handlers.GetMyTasks(db)))))
-	http.Handle("/api/my-pets", enableCORSHandler(authMiddleware(http.HandlerFunc(handlers.GetMyPets(db)))))
-	http.Handle("/api/profile", enableCORSHandler(authMiddleware(http.HandlerFunc(handlers.GetProfile(db)))))
+	http.Handle("/api/my-tasks", enableCORSHandler(middleware.AuthMiddleware(http.HandlerFunc(handlers.GetMyTasks(db)))))
+	http.Handle("/api/my-pets", enableCORSHandler(middleware.AuthMiddleware(http.HandlerFunc(handlers.GetMyPets(db)))))
+	http.Handle("/api/profile", enableCORSHandler(middleware.AuthMiddleware(http.HandlerFunc(handlers.GetProfile(db)))))
+	http.Handle("/api/take-custody", enableCORSHandler(middleware.AuthMiddleware(http.HandlerFunc(handlers.TakeCustody(db)))))
+	http.Handle("/api/release-custody", enableCORSHandler(middleware.AuthMiddleware(http.HandlerFunc(handlers.ReleaseCustody(db)))))
+	http.Handle("/api/pets", enableCORSHandler(middleware.AuthMiddleware(http.HandlerFunc(handlers.CreatePet(db)))))
 
 	// Root route - должен быть последним!
 	http.HandleFunc("/", enableCORS(handleRoot))

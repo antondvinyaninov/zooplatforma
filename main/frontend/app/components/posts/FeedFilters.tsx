@@ -4,14 +4,11 @@ import {
   SparklesIcon,
   UserGroupIcon,
   MapPinIcon,
-  MagnifyingGlassIcon,
-  CheckCircleIcon,
-  HomeIcon,
 } from '@heroicons/react/24/outline';
 
 interface FeedFiltersProps {
-  activeFilter: 'for-you' | 'following' | 'city' | 'lost' | 'found' | 'looking-for-home';
-  onFilterChange: (filter: 'for-you' | 'following' | 'city' | 'lost' | 'found' | 'looking-for-home') => void;
+  activeFilter: 'for-you' | 'following' | 'city';
+  onFilterChange: (filter: 'for-you' | 'following' | 'city') => void;
 }
 
 export default function FeedFilters({ activeFilter, onFilterChange }: FeedFiltersProps) {
@@ -19,9 +16,6 @@ export default function FeedFilters({ activeFilter, onFilterChange }: FeedFilter
     { id: 'for-you' as const, label: 'Для вас', icon: SparklesIcon },
     { id: 'following' as const, label: 'Подписки', icon: UserGroupIcon },
     { id: 'city' as const, label: 'Мой город', icon: MapPinIcon },
-    { id: 'lost' as const, label: 'Потерянные', icon: MagnifyingGlassIcon, color: 'text-red-600' },
-    { id: 'found' as const, label: 'Найденные', icon: CheckCircleIcon, color: 'text-green-600' },
-    { id: 'looking-for-home' as const, label: 'Ищут дом', icon: HomeIcon, color: 'text-orange-600' },
   ];
 
   return (
@@ -39,10 +33,10 @@ export default function FeedFilters({ activeFilter, onFilterChange }: FeedFilter
             }`}
           >
             <filter.icon 
-              className={`w-5 h-5 flex-shrink-0 ${filter.color || 'text-gray-600'}`} 
+              className="w-5 h-5 flex-shrink-0 text-gray-600" 
               strokeWidth={2} 
             />
-            <span className={`text-[13px] font-medium ${filter.color || 'text-gray-700'}`}>
+            <span className="text-[13px] font-medium text-gray-700">
               {filter.label}
             </span>
           </button>

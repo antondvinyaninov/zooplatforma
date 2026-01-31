@@ -9,9 +9,8 @@ import PollDisplay from '../polls/PollDisplay';
 import PhotoGrid from './PhotoGrid';
 import { commentsApi, Comment } from '../../../lib/api';
 import { useAuth } from '../../../contexts/AuthContext';
-import Image from 'next/image';
 
-import { getFullName } from '../../../lib/utils';
+import { getFullName, getMediaUrl } from '../../../lib/utils';
 
 interface User {
   id: number;
@@ -96,7 +95,11 @@ export default function PostModal({ post, isOpen, onClose, onCountChange }: Post
 
     if (isOpen) {
       document.addEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'hidden';
+      // Сохраняем текущую позицию скролла
+      const scrollY = window.scrollY;
+      document.body.style.position = 'fixed';
+      document.body.style.top = `-${scrollY}px`;
+      document.body.style.width = '100%';
       loadComments();
     } else {
       setComments([]);
@@ -106,7 +109,14 @@ export default function PostModal({ post, isOpen, onClose, onCountChange }: Post
 
     return () => {
       document.removeEventListener('keydown', handleEscape);
-      document.body.style.overflow = 'unset';
+      if (!isOpen) {
+        // Восстанавливаем позицию скролла
+        const scrollY = document.body.style.top;
+        document.body.style.position = '';
+        document.body.style.top = '';
+        document.body.style.width = '';
+        window.scrollTo(0, parseInt(scrollY || '0') * -1);
+      }
     };
   }, [isOpen, onClose]);
 
@@ -281,7 +291,7 @@ export default function PostModal({ post, isOpen, onClose, onCountChange }: Post
             <div className="flex items-center gap-3 mb-4">
               <div className="w-10 h-10 rounded-full bg-gray-300 flex items-center justify-center text-white font-semibold overflow-hidden">
                 {post.user?.avatar ? (
-                  <img src={post.user.avatar} alt={post.user.name} className="w-full h-full object-cover" />
+                  <img src={getMediaUrl(post.user.avatar) || ''} alt={post.user.name} className="w-full h-full object-cover" />
                 ) : (
                   <UserIcon className="w-6 h-6 text-gray-500" />
                 )}
@@ -383,7 +393,7 @@ export default function PostModal({ post, isOpen, onClose, onCountChange }: Post
               <div className="flex gap-2">
                 <div className="w-8 h-8 rounded-full bg-gray-300 flex items-center justify-center flex-shrink-0 overflow-hidden text-white text-sm font-semibold">
                   {user?.avatar ? (
-                    <Image src={user.avatar} alt={user.name} width={32} height={32} className="object-cover" />
+                    <img src={getMediaUrl(user.avatar) || ''} alt={user.name} className="w-full h-full object-cover" />
                   ) : (
                     <UserIcon className="w-4 h-4 text-gray-500" />
                   )}

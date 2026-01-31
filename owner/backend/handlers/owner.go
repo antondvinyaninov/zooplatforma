@@ -8,12 +8,14 @@ import (
 	"log"
 	"net/http"
 	"os"
-	"owner/middleware"
 	"owner/models"
 	"path/filepath"
 	"strconv"
 	"strings"
+
 	"time"
+
+	pkgmiddleware "github.com/zooplatforma/pkg/middleware"
 )
 
 // GetMyPets возвращает список питомцев текущего пользователя
@@ -21,7 +23,7 @@ import (
 /*
 func GetMyPets(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+		userID, ok := pkgmiddleware.GetUserID(r)
 		if !ok {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -71,7 +73,7 @@ func GetMyPets(db *sql.DB) http.HandlerFunc {
 /*
 func GetPetEvents(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+		userID, ok := pkgmiddleware.GetUserID(r)
 		if !ok {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -136,7 +138,7 @@ func GetPetEvents(db *sql.DB) http.HandlerFunc {
 // GetProfile возвращает профиль текущего пользователя
 func GetProfile(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+		userID, ok := pkgmiddleware.GetUserID(r)
 		if !ok {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -163,84 +165,114 @@ func GetProfile(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// GetMyPets возвращает список питомцев текущего пользователя
+// GetMyPets возвращает список питомцев текущего пользователя через PetBase API
 func GetMyPets(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+		userID, ok := pkgmiddleware.GetUserID(r)
 		if !ok {
 			log.Printf("❌ Unauthorized: no userID in context")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
-		log.Printf("🔍 Getting pets for user_id: %d", userID)
+		log.Printf("🔍 Getting pets for user_id: %d from PetBase", userID)
 
-		rows, err := db.Query(`
-			SELECT 
-				id, user_id, curator_id, organization_id,
-				name, species, breed, 
-				CAST((julianday('now') - julianday(birth_date)) / 365.25 AS INTEGER) as age,
-				gender as sex, color, weight,
-				chip_number, tattoo_number, passport_number,
-				photo as photo_url,
-				status, 'verified' as verification_status,
-				is_sterilized as sterilized, sterilization_date,
-				distinctive_marks as special_marks, character_traits as character,
-				health_notes, allergies, chronic_diseases as chronic_conditions,
-				contact_name as emergency_contact, contact_phone as emergency_phone,
-				'' as insurance_company, '' as insurance_policy,
-				city, region, urgent, contact_phone, contact_name,
-				created_at, updated_at
-			FROM pets
-			WHERE user_id = ?
-			ORDER BY created_at DESC
-		`, userID)
+		// Получаем токен из исходного запроса
+		token := r.Header.Get("Authorization")
+		if token == "" {
+			// Если токена нет в header, пробуем cookie
+			cookie, err := r.Cookie("auth_token")
+			if err == nil {
+				token = "Bearer " + cookie.Value
+			}
+		}
 
-		if err != nil {
-			log.Printf("❌ Error querying pets: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		if token == "" {
+			log.Printf("❌ No token found to forward to PetBase")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
-		defer rows.Close()
 
-		pets := []models.Pet{}
-		for rows.Next() {
-			var pet models.Pet
-			err := rows.Scan(
-				&pet.ID, &pet.OwnerID, &pet.CuratorID, &pet.OrganizationID,
-				&pet.Name, &pet.Species, &pet.Breed,
-				&pet.Age, &pet.Sex, &pet.Color, &pet.Weight,
-				&pet.ChipNumber, &pet.TattooNumber, &pet.PassportNumber,
-				&pet.PhotoURL,
-				&pet.Status, &pet.VerificationStatus,
-				&pet.Sterilized, &pet.SterilizationDate,
-				&pet.SpecialMarks, &pet.Character,
-				&pet.HealthNotes, &pet.Allergies, &pet.ChronicConditions,
-				&pet.EmergencyContact, &pet.EmergencyPhone,
-				&pet.InsuranceCompany, &pet.InsurancePolicy,
-				&pet.City, &pet.Region, &pet.Urgent, &pet.ContactPhone, &pet.ContactName,
-				&pet.CreatedAt, &pet.UpdatedAt,
-			)
-			if err != nil {
-				log.Printf("❌ Error scanning pet: %v", err)
-				continue
-			}
-			pets = append(pets, pet)
+		// Запрос к PetBase API с токеном
+		petbaseURL := fmt.Sprintf("http://localhost:8100/api/pets/user/%d", userID)
+		req, err := http.NewRequest("GET", petbaseURL, nil)
+		if err != nil {
+			log.Printf("❌ Error creating request: %v", err)
+			http.Error(w, "Failed to create request", http.StatusInternalServerError)
+			return
 		}
 
-		log.Printf("✅ Found %d pets for user %d", len(pets), userID)
+		// Передаем токен в PetBase
+		req.Header.Set("Authorization", token)
+		log.Printf("🔐 Forwarding token to PetBase: %s", token[:20]+"...")
 
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("❌ Error calling PetBase API: %v", err)
+			http.Error(w, "Failed to fetch pets from PetBase", http.StatusInternalServerError)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("❌ PetBase returned status: %d", resp.StatusCode)
+			http.Error(w, "Failed to fetch pets from PetBase", resp.StatusCode)
+			return
+		}
+
+		// Читаем ответ от PetBase
+		var petbaseResponse struct {
+			Success bool                     `json:"success"`
+			Data    []map[string]interface{} `json:"data"`
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&petbaseResponse); err != nil {
+			log.Printf("❌ Error decoding PetBase response: %v", err)
+			http.Error(w, "Failed to decode PetBase response", http.StatusInternalServerError)
+			return
+		}
+
+		if !petbaseResponse.Success {
+			log.Printf("❌ PetBase returned success=false")
+			http.Error(w, "PetBase request failed", http.StatusInternalServerError)
+			return
+		}
+
+		// Преобразуем данные: photo → photo_url, gender → sex
+		for i := range petbaseResponse.Data {
+			pet := petbaseResponse.Data[i]
+
+			// Преобразуем photo в photo_url
+			if photo, ok := pet["photo"].(string); ok && photo != "" {
+				pet["photo_url"] = photo
+			}
+
+			// Преобразуем gender в sex
+			if gender, ok := pet["gender"].(string); ok && gender != "" {
+				pet["sex"] = gender
+			}
+
+			// Добавляем verification_status если его нет
+			if _, ok := pet["verification_status"]; !ok {
+				pet["verification_status"] = "verified"
+			}
+		}
+
+		log.Printf("✅ Got %d pets from PetBase for user %d", len(petbaseResponse.Data), userID)
+
+		// Возвращаем преобразованные данные
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
-			"pets": pets,
+			"pets": petbaseResponse.Data,
 		})
 	}
 }
 
-// GetPet возвращает информацию о конкретном питомце
+// GetPet возвращает информацию о конкретном питомце через PetBase API
 func GetPet(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+		userID, ok := pkgmiddleware.GetUserID(r)
 		if !ok {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -254,56 +286,100 @@ func GetPet(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		log.Printf("🔍 Getting pet %d for user %d", petID, userID)
+		log.Printf("🔍 Getting pet %d for user %d from PetBase", petID, userID)
 
-		var pet models.Pet
-		err = db.QueryRow(`
-			SELECT 
-				id, user_id, curator_id, organization_id,
-				name, species, breed, 
-				CAST((julianday('now') - julianday(birth_date)) / 365.25 AS INTEGER) as age,
-				gender as sex, color, weight,
-				chip_number, tattoo_number, passport_number,
-				photo as photo_url,
-				status, 'verified' as verification_status,
-				is_sterilized as sterilized, sterilization_date,
-				distinctive_marks as special_marks, character_traits as character,
-				health_notes, allergies, chronic_diseases as chronic_conditions,
-				contact_name as emergency_contact, contact_phone as emergency_phone,
-				'' as insurance_company, '' as insurance_policy,
-				city, region, urgent, contact_phone, contact_name,
-				created_at, updated_at
-			FROM pets
-			WHERE id = ? AND user_id = ?
-		`, petID, userID).Scan(
-			&pet.ID, &pet.OwnerID, &pet.CuratorID, &pet.OrganizationID,
-			&pet.Name, &pet.Species, &pet.Breed,
-			&pet.Age, &pet.Sex, &pet.Color, &pet.Weight,
-			&pet.ChipNumber, &pet.TattooNumber, &pet.PassportNumber,
-			&pet.PhotoURL,
-			&pet.Status, &pet.VerificationStatus,
-			&pet.Sterilized, &pet.SterilizationDate,
-			&pet.SpecialMarks, &pet.Character,
-			&pet.HealthNotes, &pet.Allergies, &pet.ChronicConditions,
-			&pet.EmergencyContact, &pet.EmergencyPhone,
-			&pet.InsuranceCompany, &pet.InsurancePolicy,
-			&pet.City, &pet.Region, &pet.Urgent, &pet.ContactPhone, &pet.ContactName,
-			&pet.CreatedAt, &pet.UpdatedAt,
-		)
+		// Получаем токен из исходного запроса
+		token := r.Header.Get("Authorization")
+		if token == "" {
+			// Если токена нет в header, пробуем cookie
+			cookie, err := r.Cookie("auth_token")
+			if err == nil {
+				token = "Bearer " + cookie.Value
+			}
+		}
 
-		if err == sql.ErrNoRows {
+		if token == "" {
+			log.Printf("❌ No token found to forward to PetBase")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
+			return
+		}
+
+		// Запрос к PetBase API с токеном
+		petbaseURL := fmt.Sprintf("http://localhost:8100/api/pets/%d", petID)
+		req, err := http.NewRequest("GET", petbaseURL, nil)
+		if err != nil {
+			log.Printf("❌ Error creating request: %v", err)
+			http.Error(w, "Failed to create request", http.StatusInternalServerError)
+			return
+		}
+
+		// Передаем токен в PetBase
+		req.Header.Set("Authorization", token)
+		log.Printf("🔐 Forwarding token to PetBase: %s", token[:20]+"...")
+
+		client := &http.Client{}
+		resp, err := client.Do(req)
+		if err != nil {
+			log.Printf("❌ Error calling PetBase API: %v", err)
+			http.Error(w, "Failed to fetch pet from PetBase", http.StatusInternalServerError)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode == http.StatusNotFound {
 			http.Error(w, "Pet not found", http.StatusNotFound)
 			return
 		}
 
-		if err != nil {
-			log.Printf("❌ Error getting pet: %v", err)
-			http.Error(w, "Internal server error", http.StatusInternalServerError)
+		if resp.StatusCode != http.StatusOK {
+			log.Printf("❌ PetBase returned status: %d", resp.StatusCode)
+			http.Error(w, "Failed to fetch pet from PetBase", resp.StatusCode)
 			return
 		}
 
-		log.Printf("✅ Found pet %d", petID)
+		// Читаем ответ от PetBase
+		var petbaseResponse struct {
+			Success bool                   `json:"success"`
+			Data    map[string]interface{} `json:"data"`
+		}
 
+		if err := json.NewDecoder(resp.Body).Decode(&petbaseResponse); err != nil {
+			log.Printf("❌ Error decoding PetBase response: %v", err)
+			http.Error(w, "Failed to decode PetBase response", http.StatusInternalServerError)
+			return
+		}
+
+		if !petbaseResponse.Success {
+			log.Printf("❌ PetBase returned success=false")
+			http.Error(w, "PetBase request failed", http.StatusInternalServerError)
+			return
+		}
+
+		pet := petbaseResponse.Data
+
+		// Проверяем, что питомец принадлежит пользователю
+		if ownerID, ok := pet["user_id"].(float64); ok && int(ownerID) != userID {
+			log.Printf("❌ Access denied: pet owner %d != user %d", int(ownerID), userID)
+			http.Error(w, "Access denied", http.StatusForbidden)
+			return
+		}
+
+		// Преобразуем данные: photo → photo_url, gender → sex
+		if photo, ok := pet["photo"].(string); ok && photo != "" {
+			pet["photo_url"] = photo
+		}
+
+		if gender, ok := pet["gender"].(string); ok && gender != "" {
+			pet["sex"] = gender
+		}
+
+		if _, ok := pet["verification_status"]; !ok {
+			pet["verification_status"] = "verified"
+		}
+
+		log.Printf("✅ Found pet %d from PetBase", petID)
+
+		// Возвращаем преобразованные данные
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(map[string]interface{}{
 			"pet": pet,
@@ -379,10 +455,10 @@ func GetBreeds(db *sql.DB) http.HandlerFunc {
 	}
 }
 
-// CreatePet создаёт нового питомца
+// CreatePet создаёт нового питомца через PetBase API
 func CreatePet(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+		userID, ok := pkgmiddleware.GetUserID(r)
 		if !ok {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -407,7 +483,7 @@ func CreatePet(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
-		log.Printf("🐾 Creating pet for user %d: %s (%s)", userID, petData.Name, petData.Species)
+		log.Printf("🐾 Creating pet for user %d: %s (%s) via PetBase", userID, petData.Name, petData.Species)
 
 		// Вычисляем дату рождения из возраста
 		birthDate := ""
@@ -415,72 +491,110 @@ func CreatePet(db *sql.DB) http.HandlerFunc {
 			birthDate = fmt.Sprintf("%d-01-01", time.Now().Year()-petData.Age)
 		}
 
-		// Вставляем питомца в базу
-		result, err := db.Exec(`
-			INSERT INTO pets (
-				user_id, name, species, breed, birth_date, gender, color, weight,
-				chip_number, is_sterilized, status, created_at, updated_at
-			) VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, 'home', CURRENT_TIMESTAMP, CURRENT_TIMESTAMP)
-		`, userID, petData.Name, petData.Species, petData.Breed, birthDate, petData.Sex,
-			petData.Color, petData.Weight, petData.ChipNumber, petData.Sterilized)
+		// Подготавливаем данные для PetBase API
+		petbaseData := map[string]interface{}{
+			"user_id":       userID,
+			"name":          petData.Name,
+			"species":       petData.Species,
+			"breed":         petData.Breed,
+			"birth_date":    birthDate,
+			"gender":        petData.Sex,
+			"color":         petData.Color,
+			"weight":        petData.Weight,
+			"chip_number":   petData.ChipNumber,
+			"is_sterilized": petData.Sterilized,
+			"status":        "home",
+		}
 
+		// Отправляем запрос к PetBase API
+		jsonData, err := json.Marshal(petbaseData)
 		if err != nil {
-			log.Printf("❌ Error creating pet: %v", err)
-			http.Error(w, "Failed to create pet", http.StatusInternalServerError)
+			log.Printf("❌ Error marshaling data: %v", err)
+			http.Error(w, "Failed to prepare request", http.StatusInternalServerError)
 			return
 		}
 
-		petID, err := result.LastInsertId()
+		petbaseURL := "http://localhost:8100/api/pets"
+		req, err := http.NewRequest("POST", petbaseURL, strings.NewReader(string(jsonData)))
 		if err != nil {
-			log.Printf("❌ Error getting pet ID: %v", err)
-			http.Error(w, "Failed to get pet ID", http.StatusInternalServerError)
+			log.Printf("❌ Error creating request: %v", err)
+			http.Error(w, "Failed to create request", http.StatusInternalServerError)
 			return
 		}
 
-		log.Printf("✅ Created pet %d: %s", petID, petData.Name)
+		req.Header.Set("Content-Type", "application/json")
 
-		// Возвращаем созданного питомца
-		var pet models.Pet
-		err = db.QueryRow(`
-			SELECT 
-				id, user_id, curator_id, organization_id,
-				name, species, breed, 
-				CAST((julianday('now') - julianday(birth_date)) / 365.25 AS INTEGER) as age,
-				gender as sex, color, weight,
-				chip_number, tattoo_number, passport_number,
-				photo as photo_url,
-				status, 'verified' as verification_status,
-				is_sterilized as sterilized, sterilization_date,
-				distinctive_marks as special_marks, character_traits as character,
-				health_notes, allergies, chronic_diseases as chronic_conditions,
-				contact_name as emergency_contact, contact_phone as emergency_phone,
-				'' as insurance_company, '' as insurance_policy,
-				city, region, urgent, contact_phone, contact_name,
-				created_at, updated_at
-			FROM pets
-			WHERE id = ?
-		`, petID).Scan(
-			&pet.ID, &pet.OwnerID, &pet.CuratorID, &pet.OrganizationID,
-			&pet.Name, &pet.Species, &pet.Breed,
-			&pet.Age, &pet.Sex, &pet.Color, &pet.Weight,
-			&pet.ChipNumber, &pet.TattooNumber, &pet.PassportNumber,
-			&pet.PhotoURL,
-			&pet.Status, &pet.VerificationStatus,
-			&pet.Sterilized, &pet.SterilizationDate,
-			&pet.SpecialMarks, &pet.Character,
-			&pet.HealthNotes, &pet.Allergies, &pet.ChronicConditions,
-			&pet.EmergencyContact, &pet.EmergencyPhone,
-			&pet.InsuranceCompany, &pet.InsurancePolicy,
-			&pet.City, &pet.Region, &pet.Urgent, &pet.ContactPhone, &pet.ContactName,
-			&pet.CreatedAt, &pet.UpdatedAt,
-		)
+		// Получаем токен из исходного запроса
+		token := r.Header.Get("Authorization")
+		if token == "" {
+			// Если токена нет в header, пробуем cookie
+			cookie, err := r.Cookie("auth_token")
+			if err == nil {
+				token = "Bearer " + cookie.Value
+			}
+		}
 
-		if err != nil {
-			log.Printf("❌ Error fetching created pet: %v", err)
-			http.Error(w, "Failed to fetch created pet", http.StatusInternalServerError)
+		if token == "" {
+			log.Printf("❌ No token found to forward to PetBase")
+			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
+		// Передаем токен в PetBase
+		req.Header.Set("Authorization", token)
+		log.Printf("🔐 Forwarding token to PetBase for pet creation")
+
+		resp, err := http.DefaultClient.Do(req)
+		if err != nil {
+			log.Printf("❌ Error calling PetBase API: %v", err)
+			http.Error(w, "Failed to create pet in PetBase", http.StatusInternalServerError)
+			return
+		}
+		defer resp.Body.Close()
+
+		if resp.StatusCode != http.StatusOK && resp.StatusCode != http.StatusCreated {
+			body, _ := io.ReadAll(resp.Body)
+			log.Printf("❌ PetBase returned status %d: %s", resp.StatusCode, string(body))
+			http.Error(w, "Failed to create pet in PetBase", resp.StatusCode)
+			return
+		}
+
+		// Читаем ответ от PetBase
+		var petbaseResponse struct {
+			Success bool                   `json:"success"`
+			Data    map[string]interface{} `json:"data"`
+		}
+
+		if err := json.NewDecoder(resp.Body).Decode(&petbaseResponse); err != nil {
+			log.Printf("❌ Error decoding PetBase response: %v", err)
+			http.Error(w, "Failed to decode PetBase response", http.StatusInternalServerError)
+			return
+		}
+
+		if !petbaseResponse.Success {
+			log.Printf("❌ PetBase returned success=false")
+			http.Error(w, "PetBase request failed", http.StatusInternalServerError)
+			return
+		}
+
+		pet := petbaseResponse.Data
+
+		// Преобразуем данные: photo → photo_url, gender → sex
+		if photo, ok := pet["photo"].(string); ok && photo != "" {
+			pet["photo_url"] = photo
+		}
+
+		if gender, ok := pet["gender"].(string); ok && gender != "" {
+			pet["sex"] = gender
+		}
+
+		if _, ok := pet["verification_status"]; !ok {
+			pet["verification_status"] = "verified"
+		}
+
+		log.Printf("✅ Created pet %d via PetBase: %s", pet["id"], petData.Name)
+
+		// Возвращаем преобразованные данные
 		w.Header().Set("Content-Type", "application/json")
 		w.WriteHeader(http.StatusCreated)
 		json.NewEncoder(w).Encode(map[string]interface{}{
@@ -497,7 +611,7 @@ func UploadPetPhoto(db *sql.DB) http.HandlerFunc {
 		log.Printf("📸 Content-Type: %s", r.Header.Get("Content-Type"))
 		log.Printf("📸 Content-Length: %s", r.Header.Get("Content-Length"))
 
-		userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+		userID, ok := pkgmiddleware.GetUserID(r)
 		if !ok {
 			log.Printf("❌ No userID in context")
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
@@ -627,12 +741,25 @@ func UploadPetPhoto(db *sql.DB) http.HandlerFunc {
 		log.Printf("📸 Updating photo in PetID...")
 		petIDURL := fmt.Sprintf("http://localhost:8100/api/pets/%d", petID)
 
+		// Получаем токен из исходного запроса
+		token := r.Header.Get("Authorization")
+		if token == "" {
+			// Если токена нет в header, пробуем cookie
+			cookie, err := r.Cookie("auth_token")
+			if err == nil {
+				token = "Bearer " + cookie.Value
+			}
+		}
+
 		// Получаем текущие данные питомца из PetID
 		petIDReq, err := http.NewRequest("GET", petIDURL, nil)
 		if err != nil {
 			log.Printf("⚠️ Failed to create PetID request: %v", err)
 		} else {
-			petIDReq.Header.Set("X-User-ID", fmt.Sprintf("%d", userID))
+			// Передаем токен вместо X-User-ID
+			if token != "" {
+				petIDReq.Header.Set("Authorization", token)
+			}
 			petIDResp, err := http.DefaultClient.Do(petIDReq)
 			if err != nil {
 				log.Printf("⚠️ Failed to get pet from PetID: %v", err)
@@ -648,7 +775,10 @@ func UploadPetPhoto(db *sql.DB) http.HandlerFunc {
 						updateReq, err := http.NewRequest("PUT", petIDURL, strings.NewReader(string(petDataJSON)))
 						if err == nil {
 							updateReq.Header.Set("Content-Type", "application/json")
-							updateReq.Header.Set("X-User-ID", fmt.Sprintf("%d", userID))
+							// Передаем токен вместо X-User-ID
+							if token != "" {
+								updateReq.Header.Set("Authorization", token)
+							}
 							updateResp, err := http.DefaultClient.Do(updateReq)
 							if err != nil {
 								log.Printf("⚠️ Failed to update PetID: %v", err)

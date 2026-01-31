@@ -477,13 +477,33 @@ func getPetSummary(w http.ResponseWriter, _ *http.Request, id int) {
 	sendSuccess(w, summary)
 }
 
+// Owner представляет информацию о владельце питомца
+type Owner struct {
+	ID       int    `json:"id"`
+	Name     string `json:"name"`
+	LastName string `json:"last_name,omitempty"`
+	Email    string `json:"email,omitempty"`
+	Phone    string `json:"phone,omitempty"`
+	Avatar   string `json:"avatar,omitempty"`
+}
+
+// PetsWithOwnerResponse ответ с владельцем и питомцами
+type PetsWithOwnerResponse struct {
+	Owner Owner `json:"owner"`
+	Pets  []Pet `json:"pets"`
+}
+
 // getPetsByUser получает питомцев пользователя
-func getPetsByUser(w http.ResponseWriter, _ *http.Request, userIDStr string) {
+// Поддерживает параметр ?include_owner=true для включения информации о владельце
+func getPetsByUser(w http.ResponseWriter, r *http.Request, userIDStr string) {
 	userID, err := strconv.Atoi(userIDStr)
 	if err != nil {
 		sendError(w, "Invalid user ID", http.StatusBadRequest)
 		return
 	}
+
+	// Проверяем параметр include_owner
+	includeOwner := r.URL.Query().Get("include_owner") == "true"
 
 	query := `
 		SELECT id, user_id, name, species, breed, gender, birth_date, 
@@ -536,6 +556,34 @@ func getPetsByUser(w http.ResponseWriter, _ *http.Request, userIDStr string) {
 		pets = []Pet{}
 	}
 
+	// Если запрошена информация о владельце, загружаем её
+	if includeOwner {
+		var owner Owner
+		ownerQuery := `
+			SELECT id, name, last_name, email, phone, avatar
+			FROM users
+			WHERE id = ?
+		`
+		err := database.DB.QueryRow(ownerQuery, userID).Scan(
+			&owner.ID, &owner.Name, &owner.LastName, &owner.Email, &owner.Phone, &owner.Avatar,
+		)
+		if err != nil {
+			log.Printf("⚠️ Failed to fetch owner info: %v", err)
+			// Если владелец не найден, возвращаем только питомцев
+			sendSuccess(w, pets)
+			return
+		}
+
+		// Возвращаем владельца + питомцев
+		response := PetsWithOwnerResponse{
+			Owner: owner,
+			Pets:  pets,
+		}
+		sendSuccess(w, response)
+		return
+	}
+
+	// Обычный ответ - только питомцы
 	sendSuccess(w, pets)
 }
 
@@ -616,8 +664,16 @@ func createPet(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// ВАЖНО: Используем user_id из токена, а не из запроса!
-	req.UserID = userID
+	// ВАЖНО: Логика установки владельца/куратора
+	// Если передан curator_id - это волонтёр создаёт бездомное животное (НЕ устанавливаем user_id)
+	// Если НЕ передан curator_id - это обычный пользователь создаёт своего питомца (устанавливаем user_id из токена)
+	if req.CuratorID == nil || *req.CuratorID == 0 {
+		// Обычный пользователь создаёт своего питомца
+		req.UserID = userID
+	} else {
+		// Волонтёр создаёт бездомное животное - НЕ устанавливаем user_id
+		req.UserID = 0
+	}
 
 	// Устанавливаем статус по умолчанию
 	if req.Status == "" {
@@ -672,25 +728,38 @@ func createPet(w http.ResponseWriter, r *http.Request) {
 
 // updatePet обновляет карточку питомца
 func updatePet(w http.ResponseWriter, r *http.Request, id int) {
+	log.Printf("🐾 updatePet called: pet_id=%d", id)
+
 	// Получаем user_id из контекста (установлен middleware)
 	userID, ok := r.Context().Value("user_id").(int)
+	log.Printf("🔍 Context user_id: %d, ok=%v", userID, ok)
+
 	if !ok || userID == 0 {
+		log.Printf("❌ No user_id in context")
 		sendError(w, "Unauthorized: user_id not found", http.StatusUnauthorized)
 		return
 	}
+
+	log.Printf("✅ User authenticated: user_id=%d", userID)
 
 	// Проверяем, что питомец принадлежит пользователю
 	var ownerID int
 	err := database.DB.QueryRow("SELECT user_id FROM pets WHERE id = ?", id).Scan(&ownerID)
 	if err != nil {
+		log.Printf("❌ Pet not found in DB: pet_id=%d, error=%v", id, err)
 		sendError(w, "Pet not found", http.StatusNotFound)
 		return
 	}
 
+	log.Printf("🔍 Pet owner check: pet_id=%d, owner_id=%d, requester_id=%d", id, ownerID, userID)
+
 	if ownerID != userID {
+		log.Printf("❌ Forbidden: user %d trying to edit pet owned by %d", userID, ownerID)
 		sendError(w, "Forbidden: you can only edit your own pets", http.StatusForbidden)
 		return
 	}
+
+	log.Printf("✅ Ownership verified, proceeding with update")
 
 	var req CreatePetRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
@@ -765,4 +834,121 @@ func deletePet(w http.ResponseWriter, r *http.Request, id int) {
 	}
 
 	sendSuccess(w, map[string]string{"message": "Pet deleted successfully"})
+}
+
+// SearchPetsHandler - поиск питомцев для клиники
+// GET /api/pets/search?owner_phone=...&chip_number=...&name=...&status=...
+func SearchPetsHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("🔍 SearchPetsHandler called: %s %s", r.Method, r.URL.Path)
+
+	if r.Method != http.MethodGet {
+		sendError(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Получаем параметры поиска
+	ownerPhone := r.URL.Query().Get("owner_phone")
+	chipNumber := r.URL.Query().Get("chip_number")
+	petName := r.URL.Query().Get("name")
+	status := r.URL.Query().Get("status")
+
+	if ownerPhone == "" && chipNumber == "" && petName == "" {
+		sendError(w, "At least one search parameter required", http.StatusBadRequest)
+		return
+	}
+
+	// Строим динамический запрос
+	query := `
+		SELECT 
+			p.id, p.user_id, p.name, p.species, p.breed, p.gender, p.birth_date, p.color,
+			p.chip_number, p.is_sterilized, p.sterilization_date, p.status, p.photo, p.created_at,
+			u.name as owner_name, u.phone as owner_phone, u.email as owner_email
+		FROM pets p
+		LEFT JOIN users u ON p.user_id = u.id
+		WHERE 1=1
+	`
+
+	var args []interface{}
+
+	if ownerPhone != "" {
+		query += " AND u.phone LIKE ?"
+		args = append(args, "%"+ownerPhone+"%")
+	}
+
+	if chipNumber != "" {
+		query += " AND p.chip_number = ?"
+		args = append(args, chipNumber)
+	}
+
+	if petName != "" {
+		query += " AND p.name LIKE ?"
+		args = append(args, "%"+petName+"%")
+	}
+
+	if status != "" {
+		query += " AND p.status = ?"
+		args = append(args, status)
+	}
+
+	query += " ORDER BY p.created_at DESC LIMIT 50"
+
+	log.Printf("🔍 Search query: %s, args: %v", query, args)
+
+	rows, err := database.DB.Query(query, args...)
+	if err != nil {
+		log.Printf("❌ Database error: %v", err)
+		sendError(w, "Database error", http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var pets []map[string]interface{}
+	for rows.Next() {
+		var (
+			id, userID                                         int
+			name, species, status                              string
+			breed, gender, birthDate, color, chipNumber, photo *string
+			isSterilized                                       bool
+			sterilizationDate                                  *string
+			createdAt                                          time.Time
+			ownerName, ownerPhone, ownerEmail                  *string
+		)
+
+		err := rows.Scan(
+			&id, &userID, &name, &species, &breed, &gender, &birthDate, &color,
+			&chipNumber, &isSterilized, &sterilizationDate, &status, &photo, &createdAt,
+			&ownerName, &ownerPhone, &ownerEmail,
+		)
+
+		if err != nil {
+			log.Printf("❌ Scan error: %v", err)
+			continue
+		}
+
+		pet := map[string]interface{}{
+			"id":                 id,
+			"user_id":            userID,
+			"name":               name,
+			"species":            species,
+			"breed":              breed,
+			"gender":             gender,
+			"birth_date":         birthDate,
+			"color":              color,
+			"chip_number":        chipNumber,
+			"is_sterilized":      isSterilized,
+			"sterilization_date": sterilizationDate,
+			"status":             status,
+			"photo":              photo,
+			"created_at":         createdAt,
+			"owner_name":         ownerName,
+			"owner_phone":        ownerPhone,
+			"owner_email":        ownerEmail,
+		}
+
+		pets = append(pets, pet)
+	}
+
+	log.Printf("✅ Found %d pets", len(pets))
+
+	sendSuccess(w, pets)
 }

@@ -78,11 +78,12 @@ func AdminOrganizationsHandler(w http.ResponseWriter, r *http.Request) {
 	args := []interface{}{}
 
 	// Фильтр по статусу верификации
-	if status == "verified" {
+	switch status {
+	case "verified":
 		query += " AND o.is_verified = 1"
-	} else if status == "pending" {
+	case "pending":
 		query += " AND o.is_verified = 0 AND o.status = 'active'"
-	} else if status == "rejected" {
+	case "rejected":
 		query += " AND o.status = 'blocked'"
 	}
 
@@ -137,11 +138,12 @@ func AdminOrganizationsHandler(w http.ResponseWriter, r *http.Request) {
 	`
 	countArgs := []interface{}{}
 
-	if status == "verified" {
+	switch status {
+	case "verified":
 		countQuery += " AND o.is_verified = 1"
-	} else if status == "pending" {
+	case "pending":
 		countQuery += " AND o.is_verified = 0 AND o.status = 'active'"
-	} else if status == "rejected" {
+	case "rejected":
 		countQuery += " AND o.status = 'blocked'"
 	}
 
@@ -221,13 +223,14 @@ func AdminVerifyOrganizationHandler(w http.ResponseWriter, r *http.Request) {
 	var query string
 	var args []interface{}
 
-	if req.Action == "verify" {
+	switch req.Action {
+	case "verify":
 		query = `UPDATE organizations SET is_verified = 1, status = 'active', updated_at = CURRENT_TIMESTAMP WHERE id = ?`
 		args = []interface{}{orgID}
-	} else if req.Action == "reject" {
+	case "reject":
 		query = `UPDATE organizations SET is_verified = 0, status = 'blocked', updated_at = CURRENT_TIMESTAMP WHERE id = ?`
 		args = []interface{}{orgID}
-	} else {
+	default:
 		http.Error(w, "Invalid action", http.StatusBadRequest)
 		return
 	}

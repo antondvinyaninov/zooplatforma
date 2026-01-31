@@ -7,13 +7,15 @@ import (
 	"net/http"
 	"shelter/middleware"
 	"shelter/models"
+
+	pkgmiddleware "github.com/zooplatforma/pkg/middleware"
 )
 
 // GetMyShelters возвращает список приютов, где пользователь является членом
 func GetMyShelters(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		// Получаем userID из контекста (установлен AuthMiddleware)
-		userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+		userID, ok := pkgmiddleware.GetUserID(r)
 		if !ok {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return
@@ -82,7 +84,7 @@ func CreateShelter(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Получаем userID из контекста
-		userID, ok := r.Context().Value(middleware.UserIDKey).(int)
+		userID, ok := pkgmiddleware.GetUserID(r)
 		if !ok {
 			http.Error(w, "Unauthorized", http.StatusUnauthorized)
 			return

@@ -35,7 +35,7 @@ export default function EditPetPage() {
 
   const loadPet = async () => {
     try {
-      const meResponse = await fetch('http://localhost:8000/api/auth/me', {
+      const meResponse = await fetch('http://localhost:7100/api/auth/me', {
         credentials: 'include',
       });
 
@@ -71,7 +71,7 @@ export default function EditPetPage() {
     setSaving(true);
 
     try {
-      const meResponse = await fetch('http://localhost:8000/api/auth/me', {
+      const meResponse = await fetch('http://localhost:7100/api/auth/me', {
         credentials: 'include',
       });
 

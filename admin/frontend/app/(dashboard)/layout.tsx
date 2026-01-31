@@ -20,20 +20,35 @@ export default function DashboardLayout({
 }) {
   const router = useRouter();
   const pathname = usePathname();
-  const [adminUser, setAdminUser] = useState<{ email: string; role: string } | null>(null);
+  const [adminUser, setAdminUser] = useState<{ email: string; name?: string; avatar?: string; role: string } | null>(null);
   const [activeTab, setActiveTab] = useState('dashboard');
 
   useEffect(() => {
-    // Проверка авторизации
+    // Проверка авторизации через Auth Service
     const checkAuth = async () => {
       try {
-        const response = await fetch('http://localhost:9000/api/admin/me', {
+        const response = await fetch('http://localhost:7100/api/auth/me', {
           credentials: 'include',
         });
 
         if (response.ok) {
           const data = await response.json();
-          setAdminUser(data);
+          if (data.success && data.data && data.data.user) {
+            // Проверяем что пользователь - superadmin
+            if (data.data.user.role !== 'superadmin') {
+              alert('Доступ запрещен. Требуются права суперадмина.');
+              router.push('http://localhost:3000');
+              return;
+            }
+            setAdminUser({
+              email: data.data.user.email,
+              name: data.data.user.name,
+              avatar: data.data.user.avatar,
+              role: data.data.user.role,
+            });
+          } else {
+            router.push('/auth');
+          }
         } else {
           router.push('/auth');
         }
@@ -54,7 +69,7 @@ export default function DashboardLayout({
       setActiveTab('posts');
     } else if (pathname.includes('/logs')) {
       setActiveTab('logs');
-    } else if (pathname.includes('/health')) {
+    } else if (pathname.includes('/monitoring')) {
       setActiveTab('health');
     } else if (pathname.includes('/organizations')) {
       setActiveTab('organizations');
@@ -116,7 +131,7 @@ export default function DashboardLayout({
       moderation: '/moderation',
       logs: '/logs',
       organizations: '/organizations',
-      health: '/health',
+      health: '/monitoring',
     };
 
     if (routes[tabId]) {
@@ -126,7 +141,7 @@ export default function DashboardLayout({
 
   const handleLogout = async () => {
     try {
-      await fetch('http://localhost:9000/api/admin/logout', {
+      await fetch('http://localhost:7100/api/auth/logout', {
         method: 'POST',
         credentials: 'include',
       });

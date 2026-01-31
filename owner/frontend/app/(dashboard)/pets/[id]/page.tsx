@@ -35,6 +35,7 @@ interface Pet {
   character_traits?: string;
   special_needs?: string;
   photo?: string;
+  photo_url?: string;
   story?: string;
   // Паспорт
   distinctive_marks?: string;
@@ -86,30 +87,68 @@ export default function ViewPetPage() {
 
   const loadPet = async () => {
     try {
-      const meResponse = await fetch('http://localhost:8000/api/auth/me', {
+      console.log('🔍 Loading pet with ID:', params.id);
+      
+      const meResponse = await fetch('http://localhost:7100/api/auth/me', {
         credentials: 'include',
       });
 
-      if (meResponse.ok) {
-        const meResult = await meResponse.json();
-        const userId = meResult.data.id;
+      if (!meResponse.ok) {
+        console.error('❌ Auth check failed:', meResponse.status);
+        window.location.href = 'http://localhost:3000';
+        return;
+      }
 
-        const petResponse = await fetch(`http://localhost:8100/api/pets/${params.id}`, {
-          headers: {
-            'X-User-ID': userId.toString(),
-          },
-          credentials: 'include',
-        });
+      const meResult = await meResponse.json();
+      console.log('✅ Auth result:', meResult);
+      
+      const userId = meResult.data?.user?.id || meResult.data?.id;
 
-        if (petResponse.ok) {
-          const petResult = await petResponse.json();
-          if (petResult.success && petResult.data) {
-            setPet(petResult.data);
-          }
-        }
+      if (!userId) {
+        console.error('❌ User ID not found in response:', meResult);
+        setLoading(false);
+        return;
+      }
+
+      console.log('👤 User ID:', userId);
+
+      // Получаем токен для запроса к Owner Backend
+      const token = meResult.data?.token;
+      
+      if (!token) {
+        console.error('❌ No token in auth response');
+        setLoading(false);
+        return;
+      }
+
+      console.log('🔑 Using token for Owner Backend request');
+
+      const petResponse = await fetch(`http://localhost:8400/api/pets/${params.id}`, {
+        headers: {
+          'Authorization': `Bearer ${token}`,
+        },
+        credentials: 'include',
+      });
+
+      console.log('📡 Pet response status:', petResponse.status);
+
+      if (!petResponse.ok) {
+        console.error('❌ Failed to load pet:', petResponse.status);
+        setLoading(false);
+        return;
+      }
+
+      const petResult = await petResponse.json();
+      console.log('📦 Pet result:', petResult);
+
+      if (petResult.pet) {
+        console.log('✅ Pet loaded:', petResult.pet);
+        setPet(petResult.pet);
+      } else {
+        console.error('❌ No pet in response:', petResult);
       }
     } catch (error) {
-      console.error('Error loading pet:', error);
+      console.error('❌ Error loading pet:', error);
     } finally {
       setLoading(false);
     }
@@ -196,9 +235,9 @@ export default function ViewPetPage() {
           <div className="flex flex-col md:flex-row items-start md:items-center gap-6">
             {/* Фото питомца */}
             <div className="relative group">
-              {pet.photo ? (
+              {pet.photo_url ? (
                 <img
-                  src={`http://localhost:8400${pet.photo}`}
+                  src={`http://localhost:8000${pet.photo_url}`}
                   alt={pet.name}
                   className="w-40 h-40 rounded-3xl object-cover border-4 border-white shadow-2xl group-hover:scale-105 transition-transform duration-300"
                 />
@@ -872,7 +911,7 @@ function PhotoUploadTab({ petId, currentPhoto, onPhotoUpdate }: { petId: number;
           <div className="flex justify-center">
             {currentPhoto || preview ? (
               <img
-                src={preview || (currentPhoto ? `http://localhost:8400${currentPhoto}` : '')}
+                src={preview || (currentPhoto?.startsWith('http') ? currentPhoto : `http://localhost:8400${currentPhoto}`)}
                 alt="Фото питомца"
                 className="w-64 h-64 rounded-2xl object-cover shadow-lg"
               />

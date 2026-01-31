@@ -32,16 +32,24 @@ func AuthMiddleware(db *sql.DB) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			log.Printf("🔐 Auth check for: %s %s", r.Method, r.URL.Path)
 
-			// Получаем токен из cookie
-			cookie, err := r.Cookie("auth_token")
-			if err != nil {
-				log.Printf("❌ No auth_token cookie: %v", err)
-				http.Error(w, "Unauthorized", http.StatusUnauthorized)
-				return
-			}
+			var tokenString string
 
-			tokenString := cookie.Value
-			log.Printf("🍪 Token from cookie: %s...", tokenString[:min(len(tokenString), 20)])
+			// Сначала пробуем получить токен из заголовка Authorization
+			authHeader := r.Header.Get("Authorization")
+			if authHeader != "" && len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+				tokenString = authHeader[7:]
+				log.Printf("🔑 Token from Authorization header: %s...", tokenString[:min(len(tokenString), 20)])
+			} else {
+				// Если нет в заголовке, пробуем cookie
+				cookie, err := r.Cookie("auth_token")
+				if err != nil {
+					log.Printf("❌ No auth_token cookie and no Authorization header: %v", err)
+					http.Error(w, "Unauthorized", http.StatusUnauthorized)
+					return
+				}
+				tokenString = cookie.Value
+				log.Printf("🍪 Token from cookie: %s...", tokenString[:min(len(tokenString), 20)])
+			}
 
 			// Парсим и валидируем токен
 			token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {

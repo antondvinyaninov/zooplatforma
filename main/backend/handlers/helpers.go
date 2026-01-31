@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"time"
 )
 
 func sendSuccessResponse(w http.ResponseWriter, data interface{}) {
@@ -20,4 +21,27 @@ func sendErrorResponse(w http.ResponseWriter, message string, status int) {
 		"success": false,
 		"error":   message,
 	})
+}
+
+// parseTime парсит строку времени в time.Time
+func parseTime(timeStr string) *time.Time {
+	if timeStr == "" {
+		return nil
+	}
+
+	// Пробуем разные форматы
+	formats := []string{
+		time.RFC3339,
+		"2006-01-02 15:04:05",
+		"2006-01-02T15:04:05Z",
+		"2006-01-02T15:04:05",
+	}
+
+	for _, format := range formats {
+		if t, err := time.Parse(format, timeStr); err == nil {
+			return &t
+		}
+	}
+
+	return nil
 }

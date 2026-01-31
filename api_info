@@ -1,0 +1,45 @@
+# Clinic API Info
+
+## 1) Clinic backend (provides)
+Source: clinic/backend/main.go
+
+- GET /api/health
+- GET /api/my-clinics
+- POST /api/clinics
+- GET /api/my-patients
+- GET /api/appointments
+- GET /api/organization
+- PUT /api/organization
+- GET /api/members
+- POST /api/members
+- DELETE /api/members
+- GET /api/users/search
+- GET /api/profile
+
+## 2) Clinic frontend (consumes)
+
+### Main service (port 8000)
+- GET http://localhost:8000/api/auth/me
+- GET /api/main/auth/me (proxy)
+- GET http://localhost:8000/api/users/search?phone=...
+- POST http://localhost:8000/api/users
+- POST http://localhost:8000/api/media/upload
+- POST http://localhost:8000/api/notifications/send
+
+### Petbase service (port 8100)
+- GET /api/petbase/pets?... (proxy)
+- GET /api/petbase/pets/search?... (proxy)
+- POST http://localhost:8100/api/pets
+- PUT http://localhost:8100/api/pets/:id
+- POST http://localhost:8100/api/pet-events
+
+### Clinic service (port 8600)
+- GET http://localhost:8600/api/my-clinics
+- POST http://localhost:8600/api/clinics
+- GET http://localhost:8600/api/my-patients
+- GET http://localhost:8600/api/organization
+- PUT http://localhost:8600/api/organization
+- GET http://localhost:8600/api/members
+- POST http://localhost:8600/api/members
+- DELETE http://localhost:8600/api/members
+- GET http://localhost:8600/api/users/search?q=...

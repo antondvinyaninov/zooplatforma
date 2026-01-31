@@ -178,3 +178,59 @@ func sendError(w http.ResponseWriter, message string, status int) {
 	w.WriteHeader(status)
 	json.NewEncoder(w).Encode(models.Response{Success: false, Error: message})
 }
+
+// OptionalAuthMiddleware извлекает userID если пользователь авторизован, но не требует авторизации
+func OptionalAuthMiddleware(next http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Try to get token from cookie
+		cookie, err := r.Cookie("auth_token")
+		var tokenString string
+
+		if err == nil {
+			tokenString = cookie.Value
+		} else {
+			// Fallback to Authorization header
+			authHeader := r.Header.Get("Authorization")
+			if authHeader != "" {
+				tokenString = strings.TrimPrefix(authHeader, "Bearer ")
+			}
+		}
+
+		// Если токена нет - продолжаем без авторизации (userID = 0)
+		if tokenString == "" {
+			log.Printf("🔓 OptionalAuth: no token, continuing without auth")
+			next(w, r)
+			return
+		}
+
+		// Парсим токен
+		token, err := jwt.Parse(tokenString, func(token *jwt.Token) (interface{}, error) {
+			return jwtSecret, nil
+		})
+
+		if err != nil || !token.Valid {
+			log.Printf("⚠️ OptionalAuth: invalid token, continuing without auth")
+			next(w, r)
+			return
+		}
+
+		claims, ok := token.Claims.(jwt.MapClaims)
+		if !ok {
+			log.Printf("⚠️ OptionalAuth: invalid claims, continuing without auth")
+			next(w, r)
+			return
+		}
+
+		userID, ok := claims["user_id"].(float64)
+		if !ok {
+			log.Printf("⚠️ OptionalAuth: no user_id in claims, continuing without auth")
+			next(w, r)
+			return
+		}
+
+		// Добавляем userID в контекст
+		ctx := context.WithValue(r.Context(), "userID", int(userID))
+		log.Printf("✅ OptionalAuth: userID=%d extracted", int(userID))
+		next(w, r.WithContext(ctx))
+	}
+}

@@ -8,6 +8,38 @@
 import { Pet, MedicalEvent, CreatePetData, ApiResponse } from '../types/owner';
 
 const OWNER_API_URL = process.env.NEXT_PUBLIC_OWNER_API_URL || 'http://localhost:8400';
+const AUTH_SERVICE_URL = 'http://localhost:7100';
+
+/**
+ * Получить JWT токен через Auth Service
+ */
+async function getAuthToken(): Promise<string | null> {
+  try {
+    console.log('🔍 Getting auth token from Auth Service...');
+    const response = await fetch(`${AUTH_SERVICE_URL}/api/auth/me`, {
+      credentials: 'include', // Отправляет cookie с токеном
+    });
+    
+    if (!response.ok) {
+      console.error('❌ Failed to get auth token:', response.status);
+      return null;
+    }
+    
+    const data = await response.json();
+    const token = data.data?.token || null;
+    
+    if (token) {
+      console.log('✅ Auth token received:', token.substring(0, 20) + '...');
+    } else {
+      console.error('❌ No token in response:', data);
+    }
+    
+    return token;
+  } catch (error) {
+    console.error('❌ Error getting auth token:', error);
+    return null;
+  }
+}
 
 /**
  * Базовая функция для выполнения запросов к Owner API
@@ -16,8 +48,19 @@ async function ownerFetch<T>(
   endpoint: string,
   options: RequestInit = {}
 ): Promise<ApiResponse<T>> {
+  // Получаем токен через Main API
+  const token = await getAuthToken();
+  
+  if (!token) {
+    console.error('❌ No auth token available for request:', endpoint);
+    return { error: 'Unauthorized' };
+  }
+  
+  console.log('🚀 Making request to Owner API:', endpoint);
+  
   const headers: Record<string, string> = {
     'Content-Type': 'application/json',
+    'Authorization': `Bearer ${token}`, // Передаем токен в заголовке
     ...(options.headers as Record<string, string>),
   };
   
@@ -27,6 +70,8 @@ async function ownerFetch<T>(
       headers,
       credentials: 'include', // Важно для передачи cookies с JWT
     });
+    
+    console.log('📥 Response from Owner API:', response.status, endpoint);
     
     // Обработка ошибок аутентификации
     if (response.status === 401) {
@@ -162,6 +207,13 @@ export const petidApi = {
    * Загрузить фото питомца
    */
   async uploadPhoto(id: number, file: File): Promise<ApiResponse<string>> {
+    // Получаем токен через Main API
+    const token = await getAuthToken();
+    
+    if (!token) {
+      return { error: 'Unauthorized' };
+    }
+    
     const formData = new FormData();
     formData.append('photo', file);
     
@@ -169,6 +221,9 @@ export const petidApi = {
       const response = await fetch(`${OWNER_API_URL}/api/pets/${id}/photo`, {
         method: 'POST',
         body: formData,
+        headers: {
+          'Authorization': `Bearer ${token}`, // Передаем токен
+        },
         credentials: 'include',
       });
       
@@ -257,4 +312,92 @@ export const petidApi = {
   },
 };
 
+// Pet Events Types
+export type PetEventType = 
+  | 'general'
+  | 'vaccination'
+  | 'treatment'
+  | 'ownership_change'
+  | 'lost'
+  | 'found'
+  | 'death'
+  | 'shelter_intake'
+  | 'adoption';
+
+export const eventTypeLabels: Record<PetEventType, string> = {
+  general: 'Общее событие',
+  vaccination: 'Вакцинация',
+  treatment: 'Лечение',
+  ownership_change: 'Смена владельца',
+  lost: 'Потеря',
+  found: 'Найден',
+  death: 'Смерть',
+  shelter_intake: 'Поступление в приют',
+  adoption: 'Усыновление',
+};
+
+export const eventTypeIcons: Record<PetEventType, string> = {
+  general: '📝',
+  vaccination: '💉',
+  treatment: '💊',
+  ownership_change: '👥',
+  lost: '🔍',
+  found: '✅',
+  death: '🕊️',
+  shelter_intake: '🏠',
+  adoption: '❤️',
+};
+
+export const deathReasonLabels: Record<string, string> = {
+  natural: 'Естественная смерть',
+  illness: 'Болезнь',
+  accident: 'Несчастный случай',
+  euthanasia: 'Эвтаназия',
+  unknown: 'Неизвестно',
+};
+
+// Pet Events API
+export const petEventsApi = {
+  async getEvents(petId: number): Promise<ApiResponse<{ events: MedicalEvent[] }>> {
+    try {
+      const response = await ownerFetch<{ events: MedicalEvent[] }>(
+        `/api/pets/${petId}/events`
+      );
+      return response;
+    } catch (error) {
+      return { error: 'Ошибка загрузки событий' };
+    }
+  },
+
+  async createEvent(petId: number, data: any): Promise<ApiResponse<any>> {
+    try {
+      const response = await ownerFetch(
+        `/api/pets/${petId}/events`,
+        {
+          method: 'POST',
+          body: JSON.stringify(data),
+        }
+      );
+      return response;
+    } catch (error) {
+      return { error: 'Ошибка создания события' };
+    }
+  },
+
+  async deleteEvent(petId: number, eventId: number): Promise<ApiResponse<any>> {
+    try {
+      const response = await ownerFetch(
+        `/api/pets/${petId}/events/${eventId}`,
+        {
+          method: 'DELETE',
+        }
+      );
+      return response;
+    } catch (error) {
+      return { error: 'Ошибка удаления события' };
+    }
+  },
+};
+
 export default petidApi;
+

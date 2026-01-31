@@ -32,8 +32,30 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       const response = await authApi.me();
       
       if (response.success && response.data) {
-        setUser(response.data);
-        setToken('authenticated');
+        // Backend возвращает { user: User, token: string }
+        const userData = response.data as any;
+        const userId = userData.user?.id || userData.id;
+        
+        if (userId) {
+          // Получаем полные данные профиля из Main Backend
+          const profileResponse = await apiClient.get<User>(`/api/users/${userId}`);
+          
+          if (profileResponse.success && profileResponse.data) {
+            setUser(profileResponse.data);
+            setToken('authenticated');
+            setIsLoading(false);
+            return;
+          }
+        }
+        
+        // Fallback: используем данные из Auth Service
+        if (userData.user) {
+          setUser(userData.user);
+          setToken('authenticated');
+        } else {
+          setUser(response.data as User);
+          setToken('authenticated');
+        }
       }
       
       setIsLoading(false);
@@ -75,10 +97,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshUser = async () => {
-    const response = await authApi.me();
+    // Сначала получаем базовые данные из Auth Service (для проверки авторизации)
+    const authResponse = await authApi.me();
     
-    if (response.success && response.data) {
-      setUser(response.data);
+    if (authResponse.success && authResponse.data) {
+      const userData = authResponse.data as any;
+      const userId = userData.user?.id || userData.id;
+      
+      if (userId) {
+        // Затем получаем полные данные профиля из Main Backend
+        const profileResponse = await apiClient.get<User>(`/api/users/${userId}`);
+        
+        if (profileResponse.success && profileResponse.data) {
+          setUser(profileResponse.data);
+          return;
+        }
+      }
+      
+      // Fallback: используем данные из Auth Service если не удалось получить из Main Backend
+      if (userData.user) {
+        setUser(userData.user);
+      } else {
+        setUser(authResponse.data as User);
+      }
     }
   };
 

@@ -88,7 +88,7 @@ export default function AddEventModal({ petId, isOpen, onClose, onSuccess }: Add
 
       const response = await petEventsApi.createEvent(petId, eventData);
       
-      if (response.success) {
+      if (!response.error) {
         onSuccess();
         onClose();
         // Reset form

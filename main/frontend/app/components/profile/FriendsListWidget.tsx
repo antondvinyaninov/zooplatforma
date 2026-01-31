@@ -66,7 +66,7 @@ export default function FriendsListWidget({ userId, limit = 6 }: FriendsListWidg
             onClick={() => router.push(`/id${friendship.friend.id}`)}
             className="cursor-pointer group"
           >
-            <div className="aspect-square rounded-lg bg-gray-200 flex items-center justify-center overflow-hidden mb-1 group-hover:opacity-90 transition-opacity">
+            <div className="aspect-square rounded-lg bg-gray-200 flex items-center justify-center overflow-hidden mb-1 group-hover:opacity-90 transition-opacity relative">
               {friendship.friend.avatar ? (
                 <img
                   src={getMediaUrl(friendship.friend.avatar) || ''}
@@ -76,6 +76,10 @@ export default function FriendsListWidget({ userId, limit = 6 }: FriendsListWidg
               ) : (
                 <UserIcon className="w-8 h-8 text-gray-400" />
               )}
+              {/* Статус онлайн индикатор */}
+              <div className={`absolute bottom-0.5 right-0.5 w-2.5 h-2.5 rounded-full border border-white flex-shrink-0 ${
+                friendship.friend.is_online ? 'bg-green-500' : 'bg-gray-400'
+              }`}></div>
             </div>
             <div className="text-xs text-gray-700 text-center truncate">
               {getFullName(friendship.friend.name, friendship.friend.last_name)}

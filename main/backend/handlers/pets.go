@@ -26,6 +26,24 @@ func UserPetsHandler(w http.ResponseWriter, r *http.Request) {
 	getUserPets(w, r, userID)
 }
 
+// CuratedPetsHandler возвращает питомцев, которых курирует пользователь
+func CuratedPetsHandler(w http.ResponseWriter, r *http.Request) {
+	if r.Method != http.MethodGet {
+		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+		return
+	}
+
+	// Извлекаем ID пользователя из URL
+	path := strings.TrimPrefix(r.URL.Path, "/api/pets/curated/")
+	userID, err := strconv.Atoi(path)
+	if err != nil {
+		sendErrorResponse(w, "Неверный ID пользователя", http.StatusBadRequest)
+		return
+	}
+
+	getCuratedPets(w, r, userID)
+}
+
 func PetsHandler(w http.ResponseWriter, r *http.Request) {
 	switch r.Method {
 	case http.MethodPost:
@@ -45,10 +63,25 @@ func PetHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	switch r.Method {
+	case http.MethodGet:
+		getPet(w, r, id)
 	case http.MethodDelete:
 		deletePet(w, r, id)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+	}
+}
+
+// PetHandlerWithConditionalAuth применяет авторизацию только для DELETE запросов
+func PetHandlerWithConditionalAuth(authMiddleware func(http.HandlerFunc) http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		if r.Method == http.MethodDelete {
+			// Для DELETE требуется авторизация
+			authMiddleware(PetHandler).ServeHTTP(w, r)
+		} else {
+			// GET запросы публичные
+			PetHandler(w, r)
+		}
 	}
 }
 
@@ -78,6 +111,48 @@ func getUserPets(w http.ResponseWriter, _ *http.Request, userID int) {
 	}
 
 	sendSuccessResponse(w, pets)
+}
+
+// getCuratedPets возвращает питомцев, которых курирует пользователь
+func getCuratedPets(w http.ResponseWriter, _ *http.Request, userID int) {
+	query := `SELECT id, user_id, name, species, photo, created_at FROM pets WHERE curator_id = ? ORDER BY created_at DESC`
+
+	rows, err := database.DB.Query(query, userID)
+	if err != nil {
+		sendErrorResponse(w, "Ошибка получения курируемых питомцев: "+err.Error(), http.StatusInternalServerError)
+		return
+	}
+	defer rows.Close()
+
+	var pets []models.Pet
+	for rows.Next() {
+		var pet models.Pet
+		err := rows.Scan(&pet.ID, &pet.UserID, &pet.Name, &pet.Species, &pet.Photo, &pet.CreatedAt)
+		if err != nil {
+			sendErrorResponse(w, "Ошибка чтения данных: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
+		pets = append(pets, pet)
+	}
+
+	if pets == nil {
+		pets = []models.Pet{}
+	}
+
+	sendSuccessResponse(w, pets)
+}
+
+func getPet(w http.ResponseWriter, _ *http.Request, petID int) {
+	query := `SELECT id, user_id, name, species, photo, created_at FROM pets WHERE id = ?`
+
+	var pet models.Pet
+	err := database.DB.QueryRow(query, petID).Scan(&pet.ID, &pet.UserID, &pet.Name, &pet.Species, &pet.Photo, &pet.CreatedAt)
+	if err != nil {
+		sendErrorResponse(w, "Питомец не найден", http.StatusNotFound)
+		return
+	}
+
+	sendSuccessResponse(w, pet)
 }
 
 func createPet(w http.ResponseWriter, r *http.Request) {

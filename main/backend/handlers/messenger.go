@@ -355,11 +355,16 @@ func SendMediaMessageHandler(db *sql.DB) http.HandlerFunc {
 			defer file.Close()
 
 			// Определяем тип файла
-			fileType := "image"
+			fileType := "file" // По умолчанию - обычный файл
 			contentType := fileHeader.Header.Get("Content-Type")
-			if strings.HasPrefix(contentType, "video/") {
+
+			if strings.HasPrefix(contentType, "image/") {
+				fileType = "image"
+			} else if strings.HasPrefix(contentType, "video/") {
 				fileType = "video"
 			}
+
+			log.Printf("📎 File type detected: %s (Content-Type: %s)", fileType, contentType)
 
 			// Сохраняем файл
 			filePath, err := saveUploadedFile(file, fileHeader.Filename)
@@ -578,18 +583,31 @@ func userExists(db *sql.DB, userID int) (bool, error) {
 
 func getUserByID(db *sql.DB, userID int) (*models.User, error) {
 	var user models.User
+	var lastSeen sql.NullTime
+
 	err := db.QueryRow(`
-		SELECT id, email, name, last_name, avatar, cover_photo, bio, 
-		       location, phone, created_at
-		FROM users WHERE id = ?
+		SELECT u.id, u.email, u.name, u.last_name, u.avatar, u.cover_photo, u.bio, 
+		       u.location, u.phone, u.created_at, ua.last_seen
+		FROM users u
+		LEFT JOIN user_activity ua ON u.id = ua.user_id
+		WHERE u.id = ?
 	`, userID).Scan(
 		&user.ID, &user.Email, &user.Name, &user.LastName, &user.Avatar,
 		&user.CoverPhoto, &user.Bio, &user.Location, &user.Phone,
-		&user.CreatedAt,
+		&user.CreatedAt, &lastSeen,
 	)
 
 	if err != nil {
 		return nil, err
+	}
+
+	// Устанавливаем last_seen если есть
+	if lastSeen.Valid {
+		user.LastSeen = &lastSeen.Time
+		// Проверяем онлайн статус (активен в последние 5 минут)
+		user.IsOnline = time.Since(lastSeen.Time) < 5*time.Minute
+	} else {
+		user.IsOnline = false
 	}
 
 	return &user, nil

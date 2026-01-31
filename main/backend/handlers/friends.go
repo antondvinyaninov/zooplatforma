@@ -3,6 +3,7 @@ package handlers
 import (
 	"backend/models"
 	"database"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"net/http"
@@ -250,10 +251,15 @@ func GetFriendsHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем всех друзей (где статус accepted)
+	// Получаем всех друзей (где статус accepted) + проверяем онлайн статус
 	rows, err := database.DB.Query(`
 		SELECT f.id, f.user_id, f.friend_id, f.status, f.created_at, f.updated_at,
-		       u.id, u.name, u.last_name, u.email, u.avatar, u.location
+		       u.id, u.name, u.last_name, u.email, u.avatar, u.location,
+		       ua.last_seen,
+		       CASE 
+		           WHEN ua.last_seen IS NOT NULL AND datetime(ua.last_seen) > datetime('now', '-5 minutes') THEN 1
+		           ELSE 0
+		       END as is_online
 		FROM friendships f
 		JOIN users u ON (
 			CASE 
@@ -261,6 +267,7 @@ func GetFriendsHandler(w http.ResponseWriter, r *http.Request) {
 				ELSE u.id = f.user_id
 			END
 		)
+		LEFT JOIN user_activity ua ON ua.user_id = u.id
 		WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted'
 		ORDER BY f.created_at DESC
 	`, userID, userID, userID)
@@ -275,12 +282,20 @@ func GetFriendsHandler(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var fr models.FriendshipResponse
 		var friend models.UserResponse
+		var isOnline int
+		var lastSeen sql.NullTime
 		err := rows.Scan(
 			&fr.ID, &fr.UserID, &fr.FriendID, &fr.Status, &fr.CreatedAt, &fr.UpdatedAt,
 			&friend.ID, &friend.Name, &friend.LastName, &friend.Email, &friend.Avatar, &friend.Location,
+			&lastSeen,
+			&isOnline,
 		)
 		if err != nil {
 			continue
+		}
+		friend.IsOnline = (isOnline == 1)
+		if lastSeen.Valid {
+			friend.LastSeen = &lastSeen.Time
 		}
 		fr.Friend = friend
 		friends = append(friends, fr)

@@ -1,29 +1,67 @@
-'use client';
+import { Metadata } from 'next';
+import HomeClient from './HomeClient';
 
-import { useState } from 'react';
-import PostsFeed from '../components/posts/PostsFeed';
-import FeedFilters from '../components/posts/FeedFilters';
-import RightPanel from '../components/layout/RightPanel';
+type Props = {
+  searchParams: Promise<{ metka?: string }>;
+};
 
-type FilterType = 'for-you' | 'following' | 'city' | 'lost' | 'found' | 'looking-for-home';
+export async function generateMetadata({ searchParams }: Props): Promise<Metadata> {
+  const params = await searchParams;
+  const metkaId = params.metka;
 
-export default function Home() {
-  const [activeFilter, setActiveFilter] = useState<FilterType>('for-you');
+  if (metkaId) {
+    try {
+      // Получаем данные поста для SEO
+      const response = await fetch(`http://localhost:8000/api/posts/${metkaId}`, {
+        cache: 'no-store',
+      });
 
-  return (
-    <div className="flex gap-4">
-      {/* Main Feed - оптимальная ширина */}
-      <div className="w-full xl:w-[600px] xl:flex-shrink-0">
-        <PostsFeed activeFilter={activeFilter} />
-      </div>
+      if (response.ok) {
+        const result = await response.json();
+        const post = result.data;
 
-      {/* Right Panel - уменьшенная ширина */}
-      <aside className="hidden xl:block w-[320px]">
-        <div className="sticky top-[48px] space-y-2.5">
-          <FeedFilters activeFilter={activeFilter} onFilterChange={setActiveFilter} />
-          <RightPanel />
-        </div>
-      </aside>
-    </div>
-  );
+        // Формируем описание из контента поста
+        const description = post.content.substring(0, 160) + (post.content.length > 160 ? '...' : '');
+        
+        // Получаем имя автора
+        const authorName = post.author_type === 'organization' 
+          ? (post.organization?.short_name || post.organization?.name || 'Организация')
+          : (post.user?.name || 'Пользователь') + (post.user?.last_name ? ' ' + post.user.last_name : '');
+
+        // Получаем первое изображение если есть
+        const image = post.attachments?.find((a: any) => a.type === 'image' || a.media_type === 'image')?.url;
+
+        return {
+          title: `${authorName}: ${description}`,
+          description: description,
+          openGraph: {
+            title: `${authorName}: ${description}`,
+            description: description,
+            images: image ? [`http://localhost:8000${image}`] : [],
+            type: 'article',
+            url: `http://localhost:3000/?metka=${metkaId}`,
+          },
+          twitter: {
+            card: 'summary_large_image',
+            title: `${authorName}: ${description}`,
+            description: description,
+            images: image ? [`http://localhost:8000${image}`] : [],
+          },
+        };
+      }
+    } catch (error) {
+      console.error('Error fetching post for SEO:', error);
+    }
+  }
+
+  // Дефолтные meta-теги для главной страницы
+  return {
+    title: 'Главная - Зооплатформа',
+    description: 'Социальная сеть для владельцев домашних животных',
+  };
+}
+
+export default async function Home({ searchParams }: Props) {
+  const params = await searchParams;
+  return <HomeClient searchParams={params} />;
 }
