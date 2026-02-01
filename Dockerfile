@@ -115,12 +115,7 @@ case $SERVICE in
     exec /app/auth-backend
     ;;
   main)
-    # Запускаем nginx как reverse proxy
-    echo "🚀 Starting Nginx..."
-    nginx -g "daemon off;" &
-    NGINX_PID=$!
-    
-    # Запускаем backend
+    # На EasyPanel nginx уже есть, запускаем только backend и frontend
     echo "🚀 Starting Main Backend..."
     /app/main-backend &
     BACKEND_PID=$!
