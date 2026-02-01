@@ -63,8 +63,17 @@ COPY database/migrations /app/migrations
 # Копируем конфигурационные файлы
 COPY infrastructure /app/infrastructure
 
-# Копируем .env файл
-COPY .env /app/.env
+# Создаем .env файл с переменными окружения
+RUN echo "DATABASE_URL=postgres://postgres_zp:7da0905cd3349f58f368@my_projects_bd_zooplatforma:5432/bd_zp?sslmode=disable" > /app/.env && \
+    echo "DB_HOST=my_projects_bd_zooplatforma" >> /app/.env && \
+    echo "DB_PORT=5432" >> /app/.env && \
+    echo "DB_USER=postgres_zp" >> /app/.env && \
+    echo "DB_PASSWORD=7da0905cd3349f58f368" >> /app/.env && \
+    echo "DB_NAME=bd_zp" >> /app/.env && \
+    echo "DB_SSLMODE=disable" >> /app/.env && \
+    echo "JWT_SECRET=your-super-secret-key-change-this-in-production" >> /app/.env && \
+    echo "ENVIRONMENT=production" >> /app/.env && \
+    echo "LOG_LEVEL=info" >> /app/.env
 
 # Expose все порты
 EXPOSE 7100 8000 8100 8200 8400 8500 8600 9000 3000 4000 4100 5100 6100 6200 6300
