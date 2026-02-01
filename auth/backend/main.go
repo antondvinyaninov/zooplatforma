@@ -75,7 +75,7 @@ func main() {
 	// Запустить сервер
 	port := os.Getenv("PORT")
 	if port == "" {
-		port = "7000"
+		port = "7100" // Default port for Auth Service
 	}
 
 	log.Printf("🚀 Auth Service started on port %s", port)
