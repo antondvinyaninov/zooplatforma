@@ -125,9 +125,9 @@ case $SERVICE in
     /app/main-backend &
     BACKEND_PID=$!
     
-    # Запускаем frontend (production build)
+    # Запускаем frontend (dev режим для EasyPanel)
     echo "🚀 Starting Main Frontend..."
-    cd /app/frontend && npm start &
+    cd /app/frontend && npm run dev &
     FRONTEND_PID=$!
     
     # Ждем любого процесса
