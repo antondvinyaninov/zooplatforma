@@ -73,10 +73,9 @@ func main() {
 	handler := enableCORS(r)
 
 	// Запустить сервер
-	port := os.Getenv("PORT")
-	if port == "" {
-		port = "7100" // Default port for Auth Service
-	}
+	// Auth Service ВСЕГДА использует порт 7100, игнорируя PORT переменную
+	// (которую может установить EasyPanel на 80)
+	port := "7100"
 
 	log.Printf("🚀 Auth Service started on port %s", port)
 	log.Fatal(http.ListenAndServe(":"+port, handler))
