@@ -52,20 +52,16 @@ FROM node:20-alpine AS next-builder
 
 WORKDIR /app
 
-# Копируем package.json и package-lock.json для main frontend
-COPY main/frontend/package*.json ./main/frontend/
-COPY shared/package*.json ./shared/
-
-# Устанавливаем зависимости
-RUN cd main/frontend && npm ci && \
-    cd /app/shared && npm ci
-
-# Копируем исходный код
+# Копируем весь проект для сборки фронтенда
 COPY main/frontend ./main/frontend
 COPY shared ./shared
 
+# Устанавливаем зависимости
+RUN cd /app/main/frontend && npm install && \
+    cd /app/shared && npm install
+
 # Собираем Next.js
-RUN cd main/frontend && npm run build
+RUN cd /app/main/frontend && npm run build
 
 # Runtime образ
 FROM node:20-alpine
