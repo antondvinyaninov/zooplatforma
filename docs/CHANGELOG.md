@@ -26,6 +26,30 @@
 ## [Unreleased]
 
 ### Added
+- **Миграция на PostgreSQL**
+  - Обновлен `database/db.go` для работы с PostgreSQL вместо SQLite
+  - Добавлена поддержка переменной окружения `DATABASE_URL`
+  - Создана миграция `database/migrations/036_migrate_to_postgresql.sql` со всей схемой БД
+  - Добавлены `.env.example` файлы для всех backend сервисов с примерами конфигурации
+  - Создана документация `infrastructure/POSTGRESQL_MIGRATION.md` с инструкциями по миграции
+  - Обновлены `go.mod` файлы всех backend сервисов:
+    - Добавлена зависимость `github.com/lib/pq v1.10.9` (PostgreSQL драйвер)
+    - Удалена зависимость `github.com/mattn/go-sqlite3` (SQLite драйвер)
+  - Все backend сервисы теперь используют единую PostgreSQL базу данных
+  - Credentials базы данных (EasyPanel):
+    - Пользователь: `postgres_zp`
+    - Пароль: `7da0905cd3349f58f368`
+    - База данных: `bd_zp`
+    - Хост: `my_projects_bd_zooplatforma`
+    - Порт: `5432`
+  - Файлы:
+    - `database/db.go` - обновлена инициализация БД
+    - `database/migrations/036_migrate_to_postgresql.sql` - новая миграция
+    - `infrastructure/POSTGRESQL_MIGRATION.md` - документация
+    - `infrastructure/.env.postgresql.example` - пример конфигурации
+    - `*/backend/.env.example` - примеры для каждого сервиса (7 файлов)
+    - `*/backend/go.mod` - обновлены все 7 backend сервисов
+
 - **Создание животных в кабинете волонтера**
   - Отдельная страница `/dashboard/pets/create` для создания животного
   - Форма с полями: кличка, вид, порода, пол, дата рождения, окрас, размер, местоположение (город, регион, адрес), контакты (имя, телефон), описание (история, характер, здоровье), срочность
@@ -42,12 +66,27 @@
     - `volunteer/frontend/app/dashboard/pets/create/page.tsx` (форма создания)
     - `volunteer/frontend/app/dashboard/pets/layout.tsx` (обертка AdminLayout)
   - Архитектура: Volunteer Frontend → Volunteer Backend (8500) → PetBase API (8100) → database/data.db
+
 - **Добавлена функция взятия животных под опеку для волонтеров**
   - Новый API endpoint `POST /api/take-custody` - взять животное под опеку
   - Новый API endpoint `POST /api/release-custody` - снять опеку с животного
   - Проверка что у животного еще нет куратора
   - Проверка прав волонтера при снятии опеки
   - Кнопка "Выбрать из каталога" открывает каталог в новой вкладке
+
+### Changed
+- **Драйвер базы данных**
+  - SQLite → PostgreSQL для production окружения
+  - Улучшена масштабируемость и производительность
+  - Лучшая поддержка конкурентности
+  - Более надежное хранилище данных
+
+### Technical
+- PostgreSQL 17 используется на EasyPanel
+- Connection pooling настроен на 25 максимум соединений
+- Все индексы созданы для оптимизации запросов
+- Поддержка JSONB для хранения сложных данных
+- Миграция сохраняет всю существующую схему БД
   - Файлы: `volunteer/backend/handlers/volunteer.go`, `volunteer/backend/main.go`, `volunteer/frontend/app/dashboard/page.tsx`
 
 ### Fixed
