@@ -34,7 +34,8 @@ export default function PetPage() {
 
   const loadCurrentUser = async () => {
     try {
-      const response = await fetch('http://localhost:7100/api/auth/me', {
+      const apiUrl = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+      const response = await fetch(`${apiUrl}/api/auth/me`, {
         credentials: 'include',
       });
       if (response.ok) {

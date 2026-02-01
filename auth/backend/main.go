@@ -178,13 +178,20 @@ func initDatabase() error {
 func enableCORS(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		allowedOrigins := []string{
-			"http://localhost:3000", // Main Frontend
-			"http://localhost:4000", // Admin Frontend
-			"http://localhost:4100", // PetBase Frontend
-			"http://localhost:5100", // Shelter Frontend
-			"http://localhost:6100", // Owner Frontend
-			"http://localhost:6200", // Volunteer Frontend
-			"http://localhost:6300", // Clinic Frontend
+			"http://localhost:3000",                                  // Main Frontend (dev)
+			"http://localhost:4000",                                  // Admin Frontend (dev)
+			"http://localhost:4100",                                  // PetBase Frontend (dev)
+			"http://localhost:5100",                                  // Shelter Frontend (dev)
+			"http://localhost:6100",                                  // Owner Frontend (dev)
+			"http://localhost:6200",                                  // Volunteer Frontend (dev)
+			"http://localhost:6300",                                  // Clinic Frontend (dev)
+			"https://my-projects-zooplatforma.crv1ic.easypanel.host", // Main Frontend (prod)
+			"https://my-projects-admin.crv1ic.easypanel.host",        // Admin Frontend (prod)
+			"https://my-projects-petbase.crv1ic.easypanel.host",      // PetBase Frontend (prod)
+			"https://my-projects-shelter.crv1ic.easypanel.host",      // Shelter Frontend (prod)
+			"https://my-projects-owner.crv1ic.easypanel.host",        // Owner Frontend (prod)
+			"https://my-projects-volunteer.crv1ic.easypanel.host",    // Volunteer Frontend (prod)
+			"https://my-projects-clinic.crv1ic.easypanel.host",       // Clinic Frontend (prod)
 		}
 
 		origin := r.Header.Get("Origin")

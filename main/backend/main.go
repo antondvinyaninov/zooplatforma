@@ -22,13 +22,20 @@ func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 
 		// Разрешённые origins
 		allowedOrigins := map[string]bool{
-			"http://localhost:3000": true, // Main frontend
-			"http://localhost:4000": true, // Admin frontend
-			"http://localhost:4100": true, // PetBase frontend
-			"http://localhost:5100": true, // Shelter frontend
-			"http://localhost:6100": true, // Owner frontend
-			"http://localhost:6200": true, // Volunteer frontend
-			"http://localhost:6300": true, // Clinic frontend
+			"http://localhost:3000":                                  true, // Main frontend (dev)
+			"http://localhost:4000":                                  true, // Admin frontend (dev)
+			"http://localhost:4100":                                  true, // PetBase frontend (dev)
+			"http://localhost:5100":                                  true, // Shelter frontend (dev)
+			"http://localhost:6100":                                  true, // Owner frontend (dev)
+			"http://localhost:6200":                                  true, // Volunteer frontend (dev)
+			"http://localhost:6300":                                  true, // Clinic frontend (dev)
+			"https://my-projects-zooplatforma.crv1ic.easypanel.host": true, // Main frontend (prod)
+			"https://my-projects-admin.crv1ic.easypanel.host":        true, // Admin frontend (prod)
+			"https://my-projects-petbase.crv1ic.easypanel.host":      true, // PetBase frontend (prod)
+			"https://my-projects-shelter.crv1ic.easypanel.host":      true, // Shelter frontend (prod)
+			"https://my-projects-owner.crv1ic.easypanel.host":        true, // Owner frontend (prod)
+			"https://my-projects-volunteer.crv1ic.easypanel.host":    true, // Volunteer frontend (prod)
+			"https://my-projects-clinic.crv1ic.easypanel.host":       true, // Clinic frontend (prod)
 		}
 
 		// Если origin в списке разрешённых, используем его

@@ -74,6 +74,9 @@ COPY shared ./shared
 RUN cd /app/main/frontend && npm install && \
     cd /app/shared && npm install
 
+# Собираем Next.js (для production)
+RUN cd /app/main/frontend && npm run build
+
 # Runtime образ
 FROM node:20-alpine
 
@@ -84,10 +87,12 @@ WORKDIR /app
 # Копируем собранные Go бинарники
 COPY --from=go-builder /app/bin/* /app/
 
-# Копируем Next.js
-COPY --from=next-builder /app/main/frontend /app/frontend
+# Копируем Next.js (production build)
+COPY --from=next-builder /app/main/frontend/.next /app/frontend/.next
+COPY --from=next-builder /app/main/frontend/public /app/frontend/public
 COPY --from=next-builder /app/main/frontend/node_modules /app/frontend/node_modules
 COPY --from=next-builder /app/main/frontend/package.json /app/frontend/package.json
+COPY --from=next-builder /app/main/frontend/next.config.ts /app/frontend/next.config.ts
 
 # Копируем миграции БД
 COPY database/migrations /app/migrations
@@ -99,44 +104,60 @@ COPY infrastructure /app/infrastructure
 COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Создаем скрипт для запуска сервисов
-RUN echo '#!/bin/sh' > /app/start.sh && \
-    echo 'SERVICE=${SERVICE:-main}' >> /app/start.sh && \
-    echo 'case $SERVICE in' >> /app/start.sh && \
-    echo '  auth)' >> /app/start.sh && \
-    echo '    exec /app/auth-backend' >> /app/start.sh && \
-    echo '    ;;' >> /app/start.sh && \
-    echo '  main)' >> /app/start.sh && \
-    echo '    # Запускаем nginx как reverse proxy' >> /app/start.sh && \
-    echo '    nginx -g "daemon off;" &' >> /app/start.sh && \
-    echo '    # Запускаем backend' >> /app/start.sh && \
-    echo '    /app/main-backend &' >> /app/start.sh && \
-    echo '    # Запускаем frontend' >> /app/start.sh && \
-    echo '    cd /app/frontend && npm run dev' >> /app/start.sh && \
-    echo '    ;;' >> /app/start.sh && \
-    echo '  admin)' >> /app/start.sh && \
-    echo '    exec /app/admin-backend' >> /app/start.sh && \
-    echo '    ;;' >> /app/start.sh && \
-    echo '  petbase)' >> /app/start.sh && \
-    echo '    exec /app/petbase-backend' >> /app/start.sh && \
-    echo '    ;;' >> /app/start.sh && \
-    echo '  shelter)' >> /app/start.sh && \
-    echo '    exec /app/shelter-backend' >> /app/start.sh && \
-    echo '    ;;' >> /app/start.sh && \
-    echo '  owner)' >> /app/start.sh && \
-    echo '    exec /app/owner-backend' >> /app/start.sh && \
-    echo '    ;;' >> /app/start.sh && \
-    echo '  volunteer)' >> /app/start.sh && \
-    echo '    exec /app/volunteer-backend' >> /app/start.sh && \
-    echo '    ;;' >> /app/start.sh && \
-    echo '  clinic)' >> /app/start.sh && \
-    echo '    exec /app/clinic-backend' >> /app/start.sh && \
-    echo '    ;;' >> /app/start.sh && \
-    echo '  *)' >> /app/start.sh && \
-    echo '    echo "Unknown service: $SERVICE"' >> /app/start.sh && \
-    echo '    exit 1' >> /app/start.sh && \
-    echo '    ;;' >> /app/start.sh && \
-    echo 'esac' >> /app/start.sh && \
-    chmod +x /app/start.sh
+RUN cat > /app/start.sh << 'EOF'
+#!/bin/sh
+set -e
+
+SERVICE=${SERVICE:-main}
+
+case $SERVICE in
+  auth)
+    exec /app/auth-backend
+    ;;
+  main)
+    # Запускаем nginx как reverse proxy
+    echo "🚀 Starting Nginx..."
+    nginx -g "daemon off;" &
+    NGINX_PID=$!
+    
+    # Запускаем backend
+    echo "🚀 Starting Main Backend..."
+    /app/main-backend &
+    BACKEND_PID=$!
+    
+    # Запускаем frontend (production build)
+    echo "🚀 Starting Main Frontend..."
+    cd /app/frontend && npm start &
+    FRONTEND_PID=$!
+    
+    # Ждем любого процесса
+    wait -n
+    ;;
+  admin)
+    exec /app/admin-backend
+    ;;
+  petbase)
+    exec /app/petbase-backend
+    ;;
+  shelter)
+    exec /app/shelter-backend
+    ;;
+  owner)
+    exec /app/owner-backend
+    ;;
+  volunteer)
+    exec /app/volunteer-backend
+    ;;
+  clinic)
+    exec /app/clinic-backend
+    ;;
+  *)
+    echo "Unknown service: $SERVICE"
+    exit 1
+    ;;
+esac
+EOF
+chmod +x /app/start.sh
 
 # Expose все порты
 EXPOSE 7100 8000 8100 8200 8400 8500 8600 9000 3000 4000 4100 5100 6100 6200 6300
