@@ -25,6 +25,14 @@
 
 ## [Unreleased]
 
+### Fixed
+- **Исправлена ошибка Docker build: missing go.sum entry**
+  - Проблема: Go модули с локальными `replace` директивами не разрешались правильно в Docker
+  - Решение: переместить `COPY . .` перед `go mod download` для разрешения локальных модулей
+  - Добавлен `go mod tidy` после `go mod download` для каждого backend сервиса
+  - Включен `auth/backend` в процесс сборки (был пропущен)
+  - Файл: `Dockerfile` - обновлена последовательность команд в builder stage
+
 ### Added
 - **Миграция на PostgreSQL**
   - Обновлен `database/db.go` для работы с PostgreSQL вместо SQLite
