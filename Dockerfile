@@ -77,7 +77,7 @@ RUN cd /app/main/frontend && npm install && \
 # Runtime образ
 FROM node:20-alpine
 
-RUN apk add --no-cache ca-certificates
+RUN apk add --no-cache ca-certificates nginx
 
 WORKDIR /app
 
@@ -95,17 +95,8 @@ COPY database/migrations /app/migrations
 # Копируем конфигурационные файлы
 COPY infrastructure /app/infrastructure
 
-# Создаем .env файл с переменными окружения
-RUN echo "DATABASE_URL=postgres://postgres_zp:7da0905cd3349f58f368@my_projects_bd_zooplatforma:5432/bd_zp?sslmode=disable" > /app/.env && \
-    echo "DB_HOST=my_projects_bd_zooplatforma" >> /app/.env && \
-    echo "DB_PORT=5432" >> /app/.env && \
-    echo "DB_USER=postgres_zp" >> /app/.env && \
-    echo "DB_PASSWORD=7da0905cd3349f58f368" >> /app/.env && \
-    echo "DB_NAME=bd_zp" >> /app/.env && \
-    echo "DB_SSLMODE=disable" >> /app/.env && \
-    echo "JWT_SECRET=your-super-secret-key-change-this-in-production" >> /app/.env && \
-    echo "ENVIRONMENT=production" >> /app/.env && \
-    echo "LOG_LEVEL=info" >> /app/.env
+# Копируем nginx конфиг
+COPY nginx.conf /etc/nginx/conf.d/default.conf
 
 # Создаем скрипт для запуска сервисов
 RUN echo '#!/bin/sh' > /app/start.sh && \
@@ -115,7 +106,11 @@ RUN echo '#!/bin/sh' > /app/start.sh && \
     echo '    exec /app/auth-backend' >> /app/start.sh && \
     echo '    ;;' >> /app/start.sh && \
     echo '  main)' >> /app/start.sh && \
+    echo '    # Запускаем nginx как reverse proxy' >> /app/start.sh && \
+    echo '    nginx -g "daemon off;" &' >> /app/start.sh && \
+    echo '    # Запускаем backend' >> /app/start.sh && \
     echo '    /app/main-backend &' >> /app/start.sh && \
+    echo '    # Запускаем frontend' >> /app/start.sh && \
     echo '    cd /app/frontend && npm run dev' >> /app/start.sh && \
     echo '    ;;' >> /app/start.sh && \
     echo '  admin)' >> /app/start.sh && \
