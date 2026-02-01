@@ -68,7 +68,7 @@ export default function FavoritesPage() {
         })
       );
 
-      setFavorites(favoritesWithPets.filter(f => f.pet));
+      setFavorites(favoritesWithPets.filter((f): f is Favorite & { pet: any } => !!f.pet));
     } catch (error) {
       console.error('Error loading favorites:', error);
     } finally {
