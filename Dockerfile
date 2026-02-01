@@ -63,6 +63,9 @@ COPY database/migrations /app/migrations
 # Копируем конфигурационные файлы
 COPY infrastructure /app/infrastructure
 
+# Копируем .env файл
+COPY .env /app/.env
+
 # Expose все порты
 EXPOSE 7100 8000 8100 8200 8400 8500 8600 9000 3000 4000 4100 5100 6100 6200 6300
 
