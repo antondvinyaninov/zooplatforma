@@ -4,7 +4,7 @@
 FROM golang:1.25.5-alpine AS go-builder
 
 # Установка зависимостей
-RUN apk add --no-cache git make
+RUN apk add --no-cache git make build-base
 
 WORKDIR /app
 
@@ -44,7 +44,8 @@ RUN go mod download -C database && \
     go mod tidy -C volunteer/backend
 
 # Собираем все backend сервисы
-RUN cd auth/backend && go build -o /app/bin/auth-backend . && \
+# Auth Service требует CGO для sqlite3
+RUN cd auth/backend && CGO_ENABLED=1 go build -o /app/bin/auth-backend . && \
     cd /app && \
     cd main/backend && go build -o /app/bin/main-backend . && \
     cd /app && \
