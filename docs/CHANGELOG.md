@@ -28,6 +28,42 @@
 ### Added
 - **Nginx reverse proxy для API routing**
   - Создан `nginx.conf` для маршрутизации запросов:
+    - `/api/*` → Main Backend (8000)
+    - `/_next/*` → Main Frontend (3000) с кэшем
+    - `/*` → Main Frontend (3000)
+  - Добавлена поддержка WebSocket для Next.js dev server
+  - Добавлено кэширование статических файлов
+
+### Fixed
+- **CORS для production deployment на EasyPanel**
+  - Добавлены production URLs в allowlist:
+    - `https://my-projects-zooplatforma.crv1ic.easypanel.host` (Main)
+    - `https://my-projects-admin.crv1ic.easypanel.host` (Admin)
+    - `https://my-projects-petbase.crv1ic.easypanel.host` (PetBase)
+    - `https://my-projects-shelter.crv1ic.easypanel.host` (Shelter)
+    - `https://my-projects-owner.crv1ic.easypanel.host` (Owner)
+    - `https://my-projects-volunteer.crv1ic.easypanel.host` (Volunteer)
+    - `https://my-projects-clinic.crv1ic.easypanel.host` (Clinic)
+  - Обновлены CORS в Main Backend (`main/backend/main.go`)
+  - Обновлены CORS в Auth Service (`auth/backend/main.go`)
+
+- **Hardcoded localhost URLs в Frontend**
+  - Исправлены hardcoded URLs в `main/frontend/app/(main)/pets/[id]/page.tsx`
+  - Исправлены hardcoded URLs в `main/frontend/app/(main)/pets/[id]/edit/page.tsx`
+  - Теперь используется `NEXT_PUBLIC_API_URL` переменная окружения
+
+### Changed
+- **Docker build для production**
+  - Добавлен `npm run build` для Next.js в Dockerfile
+  - Изменен start.sh для использования `npm start` вместо `npm run dev`
+  - Копируются только `.next` build артефакты вместо исходников
+  - Улучшена обработка процессов в start.sh скрипте
+
+### Technical
+- Nginx upstream блоки для лучшей производительности
+- WebSocket поддержка для Next.js HMR
+- Правильная обработка X-Forwarded-* заголовков
+- Таймауты для proxy connections (60s)
     - `/api/*` → backend на порт 8000
     - `/*` → frontend на порт 3000
   - Добавлен nginx в Docker runtime образ
