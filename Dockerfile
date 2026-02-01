@@ -19,15 +19,15 @@ COPY shelter/backend/go.mod shelter/backend/go.sum ./shelter/backend/
 COPY volunteer/backend/go.mod volunteer/backend/go.sum ./volunteer/backend/
 COPY pkg ./pkg
 
-# Скачиваем Go зависимости
-RUN go mod download -C database && \
-    go mod download -C main/backend && \
-    go mod download -C admin/backend && \
-    go mod download -C clinic/backend && \
-    go mod download -C owner/backend && \
-    go mod download -C petbase/backend && \
-    go mod download -C shelter/backend && \
-    go mod download -C volunteer/backend
+# Скачиваем Go зависимости и обновляем go.sum
+RUN go mod download -C database && go mod tidy -C database && \
+    go mod download -C main/backend && go mod tidy -C main/backend && \
+    go mod download -C admin/backend && go mod tidy -C admin/backend && \
+    go mod download -C clinic/backend && go mod tidy -C clinic/backend && \
+    go mod download -C owner/backend && go mod tidy -C owner/backend && \
+    go mod download -C petbase/backend && go mod tidy -C petbase/backend && \
+    go mod download -C shelter/backend && go mod tidy -C shelter/backend && \
+    go mod download -C volunteer/backend && go mod tidy -C volunteer/backend
 
 # Копируем весь проект
 COPY . .
