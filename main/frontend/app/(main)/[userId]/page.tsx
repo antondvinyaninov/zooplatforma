@@ -266,7 +266,7 @@ export default function UserProfilePage() {
                     <span className="hidden sm:inline">Редактировать профиль</span>
                     <span className="sm:hidden">Редактировать</span>
                   </button>
-                ) : (
+                ) : userId ? (
                   <div className="flex items-center gap-2">
                     <FriendButton userId={userId} currentUserId={currentUser?.id || 0} />
                     <button 
@@ -278,7 +278,7 @@ export default function UserProfilePage() {
                       <span>Написать</span>
                     </button>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
