@@ -1,7 +1,7 @@
 # Multi-stage build для zooplatforma проекта
-# Этот Dockerfile собирает все backend сервисы
+# Этот Dockerfile собирает backend сервисы и Next.js фронтенд
 
-FROM golang:1.25.5-alpine AS builder
+FROM golang:1.25.5-alpine AS go-builder
 
 # Установка зависимостей
 RUN apk add --no-cache git make
@@ -47,15 +47,41 @@ RUN cd main/backend && go build -o /app/bin/main-backend . && \
     cd /app && \
     cd volunteer/backend && go build -o /app/bin/volunteer-backend .
 
+# Next.js builder
+FROM node:20-alpine AS next-builder
+
+WORKDIR /app
+
+# Копируем package.json и package-lock.json для main frontend
+COPY main/frontend/package*.json ./main/frontend/
+COPY shared/package*.json ./shared/
+
+# Устанавливаем зависимости
+RUN cd main/frontend && npm ci && \
+    cd /app/shared && npm ci
+
+# Копируем исходный код
+COPY main/frontend ./main/frontend
+COPY shared ./shared
+
+# Собираем Next.js
+RUN cd main/frontend && npm run build
+
 # Runtime образ
-FROM alpine:latest
+FROM node:20-alpine
 
 RUN apk add --no-cache ca-certificates
 
 WORKDIR /app
 
-# Копируем собранные бинарники
-COPY --from=builder /app/bin/* /app/
+# Копируем собранные Go бинарники
+COPY --from=go-builder /app/bin/* /app/
+
+# Копируем Next.js build
+COPY --from=next-builder /app/main/frontend/.next /app/frontend/.next
+COPY --from=next-builder /app/main/frontend/public /app/frontend/public
+COPY --from=next-builder /app/main/frontend/node_modules /app/frontend/node_modules
+COPY --from=next-builder /app/main/frontend/package.json /app/frontend/package.json
 
 # Копируем миграции БД
 COPY database/migrations /app/migrations
@@ -75,9 +101,14 @@ RUN echo "DATABASE_URL=postgres://postgres_zp:7da0905cd3349f58f368@my_projects_b
     echo "ENVIRONMENT=production" >> /app/.env && \
     echo "LOG_LEVEL=info" >> /app/.env
 
+# Создаем скрипт для запуска backend и frontend
+RUN echo '#!/bin/sh' > /app/start.sh && \
+    echo '/app/main-backend &' >> /app/start.sh && \
+    echo 'cd /app/frontend && npm start' >> /app/start.sh && \
+    chmod +x /app/start.sh
+
 # Expose все порты
 EXPOSE 7100 8000 8100 8200 8400 8500 8600 9000 3000 4000 4100 5100 6100 6200 6300
 
-# Запускаем main backend по умолчанию
-# EasyPanel может переопределить это через CMD
-CMD ["/app/main-backend"]
+# Запускаем оба сервиса
+CMD ["/app/start.sh"]
