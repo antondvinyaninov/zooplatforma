@@ -8,8 +8,16 @@ RUN apk add --no-cache git make
 
 WORKDIR /app
 
-# Копируем весь проект
-COPY . .
+# Копируем go.mod и go.sum файлы для всех модулей
+COPY database/go.mod database/go.sum ./database/
+COPY main/backend/go.mod main/backend/go.sum ./main/backend/
+COPY admin/backend/go.mod admin/backend/go.sum ./admin/backend/
+COPY clinic/backend/go.mod clinic/backend/go.sum ./clinic/backend/
+COPY owner/backend/go.mod owner/backend/go.sum ./owner/backend/
+COPY petbase/backend/go.mod petbase/backend/go.sum ./petbase/backend/
+COPY shelter/backend/go.mod shelter/backend/go.sum ./shelter/backend/
+COPY volunteer/backend/go.mod volunteer/backend/go.sum ./volunteer/backend/
+COPY pkg ./pkg
 
 # Скачиваем Go зависимости
 RUN go mod download -C database && \
@@ -20,6 +28,9 @@ RUN go mod download -C database && \
     go mod download -C petbase/backend && \
     go mod download -C shelter/backend && \
     go mod download -C volunteer/backend
+
+# Копируем весь проект
+COPY . .
 
 # Собираем все backend сервисы
 RUN cd main/backend && go build -o /app/bin/main-backend . && \
