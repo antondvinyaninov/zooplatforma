@@ -26,6 +26,14 @@
 ## [Unreleased]
 
 ### Fixed
+- **Исправлена ошибка Auth Service в Docker: CGO_ENABLED=0**
+  - Проблема: Auth Service использует go-sqlite3, который требует CGO для компиляции
+  - Ошибка: "Binary was compiled with 'CGO_ENABLED=0', go-sqlite3 requires cgo to work"
+  - Решение: 
+    - Добавлен `build-base` в Alpine для поддержки CGO
+    - Установлен `CGO_ENABLED=1` при компиляции auth/backend
+  - Файл: `Dockerfile` - обновлены зависимости и флаги компиляции
+
 - **Исправлена ошибка Docker build: missing go.sum entry**
   - Проблема: Go модули с локальными `replace` директивами не разрешались правильно в Docker
   - Решение: переместить `COPY . .` перед `go mod download` для разрешения локальных модулей
