@@ -25,6 +25,18 @@
 
 ## [Unreleased]
 
+### Added
+- **Nginx reverse proxy для API routing**
+  - Создан `nginx.conf` для маршрутизации запросов:
+    - `/api/*` → backend на порт 8000
+    - `/*` → frontend на порт 3000
+  - Добавлен nginx в Docker runtime образ
+  - Обновлен `start.sh` для запуска nginx как reverse proxy для main сервиса
+  - Это решает проблему 404 ошибок при обращении frontend к backend API
+  - Файлы:
+    - `nginx.conf` - конфигурация nginx
+    - `Dockerfile` - добавлен nginx и обновлен start.sh
+
 ### Fixed
 - **Исправлена ошибка Auth Service в Docker: CGO_ENABLED=0**
   - Проблема: Auth Service использует go-sqlite3, который требует CGO для компиляции
@@ -41,7 +53,11 @@
   - Включен `auth/backend` в процесс сборки (был пропущен)
   - Файл: `Dockerfile` - обновлена последовательность команд в builder stage
 
-### Added
+- **Исправлен порт Auth Service (7100 вместо 7100)**
+  - Auth Service теперь всегда использует порт 7100, игнорируя PORT переменную от EasyPanel
+  - Файл: `auth/backend/main.go` - обновлена логика определения порта
+
+### Added (PostgreSQL Migration)
 - **Миграция на PostgreSQL**
   - Обновлен `database/db.go` для работы с PostgreSQL вместо SQLite
   - Добавлена поддержка переменной окружения `DATABASE_URL`
