@@ -60,9 +60,6 @@ COPY shared ./shared
 RUN cd /app/main/frontend && npm install && \
     cd /app/shared && npm install
 
-# Собираем Next.js
-RUN cd /app/main/frontend && npm run build
-
 # Runtime образ
 FROM node:20-alpine
 
@@ -73,9 +70,8 @@ WORKDIR /app
 # Копируем собранные Go бинарники
 COPY --from=go-builder /app/bin/* /app/
 
-# Копируем Next.js build
-COPY --from=next-builder /app/main/frontend/.next /app/frontend/.next
-COPY --from=next-builder /app/main/frontend/public /app/frontend/public
+# Копируем Next.js
+COPY --from=next-builder /app/main/frontend /app/frontend
 COPY --from=next-builder /app/main/frontend/node_modules /app/frontend/node_modules
 COPY --from=next-builder /app/main/frontend/package.json /app/frontend/package.json
 
@@ -100,7 +96,7 @@ RUN echo "DATABASE_URL=postgres://postgres_zp:7da0905cd3349f58f368@my_projects_b
 # Создаем скрипт для запуска backend и frontend
 RUN echo '#!/bin/sh' > /app/start.sh && \
     echo '/app/main-backend &' >> /app/start.sh && \
-    echo 'cd /app/frontend && npm start' >> /app/start.sh && \
+    echo 'cd /app/frontend && npm run dev' >> /app/start.sh && \
     chmod +x /app/start.sh
 
 # Expose все порты
