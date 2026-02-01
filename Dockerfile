@@ -93,14 +93,44 @@ RUN echo "DATABASE_URL=postgres://postgres_zp:7da0905cd3349f58f368@my_projects_b
     echo "ENVIRONMENT=production" >> /app/.env && \
     echo "LOG_LEVEL=info" >> /app/.env
 
-# Создаем скрипт для запуска backend и frontend
+# Создаем скрипт для запуска сервисов
 RUN echo '#!/bin/sh' > /app/start.sh && \
-    echo '/app/main-backend &' >> /app/start.sh && \
-    echo 'cd /app/frontend && npm run dev' >> /app/start.sh && \
+    echo 'SERVICE=${SERVICE:-main}' >> /app/start.sh && \
+    echo 'case $SERVICE in' >> /app/start.sh && \
+    echo '  auth)' >> /app/start.sh && \
+    echo '    exec /app/auth-backend' >> /app/start.sh && \
+    echo '    ;;' >> /app/start.sh && \
+    echo '  main)' >> /app/start.sh && \
+    echo '    /app/main-backend &' >> /app/start.sh && \
+    echo '    cd /app/frontend && npm run dev' >> /app/start.sh && \
+    echo '    ;;' >> /app/start.sh && \
+    echo '  admin)' >> /app/start.sh && \
+    echo '    exec /app/admin-backend' >> /app/start.sh && \
+    echo '    ;;' >> /app/start.sh && \
+    echo '  petbase)' >> /app/start.sh && \
+    echo '    exec /app/petbase-backend' >> /app/start.sh && \
+    echo '    ;;' >> /app/start.sh && \
+    echo '  shelter)' >> /app/start.sh && \
+    echo '    exec /app/shelter-backend' >> /app/start.sh && \
+    echo '    ;;' >> /app/start.sh && \
+    echo '  owner)' >> /app/start.sh && \
+    echo '    exec /app/owner-backend' >> /app/start.sh && \
+    echo '    ;;' >> /app/start.sh && \
+    echo '  volunteer)' >> /app/start.sh && \
+    echo '    exec /app/volunteer-backend' >> /app/start.sh && \
+    echo '    ;;' >> /app/start.sh && \
+    echo '  clinic)' >> /app/start.sh && \
+    echo '    exec /app/clinic-backend' >> /app/start.sh && \
+    echo '    ;;' >> /app/start.sh && \
+    echo '  *)' >> /app/start.sh && \
+    echo '    echo "Unknown service: $SERVICE"' >> /app/start.sh && \
+    echo '    exit 1' >> /app/start.sh && \
+    echo '    ;;' >> /app/start.sh && \
+    echo 'esac' >> /app/start.sh && \
     chmod +x /app/start.sh
 
 # Expose все порты
 EXPOSE 7100 8000 8100 8200 8400 8500 8600 9000 3000 4000 4100 5100 6100 6200 6300
 
-# Запускаем оба сервиса
+# Запускаем сервис (по умолчанию main)
 CMD ["/app/start.sh"]
