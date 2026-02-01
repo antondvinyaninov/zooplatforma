@@ -10,6 +10,7 @@ WORKDIR /app
 
 # Копируем go.mod и go.sum файлы для всех модулей
 COPY database/go.mod database/go.sum ./database/
+COPY auth/backend/go.mod auth/backend/go.sum ./auth/backend/
 COPY main/backend/go.mod main/backend/go.sum ./main/backend/
 COPY admin/backend/go.mod admin/backend/go.sum ./admin/backend/
 COPY clinic/backend/go.mod clinic/backend/go.sum ./clinic/backend/
@@ -19,21 +20,33 @@ COPY shelter/backend/go.mod shelter/backend/go.sum ./shelter/backend/
 COPY volunteer/backend/go.mod volunteer/backend/go.sum ./volunteer/backend/
 COPY pkg ./pkg
 
-# Скачиваем Go зависимости
-RUN go mod download -C database && \
-    go mod download -C main/backend && \
-    go mod download -C admin/backend && \
-    go mod download -C clinic/backend && \
-    go mod download -C owner/backend && \
-    go mod download -C petbase/backend && \
-    go mod download -C shelter/backend && \
-    go mod download -C volunteer/backend
-
-# Копируем весь проект
+# Копируем весь проект (нужно для resolve local modules)
 COPY . .
 
+# Скачиваем Go зависимости (после копирования всех файлов для resolve local modules)
+RUN go mod download -C database && \
+    go mod tidy -C database && \
+    go mod download -C auth/backend && \
+    go mod tidy -C auth/backend && \
+    go mod download -C main/backend && \
+    go mod tidy -C main/backend && \
+    go mod download -C admin/backend && \
+    go mod tidy -C admin/backend && \
+    go mod download -C clinic/backend && \
+    go mod tidy -C clinic/backend && \
+    go mod download -C owner/backend && \
+    go mod tidy -C owner/backend && \
+    go mod download -C petbase/backend && \
+    go mod tidy -C petbase/backend && \
+    go mod download -C shelter/backend && \
+    go mod tidy -C shelter/backend && \
+    go mod download -C volunteer/backend && \
+    go mod tidy -C volunteer/backend
+
 # Собираем все backend сервисы
-RUN cd main/backend && go build -o /app/bin/main-backend . && \
+RUN cd auth/backend && go build -o /app/bin/auth-backend . && \
+    cd /app && \
+    cd main/backend && go build -o /app/bin/main-backend . && \
     cd /app && \
     cd admin/backend && go build -o /app/bin/admin-backend . && \
     cd /app && \
