@@ -152,7 +152,8 @@ case $SERVICE in
     ;;
 esac
 EOF
-chmod +x /app/start.sh
+RUN chmod +x /app/start.sh
+
 
 # Expose все порты
 EXPOSE 7100 8000 8100 8200 8400 8500 8600 9000 3000 4000 4100 5100 6100 6200 6300
