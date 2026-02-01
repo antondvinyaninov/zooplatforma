@@ -1,0 +1,144 @@
+version: '3.8'
+
+services:
+  # PostgreSQL Database
+  postgres:
+    image: postgres:17-alpine
+    container_name: zooplatforma_postgres
+    environment:
+      POSTGRES_USER: postgres_zp
+      POSTGRES_PASSWORD: 7da0905cd3349f58f368
+      POSTGRES_DB: bd_zp
+    ports:
+      - "5432:5432"
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./database/migrations:/docker-entrypoint-initdb.d
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres_zp"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+
+  # Main Backend
+  main-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zooplatforma_main_backend
+    environment:
+      DATABASE_URL: postgres://postgres_zp:7da0905cd3349f58f368@postgres:5432/bd_zp?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-backend:7100
+      PORT: 8000
+    ports:
+      - "8000:8000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: /app/main-backend
+
+  # Admin Backend
+  admin-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zooplatforma_admin_backend
+    environment:
+      DATABASE_URL: postgres://postgres_zp:7da0905cd3349f58f368@postgres:5432/bd_zp?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-backend:7100
+      PORT: 9000
+    ports:
+      - "9000:9000"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: /app/admin-backend
+
+  # PetBase Backend
+  petbase-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zooplatforma_petbase_backend
+    environment:
+      DATABASE_URL: postgres://postgres_zp:7da0905cd3349f58f368@postgres:5432/bd_zp?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-backend:7100
+      PORT: 8100
+    ports:
+      - "8100:8100"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: /app/petbase-backend
+
+  # Clinic Backend
+  clinic-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zooplatforma_clinic_backend
+    environment:
+      DATABASE_URL: postgres://postgres_zp:7da0905cd3349f58f368@postgres:5432/bd_zp?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-backend:7100
+      PORT: 8600
+    ports:
+      - "8600:8600"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: /app/clinic-backend
+
+  # Shelter Backend
+  shelter-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zooplatforma_shelter_backend
+    environment:
+      DATABASE_URL: postgres://postgres_zp:7da0905cd3349f58f368@postgres:5432/bd_zp?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-backend:7100
+      PORT: 8200
+    ports:
+      - "8200:8200"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: /app/shelter-backend
+
+  # Owner Backend
+  owner-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zooplatforma_owner_backend
+    environment:
+      DATABASE_URL: postgres://postgres_zp:7da0905cd3349f58f368@postgres:5432/bd_zp?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-backend:7100
+      PORT: 8400
+    ports:
+      - "8400:8400"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: /app/owner-backend
+
+  # Volunteer Backend
+  volunteer-backend:
+    build:
+      context: .
+      dockerfile: Dockerfile
+    container_name: zooplatforma_volunteer_backend
+    environment:
+      DATABASE_URL: postgres://postgres_zp:7da0905cd3349f58f368@postgres:5432/bd_zp?sslmode=disable
+      AUTH_SERVICE_URL: http://auth-backend:7100
+      PORT: 8500
+    ports:
+      - "8500:8500"
+    depends_on:
+      postgres:
+        condition: service_healthy
+    command: /app/volunteer-backend
+
+volumes:
+  postgres_data:
+    driver: local
