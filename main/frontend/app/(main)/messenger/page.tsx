@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useRouter } from 'next/navigation';
+import { useRouter, useSearchParams } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import ChatList from './components/ChatList';
 import ChatHeader from './components/ChatHeader';
@@ -11,6 +11,7 @@ import { Chat, Message } from './types';
 
 export default function MessengerPage() {
   const router = useRouter();
+  const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -45,6 +46,88 @@ export default function MessengerPage() {
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [user?.id]);
+
+  // Обработка query параметра ?user=ID для открытия чата с конкретным пользователем
+  useEffect(() => {
+    const userIdParam = searchParams.get('user');
+    
+    if (userIdParam && chats.length > 0 && !selectedChatId) {
+      const targetUserId = parseInt(userIdParam);
+      
+      // Ищем существующий чат с этим пользователем
+      const existingChat = chats.find(
+        chat => chat.other_user?.id === targetUserId
+      );
+      
+      if (existingChat) {
+        // Открываем существующий чат
+        setSelectedChatId(existingChat.id);
+      } else {
+        // Создаем временный чат (с отрицательным ID)
+        const tempChat: Chat = {
+          id: -targetUserId, // Временный ID
+          user1_id: user?.id || 0,
+          user2_id: targetUserId,
+          other_user: {
+            id: targetUserId,
+            name: 'Загрузка...',
+            email: '',
+            avatar: null,
+            last_name: null,
+            location: null,
+            is_online: 0,
+            last_seen: null,
+          },
+          last_message: null,
+          last_message_at: null,
+          unread_count: 0,
+          created_at: new Date().toISOString(),
+        };
+        
+        setChats(prev => [tempChat, ...prev]);
+        setSelectedChatId(tempChat.id);
+        
+        // Загружаем данные пользователя
+        fetchUserData(targetUserId);
+      }
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchParams, chats, selectedChatId, user?.id]);
+
+  const fetchUserData = async (userId: number) => {
+    try {
+      const token = localStorage.getItem('auth_token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
+      const response = await fetch(`/api/users/${userId}`, {
+        credentials: 'include',
+        headers,
+      });
+      
+      if (response.ok) {
+        const data = await response.json();
+        
+        // Обновляем временный чат с реальными данными пользователя
+        setChats(prev => prev.map(chat => {
+          if (chat.id === -userId) {
+            return {
+              ...chat,
+              other_user: data.success ? data.data : chat.other_user,
+            };
+          }
+          return chat;
+        }));
+      }
+    } catch (error) {
+      console.error('Failed to fetch user data:', error);
+    }
+  };
 
   // Загружаем сообщения при выборе чата
   useEffect(() => {
