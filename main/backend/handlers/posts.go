@@ -465,7 +465,7 @@ func getUserPosts(w http.ResponseWriter, r *http.Request, userID int) {
 	log.Printf("🔍 getUserPosts: Pagination - limit=%d, offset=%d", limit, offset)
 
 	simpleQuery := `SELECT id FROM posts WHERE author_id = ? AND author_type = 'user' AND is_deleted = FALSE ORDER BY created_at DESC LIMIT ? OFFSET ?`
-	rows, err := database.DB.Query(simpleQuery, userID, limit, offset)
+	rows, err := database.DB.Query(ConvertPlaceholders(simpleQuery), userID, limit, offset)
 	if err != nil {
 		log.Printf("❌ getUserPosts: Query error: %v", err)
 		sendErrorResponse(w, "Ошибка получения постов: "+err.Error(), http.StatusInternalServerError)
@@ -498,7 +498,7 @@ func getUserPosts(w http.ResponseWriter, r *http.Request, userID int) {
 		var attachedPetsJSON, attachmentsJSON, tagsJSON sql.NullString
 		var scheduledAt sql.NullTime
 
-		err := database.DB.QueryRow(query, postID).Scan(
+		err := database.DB.QueryRow(ConvertPlaceholders(query), postID).Scan(
 			&post.ID, &post.AuthorID, &post.AuthorType, &post.Content,
 			&attachedPetsJSON, &attachmentsJSON, &tagsJSON,
 			&post.Status, &scheduledAt, &post.CreatedAt, &post.UpdatedAt,

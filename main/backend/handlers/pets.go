@@ -95,7 +95,7 @@ func getUserPets(w http.ResponseWriter, _ *http.Request, userID int) {
 
 	query := `SELECT id, user_id, name, species, photo, created_at FROM pets WHERE user_id = ? ORDER BY created_at DESC`
 
-	rows, err := database.DB.Query(query, userID)
+	rows, err := database.DB.Query(ConvertPlaceholders(query), userID)
 	if err != nil {
 		log.Printf("❌ getUserPets: Ошибка запроса к БД для user_id=%d: %v", userID, err)
 		sendErrorResponse(w, "Ошибка получения питомцев: "+err.Error(), http.StatusInternalServerError)
@@ -129,7 +129,7 @@ func getCuratedPets(w http.ResponseWriter, _ *http.Request, userID int) {
 
 	query := `SELECT id, user_id, name, species, photo, created_at FROM pets WHERE curator_id = ? ORDER BY created_at DESC`
 
-	rows, err := database.DB.Query(query, userID)
+	rows, err := database.DB.Query(ConvertPlaceholders(query), userID)
 	if err != nil {
 		log.Printf("❌ getCuratedPets: Ошибка запроса к БД для user_id=%d: %v", userID, err)
 		sendErrorResponse(w, "Ошибка получения курируемых питомцев: "+err.Error(), http.StatusInternalServerError)
@@ -161,7 +161,7 @@ func getPet(w http.ResponseWriter, _ *http.Request, petID int) {
 	query := `SELECT id, user_id, name, species, photo, created_at FROM pets WHERE id = ?`
 
 	var pet models.Pet
-	err := database.DB.QueryRow(query, petID).Scan(&pet.ID, &pet.UserID, &pet.Name, &pet.Species, &pet.Photo, &pet.CreatedAt)
+	err := database.DB.QueryRow(ConvertPlaceholders(query), petID).Scan(&pet.ID, &pet.UserID, &pet.Name, &pet.Species, &pet.Photo, &pet.CreatedAt)
 	if err != nil {
 		sendErrorResponse(w, "Питомец не найден", http.StatusNotFound)
 		return
@@ -189,7 +189,7 @@ func createPet(w http.ResponseWriter, r *http.Request) {
 	}
 
 	query := `INSERT INTO pets (user_id, name, species, photo) VALUES (?, ?, ?, ?)`
-	result, err := database.DB.Exec(query, userID, req.Name, req.Species, req.Photo)
+	result, err := database.DB.Exec(ConvertPlaceholders(query), userID, req.Name, req.Species, req.Photo)
 	if err != nil {
 		sendErrorResponse(w, "Ошибка добавления питомца: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -200,7 +200,7 @@ func createPet(w http.ResponseWriter, r *http.Request) {
 	// Получаем созданного питомца
 	var pet models.Pet
 	query = `SELECT id, user_id, name, species, photo, created_at FROM pets WHERE id = ?`
-	err = database.DB.QueryRow(query, id).Scan(&pet.ID, &pet.UserID, &pet.Name, &pet.Species, &pet.Photo, &pet.CreatedAt)
+	err = database.DB.QueryRow(ConvertPlaceholders(query), id).Scan(&pet.ID, &pet.UserID, &pet.Name, &pet.Species, &pet.Photo, &pet.CreatedAt)
 	if err != nil {
 		sendErrorResponse(w, "Ошибка получения питомца", http.StatusInternalServerError)
 		return
