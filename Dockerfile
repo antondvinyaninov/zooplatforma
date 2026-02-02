@@ -87,12 +87,20 @@ WORKDIR /app
 # Копируем собранные Go бинарники
 COPY --from=go-builder /app/bin/* /app/
 
-# Копируем Next.js (production build)
+# Копируем Next.js (production build и все необходимые файлы)
 COPY --from=next-builder /app/main/frontend/.next /app/frontend/.next
+COPY --from=next-builder /app/main/frontend/app /app/frontend/app
+COPY --from=next-builder /app/main/frontend/contexts /app/frontend/contexts
+COPY --from=next-builder /app/main/frontend/lib /app/frontend/lib
+COPY --from=next-builder /app/main/frontend/types /app/frontend/types
 COPY --from=next-builder /app/main/frontend/public /app/frontend/public
 COPY --from=next-builder /app/main/frontend/node_modules /app/frontend/node_modules
 COPY --from=next-builder /app/main/frontend/package.json /app/frontend/package.json
 COPY --from=next-builder /app/main/frontend/next.config.ts /app/frontend/next.config.ts
+COPY --from=next-builder /app/main/frontend/tsconfig.json /app/frontend/tsconfig.json
+COPY --from=next-builder /app/main/frontend/next-env.d.ts /app/frontend/next-env.d.ts
+COPY --from=next-builder /app/main/frontend/postcss.config.mjs /app/frontend/postcss.config.mjs
+COPY --from=next-builder /app/main/frontend/tailwind.config.ts /app/frontend/tailwind.config.ts
 
 # Копируем миграции БД
 COPY database/migrations /app/migrations

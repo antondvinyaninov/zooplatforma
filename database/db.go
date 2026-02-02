@@ -5,9 +5,11 @@ import (
 	"fmt"
 	"log"
 	"os"
+	"strings"
 	"time"
 
 	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var DB *sql.DB
@@ -16,10 +18,12 @@ func InitDB() error {
 	// Получаем connection string из переменной окружения
 	dbURL := os.Getenv("DATABASE_URL")
 	if dbURL == "" {
-		// Fallback для локальной разработки
-		dbURL = "postgres://postgres_zp:7da0905cd3349f58f368@localhost:5432/bd_zp?sslmode=disable"
+		// Fallback для локальной разработки - используем SQLite
+		log.Println("📦 Using SQLite for local development (database/data.db)")
+		return InitSQLite("database/data.db")
 	}
 
+	// Production - используем PostgreSQL
 	return InitDBWithURL(dbURL)
 }
 
@@ -49,10 +53,36 @@ func InitDBWithURL(dbURL string) error {
 	}
 
 	log.Println("✅ PostgreSQL database connected successfully")
-	return createTables()
+	return createTablesPostgreSQL()
 }
 
-func createTables() error {
+func InitSQLite(path string) error {
+	var err error
+
+	// Если путь относительный и не начинается с ../, добавляем ../../
+	// (для запуска из service/backend директории)
+	if !strings.HasPrefix(path, "/") && !strings.HasPrefix(path, "..") {
+		path = "../../" + path
+	}
+
+	DB, err = sql.Open("sqlite3", path)
+	if err != nil {
+		return fmt.Errorf("failed to open SQLite database: %w", err)
+	}
+
+	// Настройка для SQLite
+	DB.SetMaxOpenConns(1) // SQLite работает лучше с одним соединением
+
+	// Проверяем подключение
+	if err = DB.Ping(); err != nil {
+		return fmt.Errorf("failed to ping SQLite database: %w", err)
+	}
+
+	log.Printf("✅ SQLite database connected successfully: %s", path)
+	return createTablesSQLite()
+}
+
+func createTablesPostgreSQL() error {
 	// PostgreSQL использует SERIAL для auto-increment
 	query := `
 	CREATE TABLE IF NOT EXISTS users (
@@ -85,11 +115,57 @@ func createTables() error {
 	`
 	_, err := DB.Exec(query)
 	if err != nil {
-		return fmt.Errorf("failed to create tables: %w", err)
+		return fmt.Errorf("failed to create PostgreSQL tables: %w", err)
 	}
 
-	log.Println("✅ Tables created successfully")
+	log.Println("✅ PostgreSQL tables created successfully")
 	return nil
+}
+
+func createTablesSQLite() error {
+	// SQLite использует INTEGER PRIMARY KEY AUTOINCREMENT
+	query := `
+	CREATE TABLE IF NOT EXISTS users (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		name TEXT NOT NULL,
+		email TEXT UNIQUE NOT NULL,
+		password TEXT NOT NULL,
+		created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+	);
+
+	CREATE TABLE IF NOT EXISTS user_media (
+		id INTEGER PRIMARY KEY AUTOINCREMENT,
+		user_id INTEGER NOT NULL,
+		file_name TEXT NOT NULL,
+		original_name TEXT NOT NULL,
+		file_path TEXT NOT NULL,
+		file_size INTEGER NOT NULL,
+		mime_type TEXT NOT NULL,
+		media_type TEXT NOT NULL,
+		width INTEGER,
+		height INTEGER,
+		duration INTEGER,
+		uploaded_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+		FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+	);
+
+	CREATE INDEX IF NOT EXISTS idx_user_media_user_id ON user_media(user_id);
+	CREATE INDEX IF NOT EXISTS idx_user_media_type ON user_media(media_type);
+	CREATE INDEX IF NOT EXISTS idx_user_media_uploaded ON user_media(uploaded_at);
+	`
+	_, err := DB.Exec(query)
+	if err != nil {
+		return fmt.Errorf("failed to create SQLite tables: %w", err)
+	}
+
+	log.Println("✅ SQLite tables created successfully")
+	return nil
+}
+
+func createTables() error {
+	// Deprecated - используй createTablesPostgreSQL() или createTablesSQLite()
+	log.Println("⚠️ Warning: createTables() is deprecated")
+	return createTablesPostgreSQL()
 }
 
 func CloseDB() {

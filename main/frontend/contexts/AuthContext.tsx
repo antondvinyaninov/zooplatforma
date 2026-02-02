@@ -28,40 +28,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    let mounted = true;
+
     const checkAuth = async () => {
-      const response = await authApi.me();
-      
-      if (response.success && response.data) {
-        // Backend возвращает { user: User, token: string }
-        const userData = response.data as any;
-        const userId = userData.user?.id || userData.id;
+      try {
+        // Простой запрос к Auth Service
+        const response = await authApi.me();
         
-        if (userId) {
-          // Получаем полные данные профиля из Main Backend
-          const profileResponse = await apiClient.get<User>(`/api/users/${userId}`);
+        if (mounted && response.success && response.data) {
+          const userData = response.data as any;
+          const user = userData.user || userData;
           
-          if (profileResponse.success && profileResponse.data) {
-            setUser(profileResponse.data);
-            setToken('authenticated');
-            setIsLoading(false);
-            return;
-          }
+          setUser(user);
+          setToken('authenticated');
         }
-        
-        // Fallback: используем данные из Auth Service
-        if (userData.user) {
-          setUser(userData.user);
-          setToken('authenticated');
-        } else {
-          setUser(response.data as User);
-          setToken('authenticated');
+      } catch (error) {
+        console.error('Auth check failed:', error);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
         }
       }
-      
-      setIsLoading(false);
     };
 
     checkAuth();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -97,29 +91,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshUser = async () => {
-    // Сначала получаем базовые данные из Auth Service (для проверки авторизации)
-    const authResponse = await authApi.me();
-    
-    if (authResponse.success && authResponse.data) {
-      const userData = authResponse.data as any;
-      const userId = userData.user?.id || userData.id;
+    try {
+      const authResponse = await authApi.me();
       
-      if (userId) {
-        // Затем получаем полные данные профиля из Main Backend
-        const profileResponse = await apiClient.get<User>(`/api/users/${userId}`);
-        
-        if (profileResponse.success && profileResponse.data) {
-          setUser(profileResponse.data);
-          return;
-        }
+      if (authResponse.success && authResponse.data) {
+        const userData = authResponse.data as any;
+        const user = userData.user || userData;
+        setUser(user);
       }
-      
-      // Fallback: используем данные из Auth Service если не удалось получить из Main Backend
-      if (userData.user) {
-        setUser(userData.user);
-      } else {
-        setUser(authResponse.data as User);
-      }
+    } catch (error) {
+      console.error('User refresh failed:', error);
     }
   };
 

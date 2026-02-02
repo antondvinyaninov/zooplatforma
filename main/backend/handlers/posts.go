@@ -96,6 +96,8 @@ func PostHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UserPostsHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("📥 UserPostsHandler: %s %s", r.Method, r.URL.Path)
+
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
@@ -103,12 +105,16 @@ func UserPostsHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Извлекаем ID пользователя из URL
 	path := strings.TrimPrefix(r.URL.Path, "/api/posts/user/")
+	log.Printf("🔍 UserPostsHandler: Extracted path: %s", path)
+
 	userID, err := strconv.Atoi(path)
 	if err != nil {
+		log.Printf("❌ UserPostsHandler: Invalid user ID: %s, error: %v", path, err)
 		sendErrorResponse(w, "Неверный ID пользователя", http.StatusBadRequest)
 		return
 	}
 
+	log.Printf("✅ UserPostsHandler: Calling getUserPosts for userID=%d", userID)
 	getUserPosts(w, r, userID)
 }
 
@@ -212,6 +218,7 @@ func getAllPosts(w http.ResponseWriter, r *http.Request) {
 		SELECT p.id, p.author_id, p.author_type, p.content, p.attached_pets, 
 		       p.attachments, p.tags, p.status, p.scheduled_at, p.created_at, p.updated_at,
 		       o.name as org_name, o.short_name as org_short_name, o.logo as org_logo,
+		       u.name as user_name, u.last_name as user_last_name, u.avatar as user_avatar,
 		       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count,
 		       CASE 
 		           WHEN p.author_type = 'user' AND EXISTS (
@@ -271,6 +278,7 @@ func getAllPosts(w http.ResponseWriter, r *http.Request) {
 		var post models.Post
 		var attachedPetsJSON, attachmentsJSON, tagsJSON string
 		var orgName, orgShortName, orgLogo *string
+		var userName, userLastName, userAvatar *string
 		var isFriend int
 
 		err := rows.Scan(
@@ -279,6 +287,7 @@ func getAllPosts(w http.ResponseWriter, r *http.Request) {
 			&post.Status, &post.ScheduledAt,
 			&post.CreatedAt, &post.UpdatedAt,
 			&orgName, &orgShortName, &orgLogo,
+			&userName, &userLastName, &userAvatar,
 			&post.CommentsCount,
 			&isFriend,
 		)
@@ -314,11 +323,23 @@ func getAllPosts(w http.ResponseWriter, r *http.Request) {
 			post.Organization = &org
 		}
 
+		// Добавляем данные пользователя если это user
+		if post.AuthorType == "user" && userName != nil {
+			user := models.User{
+				ID:   post.AuthorID,
+				Name: *userName,
+			}
+			if userLastName != nil {
+				user.LastName = *userLastName // Если LastName это *string в модели
+			}
+			if userAvatar != nil {
+				user.Avatar = *userAvatar // Если Avatar это *string в модели
+			}
+			post.User = &user
+		}
+
 		posts = append(posts, post)
 	}
-
-	// ✅ Загружаем данные пользователей через Auth Service batch-запросом
-	posts = loadUsersForPostsBatch(posts)
 
 	if posts == nil {
 		posts = []models.Post{}
@@ -405,51 +426,134 @@ func DraftsHandler(w http.ResponseWriter, r *http.Request) {
 
 // getUserPosts получает посты конкретного пользователя (Wall)
 func getUserPosts(w http.ResponseWriter, r *http.Request, userID int) {
+	log.Printf("🔍 getUserPosts: Starting for userID=%d", userID)
+
 	// Получаем текущего пользователя из контекста
 	currentUserID, _ := r.Context().Value("userID").(int)
+	log.Printf("🔍 getUserPosts: currentUserID=%d", currentUserID)
 
-	query := `
-		SELECT p.id, p.author_id, p.author_type, p.content, p.attached_pets, 
-		       p.attachments, p.tags, p.status, p.scheduled_at, p.created_at, p.updated_at,
-		       u.name, u.email, u.avatar,
-		       o.name as org_name, o.short_name as org_short_name, o.logo as org_logo,
-		       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count
-		FROM posts p
-		LEFT JOIN users u ON p.author_id = u.id AND p.author_type = 'user'
-		LEFT JOIN organizations o ON p.author_id = o.id AND p.author_type = 'organization'
-		WHERE p.author_id = ? AND p.author_type = 'user' AND p.is_deleted = 0
-		ORDER BY p.created_at DESC
-	`
+	// Простой запрос только ID постов (без JOIN)
+	log.Printf("🔍 getUserPosts: Fetching post IDs...")
 
-	rows, err := database.DB.Query(query, userID)
+	// Получаем параметры пагинации из query
+	limitStr := r.URL.Query().Get("limit")
+	offsetStr := r.URL.Query().Get("offset")
+
+	limit := 20 // По умолчанию 20 постов
+	if limitStr != "" {
+		if parsedLimit, err := strconv.Atoi(limitStr); err == nil && parsedLimit > 0 && parsedLimit <= 50 {
+			limit = parsedLimit
+		}
+	}
+
+	offset := 0 // По умолчанию с начала
+	if offsetStr != "" {
+		if parsedOffset, err := strconv.Atoi(offsetStr); err == nil && parsedOffset >= 0 {
+			offset = parsedOffset
+		}
+	}
+
+	log.Printf("🔍 getUserPosts: Pagination - limit=%d, offset=%d", limit, offset)
+
+	simpleQuery := `SELECT id FROM posts WHERE author_id = ? AND author_type = 'user' AND is_deleted = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?`
+	rows, err := database.DB.Query(simpleQuery, userID, limit, offset)
 	if err != nil {
+		log.Printf("❌ getUserPosts: Query error: %v", err)
 		sendErrorResponse(w, "Ошибка получения постов: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
 	defer rows.Close()
 
-	var posts []models.Post
+	var postIDs []int
 	for rows.Next() {
-		post, err := scanPost(rows)
-		if err != nil {
-			sendErrorResponse(w, "Ошибка чтения данных: "+err.Error(), http.StatusInternalServerError)
-			return
+		var id int
+		if err := rows.Scan(&id); err != nil {
+			log.Printf("❌ getUserPosts: Scan error: %v", err)
+			continue
 		}
+		postIDs = append(postIDs, id)
+	}
+	log.Printf("✅ getUserPosts: Found %d post IDs", len(postIDs))
+
+	// Загружаем полные данные для каждого поста отдельным запросом
+	var posts []models.Post
+	for _, postID := range postIDs {
+		// Простой запрос без JOIN
+		query := `
+			SELECT id, author_id, author_type, content, attached_pets, 
+			       attachments, tags, status, scheduled_at, created_at, updated_at
+			FROM posts
+			WHERE id = ?
+		`
+		var post models.Post
+		var attachedPetsJSON, attachmentsJSON, tagsJSON sql.NullString
+		var scheduledAt sql.NullTime
+
+		err := database.DB.QueryRow(query, postID).Scan(
+			&post.ID, &post.AuthorID, &post.AuthorType, &post.Content,
+			&attachedPetsJSON, &attachmentsJSON, &tagsJSON,
+			&post.Status, &scheduledAt, &post.CreatedAt, &post.UpdatedAt,
+		)
+
+		if err != nil {
+			log.Printf("⚠️ getUserPosts: Failed to load post %d: %v", postID, err)
+			continue
+		}
+
+		// Парсим JSON поля
+		if attachedPetsJSON.Valid && attachedPetsJSON.String != "" && attachedPetsJSON.String != "null" {
+			json.Unmarshal([]byte(attachedPetsJSON.String), &post.AttachedPets)
+		}
+		if post.AttachedPets == nil {
+			post.AttachedPets = []int{}
+		}
+
+		if attachmentsJSON.Valid && attachmentsJSON.String != "" && attachmentsJSON.String != "null" {
+			json.Unmarshal([]byte(attachmentsJSON.String), &post.Attachments)
+		}
+		if post.Attachments == nil {
+			post.Attachments = []models.Attachment{}
+		}
+
+		if tagsJSON.Valid && tagsJSON.String != "" && tagsJSON.String != "null" {
+			json.Unmarshal([]byte(tagsJSON.String), &post.Tags)
+		}
+		if post.Tags == nil {
+			post.Tags = []string{}
+		}
+
+		if scheduledAt.Valid {
+			timeStr := scheduledAt.Time.Format(time.RFC3339)
+			post.ScheduledAt = &timeStr
+		}
+
+		// User и Organization будут nil (можно загрузить позже если нужно)
+		post.User = nil
+		post.Organization = nil
+		post.Pets = []models.Pet{}
+		post.CommentsCount = 0
+
 		posts = append(posts, post)
 	}
+	log.Printf("✅ getUserPosts: Loaded %d posts", len(posts))
 
 	if posts == nil {
 		posts = []models.Post{}
 	}
 
 	// Загружаем опросы для всех постов
+	log.Printf("🔍 getUserPosts: Loading polls...")
 	posts = loadPollsForPosts(posts, currentUserID)
+	log.Printf("✅ getUserPosts: Polls loaded")
 
-	// ✅ Проверяем права на редактирование для каждого поста
+	// Проверяем права на редактирование для каждого поста
+	log.Printf("🔍 getUserPosts: Checking edit permissions...")
 	for i := range posts {
 		posts[i].CanEdit = checkCanEditPost(currentUserID, &posts[i])
 	}
+	log.Printf("✅ getUserPosts: Edit permissions checked")
 
+	log.Printf("✅ getUserPosts: Sending response with %d posts", len(posts))
 	sendSuccessResponse(w, posts)
 }
 

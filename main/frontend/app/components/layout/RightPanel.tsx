@@ -3,6 +3,7 @@
 import { useEffect, useState } from 'react';
 import Link from 'next/link';
 import { useAuth } from '@/contexts/AuthContext';
+import { friendsApi, type Friendship } from '@/lib/api';
 
 interface OnlineFriend {
   id: number;
@@ -30,20 +31,26 @@ export default function RightPanel() {
 
   const fetchOnlineFriends = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/friends', {
-        credentials: 'include',
-      });
+      // ✅ Используем friendsApi вместо прямого fetch
+      const result = await friendsApi.getFriends();
       
-      if (response.ok) {
-        const data = await response.json();
-        // Фильтруем только онлайн друзей (пока показываем всех, потом добавим проверку онлайн статуса)
-        setOnlineFriends(data.data || []);
+      if (result.success && result.data) {
+        // Преобразуем Friendship[] в OnlineFriend[]
+        const friends = result.data.map((f: Friendship) => ({
+          id: f.friend.id,
+          name: f.friend.name,
+          last_name: f.friend.last_name || '',
+          avatar: f.friend.avatar || '',
+          is_online: f.friend.is_online,
+          last_seen: f.friend.last_seen,
+        }));
+        setOnlineFriends(friends);
       } else {
-        // Любая ошибка (включая 401) - просто не показываем друзей
         setOnlineFriends([]);
       }
     } catch (error) {
       // Тихо игнорируем ошибки сети - друзья опциональны
+      console.error('Failed to load friends:', error);
       setOnlineFriends([]);
     } finally {
       setLoading(false);

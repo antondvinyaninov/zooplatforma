@@ -8,6 +8,7 @@ import { UserIcon } from '@heroicons/react/24/outline';
 import { Pencil, Trash2 } from 'lucide-react';
 import { getMediaUrl, getFullName } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { postsApi } from '@/lib/api';
 import PostComments from '../shared/PostComments';
 import PostModal from './PostModal';
 import PollDisplay from '../polls/PollDisplay';
@@ -23,6 +24,14 @@ interface User {
   last_name?: string;
   email: string;
   avatar?: string;
+}
+
+interface Organization {
+  id: number;
+  name: string;
+  short_name?: string;
+  logo?: string;
+  type?: string;
 }
 
 interface Pet {
@@ -95,7 +104,7 @@ interface Post {
   organization?: Organization;
   pets?: Pet[];
   poll?: Poll;
-  comments_count?: number;
+  comments_count: number;
   can_edit?: boolean; // ✅ Добавлено поле can_edit из Backend
 }
 
@@ -113,7 +122,7 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
   const [scrollPosition, setScrollPosition] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
-  const [commentsCount, setCommentsCount] = useState(post.comments_count || 0);
+  const [commentsCount, setCommentsCount] = useState(post.comments_count);
   const [showModal, setShowModal] = useState(false);
   const [showLikersModal, setShowLikersModal] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
@@ -160,25 +169,17 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
 
   const loadLikeStatus = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/posts/${post.id}/like`, {
-        method: 'GET',
-        credentials: 'include',
-      });
+      const response = await postsApi.getLikeStatus(post.id);
       
-      if (response.status === 401) {
-        // Пользователь не авторизован - показываем 0 лайков
+      if (response.success && response.data) {
+        setIsLiked(response.data.liked);
+        setLikesCount(response.data.likes_count);
+      } else {
         setIsLiked(false);
         setLikesCount(0);
-        return;
-      }
-      
-      const result = await response.json();
-      if (result.success && result.data) {
-        setIsLiked(result.data.liked);
-        setLikesCount(result.data.likes_count);
       }
     } catch (error) {
-      // Тихо игнорируем ошибки
+      console.error(`❌ [PostCard ${post.id}] Error loading like status:`, error);
       setIsLiked(false);
       setLikesCount(0);
     }
@@ -186,24 +187,27 @@ export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
 
   const handleLike = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/posts/${post.id}/like`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      const response = await postsApi.toggleLike(post.id);
       
-      const result = await response.json();
-      if (result.success && result.data) {
-        setIsLiked(result.data.liked);
-        setLikesCount(result.data.likes_count);
+      if (response.success && response.data) {
+        setIsLiked(response.data.liked);
+        setLikesCount(response.data.likes_count);
         
         // Показываем анимацию только при лайке (не при анлайке)
-        if (result.data.liked) {
+        if (response.data.liked) {
           setShowLikeAnimation(true);
           setTimeout(() => setShowLikeAnimation(false), 1000);
         }
+      } else {
+        console.error(`❌ [PostCard ${post.id}] Invalid response:`, response);
       }
     } catch (error) {
-      console.error('Ошибка лайка:', error);
+      console.error(`❌ [PostCard ${post.id}] Error toggling like:`, error);
+      console.error(`❌ [PostCard ${post.id}] Error details:`, {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
     }
   };
 

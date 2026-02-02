@@ -12,21 +12,32 @@ import (
 	"strings"
 )
 
-// min returns the smaller of two integers
-func min(a, b int) int {
-	if a < b {
-		return a
-	}
-	return b
+// Используем строковые ключи для совместимости с существующими handlers
+const (
+	UserIDKey    = "userID"
+	UserEmailKey = "userEmail"
+	UserRoleKey  = "userRole"
+)
+
+var authServiceURL string
+
+// InitAuthMiddleware инициализирует middleware с URL Auth Service
+func InitAuthMiddleware(url string) {
+	authServiceURL = url
 }
 
-type contextKey string
-
-const (
-	UserIDKey    contextKey = "userID"
-	UserEmailKey contextKey = "userEmail"
-	UserRoleKey  contextKey = "userRole"
-)
+// getAuthServiceURL возвращает URL Auth Service
+func getAuthServiceURL() string {
+	if authServiceURL != "" {
+		return authServiceURL
+	}
+	// Fallback на переменную окружения
+	url := os.Getenv("AUTH_SERVICE_URL")
+	if url == "" {
+		url = "http://localhost:7100"
+	}
+	return url
+}
 
 // User - структура пользователя из Auth Service
 type User struct {
@@ -43,48 +54,33 @@ type User struct {
 // Работает для всех микросервисов
 func AuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("🔐 AuthMiddleware: %s %s", r.Method, r.URL.Path)
-
 		// 1. Получить токен из Authorization header (приоритет)
 		token := r.Header.Get("Authorization")
-		log.Printf("🔍 Authorization header: %s", token)
 
 		if token != "" {
 			token = strings.TrimPrefix(token, "Bearer ")
-			log.Printf("✅ Token from header: %s...", token[:min(20, len(token))])
 		}
 
 		// 2. Если нет в header, попробовать cookie
 		if token == "" {
-			log.Printf("⚠️ No token in header, checking cookie...")
 			cookie, err := r.Cookie("auth_token")
 			if err == nil {
 				token = cookie.Value
-				log.Printf("✅ Token from cookie: %s...", token[:min(20, len(token))])
-			} else {
-				log.Printf("❌ No auth_token cookie: %v", err)
 			}
 		}
 
 		// 3. Если токена нет - 401
 		if token == "" {
-			log.Printf("❌ No token found in header or cookie")
 			sendError(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
 
 		// 4. Проверить токен через Auth Service (SSO)
-		authServiceURL := os.Getenv("AUTH_SERVICE_URL")
-		if authServiceURL == "" {
-			authServiceURL = "http://localhost:7100"
-		}
-
-		log.Printf("🔄 Verifying token with Auth Service: %s", authServiceURL)
+		authURL := getAuthServiceURL()
 
 		// Создаем запрос к Auth Service /api/auth/me
-		req, err := http.NewRequest("GET", authServiceURL+"/api/auth/me", nil)
+		req, err := http.NewRequest("GET", authURL+"/api/auth/me", nil)
 		if err != nil {
-			log.Printf("❌ Failed to create request: %v", err)
 			sendError(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
@@ -96,7 +92,7 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		client := &http.Client{}
 		resp, err := client.Do(req)
 		if err != nil {
-			log.Printf("❌ Auth Service unavailable: %v", err)
+			log.Printf("❌ AuthMiddleware: Auth Service unavailable: %v", err)
 			sendError(w, "Auth service unavailable", http.StatusServiceUnavailable)
 			return
 		}
@@ -105,10 +101,8 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		// Читаем ответ
 		body, _ := io.ReadAll(resp.Body)
 
-		log.Printf("🔍 Auth Service response: status=%d, body=%s", resp.StatusCode, string(body))
-
 		if resp.StatusCode != http.StatusOK {
-			log.Printf("❌ Auth Service returned %d: %s", resp.StatusCode, string(body))
+			log.Printf("❌ AuthMiddleware: Auth Service returned %d", resp.StatusCode)
 			sendError(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -122,13 +116,12 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		if err := json.Unmarshal(body, &authResp); err != nil {
-			log.Printf("❌ Failed to parse auth response: %v", err)
+			log.Printf("❌ AuthMiddleware: Failed to parse auth response: %v", err)
 			sendError(w, "Internal server error", http.StatusInternalServerError)
 			return
 		}
 
 		if !authResp.Success || authResp.Data.User == nil {
-			log.Printf("❌ Token is invalid")
 			sendError(w, "Unauthorized", http.StatusUnauthorized)
 			return
 		}
@@ -139,9 +132,6 @@ func AuthMiddleware(next http.Handler) http.Handler {
 		ctx = context.WithValue(ctx, UserEmailKey, user.Email)
 		ctx = context.WithValue(ctx, UserRoleKey, user.Role)
 
-		log.Printf("✅ User authenticated via Auth Service: ID=%d, Email=%s, Role=%s", user.ID, user.Email, user.Role)
-		log.Printf("🔑 Setting context: UserIDKey=%v, value=%d", UserIDKey, user.ID)
-
 		next.ServeHTTP(w, r.WithContext(ctx))
 	})
 }
@@ -151,6 +141,7 @@ func OptionalAuthMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		// Пробуем получить токен
 		token := r.Header.Get("Authorization")
+
 		if token != "" {
 			token = strings.TrimPrefix(token, "Bearer ")
 		}
@@ -169,12 +160,9 @@ func OptionalAuthMiddleware(next http.Handler) http.Handler {
 		}
 
 		// Если токен есть - проверяем через Auth Service (SSO)
-		authServiceURL := os.Getenv("AUTH_SERVICE_URL")
-		if authServiceURL == "" {
-			authServiceURL = "http://localhost:7100"
-		}
+		authURL := getAuthServiceURL()
 
-		req, err := http.NewRequest("GET", authServiceURL+"/api/auth/me", nil)
+		req, err := http.NewRequest("GET", authURL+"/api/auth/me", nil)
 		if err != nil {
 			next.ServeHTTP(w, r)
 			return
@@ -190,12 +178,12 @@ func OptionalAuthMiddleware(next http.Handler) http.Handler {
 		}
 		defer resp.Body.Close()
 
+		body, _ := io.ReadAll(resp.Body)
+
 		if resp.StatusCode != http.StatusOK {
 			next.ServeHTTP(w, r)
 			return
 		}
-
-		body, _ := io.ReadAll(resp.Body)
 
 		var authResp struct {
 			Success bool `json:"success"`
@@ -223,9 +211,7 @@ func OptionalAuthMiddleware(next http.Handler) http.Handler {
 
 // GetUserID получает user_id из контекста
 func GetUserID(r *http.Request) (int, bool) {
-	log.Printf("🔍 GetUserID: checking context for UserIDKey=%v", UserIDKey)
 	userID, ok := r.Context().Value(UserIDKey).(int)
-	log.Printf("🔍 GetUserID result: userID=%d, ok=%v", userID, ok)
 	return userID, ok
 }
 
@@ -246,7 +232,6 @@ func RequireSuperAdmin(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		role, ok := GetUserRole(r)
 		if !ok || role != "superadmin" {
-			log.Printf("❌ Forbidden: superadmin access required")
 			sendError(w, "Forbidden: superadmin access required", http.StatusForbidden)
 			return
 		}
@@ -257,12 +242,9 @@ func RequireSuperAdmin(next http.Handler) http.Handler {
 
 // VerifyTokenViaAuthService - проверяет токен через Auth Service (SSO) и возвращает пользователя
 func VerifyTokenViaAuthService(token string) (*User, error) {
-	authServiceURL := os.Getenv("AUTH_SERVICE_URL")
-	if authServiceURL == "" {
-		authServiceURL = "http://localhost:7100"
-	}
+	authURL := getAuthServiceURL()
 
-	req, err := http.NewRequest("GET", authServiceURL+"/api/auth/me", nil)
+	req, err := http.NewRequest("GET", authURL+"/api/auth/me", nil)
 	if err != nil {
 		return nil, fmt.Errorf("failed to create request: %w", err)
 	}
@@ -302,10 +284,7 @@ func VerifyTokenViaAuthService(token string) (*User, error) {
 
 // LoginViaAuthService - выполняет вход через Auth Service (SSO)
 func LoginViaAuthService(email, password string) (string, *User, error) {
-	authServiceURL := os.Getenv("AUTH_SERVICE_URL")
-	if authServiceURL == "" {
-		authServiceURL = "http://localhost:7100"
-	}
+	authURL := getAuthServiceURL()
 
 	reqBody := map[string]string{
 		"email":    email,
@@ -314,7 +293,7 @@ func LoginViaAuthService(email, password string) (string, *User, error) {
 
 	jsonData, _ := json.Marshal(reqBody)
 
-	resp, err := http.Post(authServiceURL+"/api/auth/login", "application/json", bytes.NewBuffer(jsonData))
+	resp, err := http.Post(authURL+"/api/auth/login", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
 		return "", nil, fmt.Errorf("auth service unavailable: %w", err)
 	}
@@ -348,7 +327,7 @@ func LoginViaAuthService(email, password string) (string, *User, error) {
 func sendError(w http.ResponseWriter, message string, status int) {
 	w.Header().Set("Content-Type", "application/json")
 	w.WriteHeader(status)
-	json.NewEncoder(w).Encode(map[string]interface{}{
+	json.NewEncoder(w).Encode(map[string]any{
 		"success": false,
 		"error":   message,
 	})

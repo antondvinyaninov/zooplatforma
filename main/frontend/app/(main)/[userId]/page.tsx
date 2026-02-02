@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '../../../contexts/AuthContext';
 import { postsApi, petsApi, usersApi, Post, Pet, User } from '../../../lib/api';
@@ -34,10 +34,14 @@ export default function UserProfilePage() {
   const [curatedPets, setCuratedPets] = useState<Pet[]>([]);
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(0);
   const [activeTab, setActiveTab] = useState<TabType>('posts');
   const { user: currentUser, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
+  const observerTarget = useRef<HTMLDivElement>(null);
 
   // Извлекаем ID из параметра (id1 -> 1)
   const userIdParam = params.userId as string;
@@ -45,20 +49,6 @@ export default function UserProfilePage() {
 
   // Проверяем, это профиль текущего пользователя или чужой
   const isOwnProfile = currentUser && userId === currentUser.id;
-
-  useEffect(() => {
-    // Проверяем только на клиенте
-    if (typeof window === 'undefined') return;
-
-    if (!isLoading && !isAuthenticated) {
-      router.push('/auth');
-      return;
-    }
-
-    if (userId) {
-      loadUserProfile();
-    }
-  }, [userId, isLoading, isAuthenticated, currentUser]); // Добавили currentUser в зависимости
 
   const loadUserProfile = async () => {
     if (!userId) return;
@@ -74,15 +64,17 @@ export default function UserProfilePage() {
         return;
       }
 
-      // Загружаем посты и питомцев
+      // Загружаем первые посты и питомцев
       const [postsResponse, petsResponse, curatedPetsResponse] = await Promise.all([
-        postsApi.getUserPosts(userId),
+        postsApi.getUserPosts(userId, { limit: 20, offset: 0 }),
         petsApi.getUserPets(userId),
         petsApi.getCuratedPets(userId),
       ]);
 
       if (postsResponse.success && postsResponse.data) {
         setPosts(postsResponse.data);
+        setHasMore(postsResponse.data.length === 20); // Если вернулось 20, значит есть еще
+        setOffset(20); // Следующая порция начнется с 20
       }
 
       if (petsResponse.success && petsResponse.data) {
@@ -98,6 +90,62 @@ export default function UserProfilePage() {
       setLoading(false);
     }
   };
+
+  const loadMorePosts = async () => {
+    if (!userId || loadingMore || !hasMore) return;
+
+    setLoadingMore(true);
+    try {
+      const postsResponse = await postsApi.getUserPosts(userId, { limit: 20, offset });
+      
+      if (postsResponse.success && postsResponse.data) {
+        setPosts(prev => [...prev, ...postsResponse.data]);
+        setHasMore(postsResponse.data.length === 20);
+        setOffset(prev => prev + postsResponse.data.length);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки постов:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    // Проверяем только на клиенте
+    if (typeof window === 'undefined') return;
+
+    if (!isLoading && !isAuthenticated) {
+      router.push('/auth');
+      return;
+    }
+
+    if (userId && isAuthenticated) {
+      loadUserProfile();
+    }
+  }, [userId, isLoading, isAuthenticated]); // Убрали currentUser из зависимостей
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && activeTab === 'posts') {
+          loadMorePosts();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMore, loadingMore, activeTab, offset]);
 
   const handleEditClick = () => {
     router.push('/profile/edit');
@@ -337,6 +385,16 @@ export default function UserProfilePage() {
                       {posts.map((post) => (
                         <PostCard key={post.id} post={post} />
                       ))}
+                      
+                      {/* Элемент для наблюдения (infinite scroll trigger) */}
+                      <div ref={observerTarget} className="h-10 flex items-center justify-center">
+                        {loadingMore && (
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderColor: '#1B76FF' }}></div>
+                        )}
+                        {!hasMore && posts.length > 0 && (
+                          <p className="text-sm text-gray-500">Все посты загружены</p>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>

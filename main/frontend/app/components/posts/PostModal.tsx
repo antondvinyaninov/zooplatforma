@@ -20,6 +20,14 @@ interface User {
   avatar?: string;
 }
 
+interface Organization {
+  id: number;
+  name: string;
+  short_name?: string;
+  logo?: string;
+  type?: string;
+}
+
 interface Pet {
   id: number;
   name: string;

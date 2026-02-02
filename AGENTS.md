@@ -84,10 +84,13 @@ This repository is a multi-service monorepo (Next.js + Go + shared TS + Expo). U
 - Consider Error Boundaries for React rendering issues.
 
 ### SSO & Auth
-- All services use SSO via Main backend.
-- JWT token retrieved from Main (`/api/auth/me`).
-- Frontends must use `credentials: 'include'` and pass Bearer token when needed.
-- Backends must implement `AuthMiddleware` and set context keys.
+- All services use SSO via Auth Service (port 7100).
+- JWT token retrieved from Auth Service (`http://localhost:7100/api/auth/me`).
+- Auth Service sets `auth_token` cookie on login/register.
+- Frontends must use `credentials: 'include'` to send cookies.
+- Backends must use `pkg/middleware.AuthMiddleware` for authentication.
+- Main Backend (8000) does NOT handle authentication - only Auth Service (7100).
+- See `.kiro/steering/sso-integration.md` for detailed rules.
 
 ### Shared components (`shared/`)
 - `shared/` contains types, hooks, utils, API clients, and components.

@@ -116,6 +116,18 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Установить cookie с токеном (для работы между портами localhost)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Path:     "/",
+		Domain:   "localhost",          // Явно указываем localhost
+		HttpOnly: false,                // false чтобы JS мог читать (для отладки)
+		Secure:   false,                // false для localhost
+		SameSite: http.SameSiteLaxMode, // Lax для localhost (None требует Secure=true)
+		MaxAge:   86400 * 7,            // 7 дней
+	})
+
 	// Ответ
 	user := User{
 		ID:       int(userID),
@@ -212,6 +224,18 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		http.Error(w, `{"success":false,"error":"Failed to create token"}`, http.StatusInternalServerError)
 		return
 	}
+
+	// Установить cookie с токеном (для работы между портами localhost)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Path:     "/",
+		Domain:   "localhost",          // Явно указываем localhost
+		HttpOnly: false,                // false чтобы JS мог читать (для отладки)
+		Secure:   false,                // false для localhost
+		SameSite: http.SameSiteLaxMode, // Lax для localhost (None требует Secure=true)
+		MaxAge:   86400 * 7,            // 7 дней
+	})
 
 	// Ответ
 	response := map[string]interface{}{
@@ -404,8 +428,22 @@ func verifyTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 // Заглушки для остальных handlers
 func logoutHandler(w http.ResponseWriter, r *http.Request) {
+	// Удалить cookie (для всех портов localhost)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    "",
+		Path:     "/",
+		Domain:   "localhost",
+		HttpOnly: false,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode, // Lax для localhost
+		MaxAge:   -1,                   // Удалить cookie
+	})
+
 	w.Header().Set("Content-Type", "application/json")
 	w.Write([]byte(`{"success":true,"message":"Logged out successfully"}`))
+
+	log.Printf("✅ User logged out")
 }
 
 func refreshHandler(w http.ResponseWriter, r *http.Request) {

@@ -14,10 +14,15 @@ export class ApiClient {
     this.baseUrl = baseUrl;
   }
 
-  private getHeaders(): HeadersInit {
-    return {
+  private async getHeaders(): Promise<HeadersInit> {
+    const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
+
+    // ✅ ВАЖНО: Cookie auth_token автоматически отправляется браузером через credentials: 'include'
+    // Не нужно добавлять Authorization header - используем HttpOnly cookie
+
+    return headers;
   }
 
   private async handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
@@ -45,16 +50,14 @@ export class ApiClient {
   }
 
   async get<T>(endpoint: string): Promise<ApiResponse<T>> {
-    try {
+    try {      const headers = await this.getHeaders();      
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'GET',
-        headers: this.getHeaders(),
+        headers,
         credentials: 'include', // Include cookies
       });
-
       return this.handleResponse<T>(response);
-    } catch (error) {
-      return {
+    } catch (error) {      return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
@@ -63,9 +66,10 @@ export class ApiClient {
 
   async post<T>(endpoint: string, body: unknown): Promise<ApiResponse<T>> {
     try {
+      const headers = await this.getHeaders();
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers,
         credentials: 'include', // Include cookies
         body: JSON.stringify(body),
       });
@@ -81,9 +85,10 @@ export class ApiClient {
 
   async put<T>(endpoint: string, body: unknown): Promise<ApiResponse<T>> {
     try {
+      const headers = await this.getHeaders();
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'PUT',
-        headers: this.getHeaders(),
+        headers,
         credentials: 'include', // Include cookies
         body: JSON.stringify(body),
       });
@@ -99,9 +104,10 @@ export class ApiClient {
 
   async delete<T>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
     try {
+      const headers = await this.getHeaders();
       const options: RequestInit = {
         method: 'DELETE',
-        headers: this.getHeaders(),
+        headers,
         credentials: 'include', // Include cookies
       };
       
@@ -317,7 +323,13 @@ export const profileApi = {
 export const postsApi = {
   getAll: () => apiClient.get<Post[]>('/api/posts'),
   
-  getUserPosts: (userId: number) => apiClient.get<Post[]>(`/api/posts/user/${userId}`),
+  getUserPosts: (userId: number, params?: { limit?: number; offset?: number }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+    const queryString = queryParams.toString();
+    return apiClient.get<Post[]>(`/api/posts/user/${userId}${queryString ? `?${queryString}` : ''}`);
+  },
   
   getPetPosts: (petId: number) => apiClient.get<Post[]>(`/api/posts/pet/${petId}`),
   
@@ -501,7 +513,7 @@ export interface Post {
   organization?: Organization;
   pets?: Pet[];
   poll?: Poll;
-  comments_count?: number;
+  comments_count: number;
   // Лайки
   liked?: boolean;
   likes_count?: number;

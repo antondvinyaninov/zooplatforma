@@ -83,9 +83,13 @@ export default function CreatePost({ onPostCreated, editMode = false, editPost, 
       setSelectedPets(editPost.attached_pets || []);
       if (editPost.attachments && editPost.attachments.length > 0) {
         setUploadedMedia(editPost.attachments.map(att => ({
+          id: att.id || 0,
           url: att.url,
           media_type: att.type === 'video' ? 'video' : 'image',
           file_name: att.file_name || '',
+          original_name: att.file_name || '',
+          file_size: att.size || 0,
+          mime_type: att.type === 'video' ? 'video/mp4' : 'image/jpeg',
           size: att.size || 0,
         })));
       }
@@ -380,7 +384,7 @@ export default function CreatePost({ onPostCreated, editMode = false, editPost, 
     try {
       const response = await apiClient.get('/api/organizations/my');
       if (response.success && response.data) {
-        setOrganizations(response.data?.organizations || []);
+        setOrganizations(Array.isArray(response.data) ? response.data : []);
       } else {
         setOrganizations([]);
       }

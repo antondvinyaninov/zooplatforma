@@ -4,6 +4,7 @@ import (
 	"backend/models"
 	"database"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
@@ -19,10 +20,12 @@ func UserPetsHandler(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/pets/user/")
 	userID, err := strconv.Atoi(path)
 	if err != nil {
+		log.Printf("❌ UserPetsHandler: Неверный ID пользователя в URL: %s", path)
 		sendErrorResponse(w, "Неверный ID пользователя", http.StatusBadRequest)
 		return
 	}
 
+	log.Printf("📥 UserPetsHandler: GET /api/pets/user/%d", userID)
 	getUserPets(w, r, userID)
 }
 
@@ -37,10 +40,12 @@ func CuratedPetsHandler(w http.ResponseWriter, r *http.Request) {
 	path := strings.TrimPrefix(r.URL.Path, "/api/pets/curated/")
 	userID, err := strconv.Atoi(path)
 	if err != nil {
+		log.Printf("❌ CuratedPetsHandler: Неверный ID пользователя в URL: %s", path)
 		sendErrorResponse(w, "Неверный ID пользователя", http.StatusBadRequest)
 		return
 	}
 
+	log.Printf("📥 CuratedPetsHandler: GET /api/pets/curated/%d", userID)
 	getCuratedPets(w, r, userID)
 }
 
@@ -86,10 +91,13 @@ func PetHandlerWithConditionalAuth(authMiddleware func(http.HandlerFunc) http.Ha
 }
 
 func getUserPets(w http.ResponseWriter, _ *http.Request, userID int) {
+	log.Printf("🐾 getUserPets: Запрос питомцев для user_id=%d", userID)
+
 	query := `SELECT id, user_id, name, species, photo, created_at FROM pets WHERE user_id = ? ORDER BY created_at DESC`
 
 	rows, err := database.DB.Query(query, userID)
 	if err != nil {
+		log.Printf("❌ getUserPets: Ошибка запроса к БД для user_id=%d: %v", userID, err)
 		sendErrorResponse(w, "Ошибка получения питомцев: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -100,6 +108,7 @@ func getUserPets(w http.ResponseWriter, _ *http.Request, userID int) {
 		var pet models.Pet
 		err := rows.Scan(&pet.ID, &pet.UserID, &pet.Name, &pet.Species, &pet.Photo, &pet.CreatedAt)
 		if err != nil {
+			log.Printf("❌ getUserPets: Ошибка чтения строки для user_id=%d: %v", userID, err)
 			sendErrorResponse(w, "Ошибка чтения данных: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -110,15 +119,19 @@ func getUserPets(w http.ResponseWriter, _ *http.Request, userID int) {
 		pets = []models.Pet{}
 	}
 
+	log.Printf("✅ getUserPets: Найдено %d питомцев для user_id=%d", len(pets), userID)
 	sendSuccessResponse(w, pets)
 }
 
 // getCuratedPets возвращает питомцев, которых курирует пользователь
 func getCuratedPets(w http.ResponseWriter, _ *http.Request, userID int) {
+	log.Printf("🐾 getCuratedPets: Запрос курируемых питомцев для user_id=%d", userID)
+
 	query := `SELECT id, user_id, name, species, photo, created_at FROM pets WHERE curator_id = ? ORDER BY created_at DESC`
 
 	rows, err := database.DB.Query(query, userID)
 	if err != nil {
+		log.Printf("❌ getCuratedPets: Ошибка запроса к БД для user_id=%d: %v", userID, err)
 		sendErrorResponse(w, "Ошибка получения курируемых питомцев: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -129,6 +142,7 @@ func getCuratedPets(w http.ResponseWriter, _ *http.Request, userID int) {
 		var pet models.Pet
 		err := rows.Scan(&pet.ID, &pet.UserID, &pet.Name, &pet.Species, &pet.Photo, &pet.CreatedAt)
 		if err != nil {
+			log.Printf("❌ getCuratedPets: Ошибка чтения строки для user_id=%d: %v", userID, err)
 			sendErrorResponse(w, "Ошибка чтения данных: "+err.Error(), http.StatusInternalServerError)
 			return
 		}
@@ -139,6 +153,7 @@ func getCuratedPets(w http.ResponseWriter, _ *http.Request, userID int) {
 		pets = []models.Pet{}
 	}
 
+	log.Printf("✅ getCuratedPets: Найдено %d курируемых питомцев для user_id=%d", len(pets), userID)
 	sendSuccessResponse(w, pets)
 }
 

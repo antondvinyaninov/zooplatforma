@@ -34,7 +34,7 @@ export default function PostsFeed({ activeFilter = 'for-you' }: PostsFeedProps) 
   const loadPosts = async () => {
     try {
       setLoading(true);
-      const response = await apiClient.get(`/api/posts?filter=${activeFilter}`);
+      const response = await apiClient.get<Post[]>(`/api/posts?filter=${activeFilter}`);
       setPosts(response.data || []);
     } catch (error) {
       console.error('Ошибка загрузки постов:', error);
@@ -50,13 +50,13 @@ export default function PostsFeed({ activeFilter = 'for-you' }: PostsFeedProps) 
   const handleUpdatePost = async (postId: number) => {
     try {
       // Получаем обновленный пост с сервера
-      const response = await apiClient.get(`/api/posts/${postId}`);
+      const response = await apiClient.get<Post>(`/api/posts/${postId}`);
       
       if (response.success && response.data) {
         // Обновляем пост в списке
         setPosts(prevPosts => 
           prevPosts.map(post => 
-            post.id === postId ? response.data : post
+            post.id === postId ? response.data as Post : post
           )
         );
       }

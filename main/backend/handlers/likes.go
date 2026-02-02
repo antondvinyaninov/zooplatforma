@@ -19,16 +19,20 @@ func LikesHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	userID, ok := r.Context().Value("userID").(int)
-	if !ok {
-		sendErrorResponse(w, "Не авторизован", http.StatusUnauthorized)
-		return
-	}
+	// Для GET запросов userID опционален (OptionalAuthMiddleware)
+	// Для POST запросов userID обязателен (AuthMiddleware)
+	userID, _ := r.Context().Value("userID").(int)
 
 	switch r.Method {
 	case http.MethodPost:
+		// POST требует авторизации
+		if userID == 0 {
+			sendErrorResponse(w, "Не авторизован", http.StatusUnauthorized)
+			return
+		}
 		toggleLike(w, r, postID, userID)
 	case http.MethodGet:
+		// GET работает и без авторизации (userID может быть 0)
 		getLikeStatus(w, r, postID, userID)
 	default:
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
@@ -108,14 +112,19 @@ func toggleLike(w http.ResponseWriter, r *http.Request, postID int, userID int) 
 // getLikeStatus получает статус лайка и количество
 func getLikeStatus(w http.ResponseWriter, _ *http.Request, postID int, userID int) {
 	var liked bool
-	err := database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = ?)", userID, postID).Scan(&liked)
-	if err != nil {
-		sendErrorResponse(w, "Ошибка проверки лайка: "+err.Error(), http.StatusInternalServerError)
-		return
+
+	// Если пользователь авторизован - проверяем его лайк
+	if userID > 0 {
+		err := database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = ?)", userID, postID).Scan(&liked)
+		if err != nil {
+			sendErrorResponse(w, "Ошибка проверки лайка: "+err.Error(), http.StatusInternalServerError)
+			return
+		}
 	}
+	// Если не авторизован - liked = false
 
 	var likesCount int
-	err = database.DB.QueryRow("SELECT COUNT(*) FROM likes WHERE post_id = ?", postID).Scan(&likesCount)
+	err := database.DB.QueryRow("SELECT COUNT(*) FROM likes WHERE post_id = ?", postID).Scan(&likesCount)
 	if err != nil {
 		sendErrorResponse(w, "Ошибка подсчета лайков: "+err.Error(), http.StatusInternalServerError)
 		return

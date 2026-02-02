@@ -16,8 +16,6 @@ import (
 
 func enableCORSHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		// Убрали verbose логирование для уменьшения шума в консоли
-
 		origin := r.Header.Get("Origin")
 		allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
 		allowedOrigins := map[string]bool{
@@ -36,7 +34,6 @@ func enableCORSHandler(next http.Handler) http.Handler {
 			log.Printf("✅ Origin allowed: %s", origin)
 		} else if origin == "" {
 			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:6100")
-			// Убрали verbose логирование
 		}
 
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -49,7 +46,6 @@ func enableCORSHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		// Убрали verbose логирование
 		next.ServeHTTP(w, r)
 	})
 }
@@ -194,7 +190,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 func createTables() error {
 	db := database.DB
 
-	// Create treatments table
+	// Create treatments table (SQLite syntax)
 	query := `
 	CREATE TABLE IF NOT EXISTS treatments (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -219,13 +215,13 @@ func createTables() error {
 		return fmt.Errorf("failed to create treatments table: %w", err)
 	}
 
-	// Create trigger for updated_at
+	// Create trigger for updated_at (SQLite syntax)
 	triggerQuery := `
-	CREATE TRIGGER IF NOT EXISTS update_treatments_timestamp 
+	CREATE TRIGGER IF NOT EXISTS update_treatments_timestamp
 	AFTER UPDATE ON treatments
 	FOR EACH ROW
 	BEGIN
-		UPDATE treatments SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+		UPDATE treatments SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 	END;
 	`
 

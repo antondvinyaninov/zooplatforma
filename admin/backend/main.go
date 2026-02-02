@@ -153,11 +153,11 @@ func createAdminTables() error {
 	// Создаем таблицу администраторов
 	_, err := database.DB.Exec(`
 		CREATE TABLE IF NOT EXISTS admins (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id SERIAL PRIMARY KEY,
 			user_id INTEGER NOT NULL REFERENCES users(id),
 			role TEXT NOT NULL DEFAULT 'moderator',
 			permissions TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			created_by INTEGER REFERENCES admins(id)
 		)
 	`)
@@ -168,14 +168,14 @@ func createAdminTables() error {
 	// Создаем таблицу логов администраторов
 	_, err = database.DB.Exec(`
 		CREATE TABLE IF NOT EXISTS admin_logs (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id SERIAL PRIMARY KEY,
 			admin_id INTEGER NOT NULL REFERENCES admins(id),
 			action TEXT NOT NULL,
 			target_type TEXT,
 			target_id INTEGER,
 			details TEXT,
 			ip_address TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)
 	`)
 	if err != nil {
@@ -185,7 +185,7 @@ func createAdminTables() error {
 	// Создаем общую таблицу системных логов
 	_, err = database.DB.Exec(`
 		CREATE TABLE IF NOT EXISTS system_logs (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id SERIAL PRIMARY KEY,
 			level TEXT NOT NULL DEFAULT 'info',
 			category TEXT NOT NULL,
 			action TEXT NOT NULL,
@@ -196,7 +196,7 @@ func createAdminTables() error {
 			details TEXT,
 			ip_address TEXT,
 			user_agent TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)
 	`)
 	if err != nil {

@@ -253,15 +253,15 @@ func handlePetIDRoutes(w http.ResponseWriter, r *http.Request) {
 func createTables() error {
 	queries := []string{
 		`CREATE TABLE IF NOT EXISTS species (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id SERIAL PRIMARY KEY,
 			name TEXT NOT NULL,
 			name_en TEXT NOT NULL,
 			description TEXT,
 			icon TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)`,
 		`CREATE TABLE IF NOT EXISTS breeds (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id SERIAL PRIMARY KEY,
 			species_id INTEGER NOT NULL,
 			name TEXT NOT NULL,
 			name_en TEXT,
@@ -275,11 +275,11 @@ func createTables() error {
 			temperament TEXT,
 			care_level TEXT,
 			photo TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (species_id) REFERENCES species(id)
 		)`,
 		`CREATE TABLE IF NOT EXISTS pet_cards (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id SERIAL PRIMARY KEY,
 			breed_id INTEGER NOT NULL,
 			title TEXT NOT NULL,
 			description TEXT,
@@ -288,9 +288,9 @@ func createTables() error {
 			health_info TEXT,
 			nutrition TEXT,
 			photos TEXT,
-			is_published BOOLEAN DEFAULT 0,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			updated_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			is_published BOOLEAN DEFAULT false,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+			updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			FOREIGN KEY (breed_id) REFERENCES breeds(id)
 		)`,
 	}

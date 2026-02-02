@@ -25,6 +25,13 @@ import {
   RectangleStackIcon,
 } from '@heroicons/react/24/outline';
 
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  badge?: string;
+}
+
 const additionalLinks = [
   { name: 'О платформе', href: '/about', icon: InformationCircleIcon },
   { name: 'Статистика', href: '/statistics', icon: ChartBarIcon },
@@ -37,7 +44,7 @@ export default function Sidebar() {
   const unreadCount = useUnreadMessages();
 
   // Навигация для авторизованных пользователей
-  const authenticatedNavigation = [
+  const authenticatedNavigation: NavItem[] = [
     { name: 'Метки', href: '/', icon: DocumentTextIcon },
     { name: 'Профиль', href: user ? `/id${user.id}` : '/profile', icon: UserIcon },
     { name: 'Мессенджер', href: '/messenger', icon: ChatBubbleLeftIcon, badge: unreadCount > 0 ? unreadCount.toString() : undefined },
@@ -48,7 +55,7 @@ export default function Sidebar() {
   ];
 
   // Навигация для неавторизованных пользователей (только публичные разделы)
-  const publicNavigation = [
+  const publicNavigation: NavItem[] = [
     { name: 'Метки', href: '/', icon: DocumentTextIcon },
     { name: 'Каталог', href: '/catalog', icon: RectangleStackIcon },
   ];

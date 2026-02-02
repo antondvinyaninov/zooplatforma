@@ -30,7 +30,11 @@ type NotificationsHandler struct {
 
 // GetNotifications - получить список уведомлений текущего пользователя
 func (h *NotificationsHandler) GetNotifications(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("userID").(int)
+	userID, ok := r.Context().Value("userID").(int)
+	if !ok || userID == 0 {
+		http.Error(w, `{"success":false,"error":"Unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
 
 	query := `
 		SELECT n.id, n.user_id, n.type, n.actor_id, n.entity_type, n.entity_id, 
@@ -94,7 +98,11 @@ func (h *NotificationsHandler) GetNotifications(w http.ResponseWriter, r *http.R
 
 // GetUnreadCount - получить количество непрочитанных уведомлений
 func (h *NotificationsHandler) GetUnreadCount(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("userID").(int)
+	userID, ok := r.Context().Value("userID").(int)
+	if !ok || userID == 0 {
+		http.Error(w, `{"success":false,"error":"Unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
 
 	var count int
 	err := h.DB.QueryRow("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0", userID).Scan(&count)
@@ -114,7 +122,11 @@ func (h *NotificationsHandler) GetUnreadCount(w http.ResponseWriter, r *http.Req
 
 // MarkAsRead - отметить уведомление как прочитанное
 func (h *NotificationsHandler) MarkAsRead(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("userID").(int)
+	userID, ok := r.Context().Value("userID").(int)
+	if !ok || userID == 0 {
+		http.Error(w, `{"success":false,"error":"Unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
 
 	// Извлекаем ID из URL: /api/notifications/{id}
 	path := strings.TrimPrefix(r.URL.Path, "/api/notifications/")
@@ -160,7 +172,11 @@ func (h *NotificationsHandler) MarkAsRead(w http.ResponseWriter, r *http.Request
 
 // MarkAllAsRead - отметить все уведомления как прочитанные
 func (h *NotificationsHandler) MarkAllAsRead(w http.ResponseWriter, r *http.Request) {
-	userID := r.Context().Value("userID").(int)
+	userID, ok := r.Context().Value("userID").(int)
+	if !ok || userID == 0 {
+		http.Error(w, `{"success":false,"error":"Unauthorized"}`, http.StatusUnauthorized)
+		return
+	}
 
 	_, err := h.DB.Exec("UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0", userID)
 	if err != nil {

@@ -25,9 +25,12 @@ func UsersHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UserHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("🔍 UserHandler: Received %s request to %s", r.Method, r.URL.Path)
 	w.Header().Set("Content-Type", "application/json")
 
 	id := extractID(r.URL.Path)
+	log.Printf("🔍 UserHandler: Extracted ID: %d", id)
+
 	if id == 0 {
 		sendError(w, "Invalid user ID", http.StatusBadRequest)
 		return
@@ -35,6 +38,7 @@ func UserHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
+		log.Printf("🔍 UserHandler: Calling handleGetUser for id=%d", id)
 		// GET публичный - можно просматривать профили без авторизации
 		handleGetUser(w, r, id)
 	case http.MethodPut:

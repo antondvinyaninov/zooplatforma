@@ -9,7 +9,7 @@ import PostComments from './PostComments';
 
 type PostType = 'post' | 'sale' | 'lost' | 'found' | 'help';
 
-const postTypeBadges = {
+const postTypeBadges: Record<Exclude<PostType, 'post'>, { label: string; icon: string; color: string; bg: string }> = {
   sale: { label: 'Объявление', icon: '📢', color: '#10B981', bg: '#D1FAE5' },
   lost: { label: 'Потерялся', icon: '🐾', color: '#F59E0B', bg: '#FEF3C7' },
   found: { label: 'Нашелся', icon: '💚', color: '#059669', bg: '#D1FAE5' },
@@ -34,7 +34,7 @@ const formatDate = (dateString: string) => {
 
 export default function PostCard({ post }: { post: Post }) {
   const [commentsCount, setCommentsCount] = useState(post.comments_count || 0);
-  const badge = post.post_type && post.post_type !== 'post' ? postTypeBadges[post.post_type as PostType] : null;
+  const badge = post.post_type && post.post_type !== 'post' ? postTypeBadges[post.post_type as Exclude<PostType, 'post'>] : null;
   return (
     <div className="bg-white rounded-xl shadow-sm border border-gray-100 hover:shadow-md transition-shadow">
       {/* Header */}
@@ -48,7 +48,7 @@ export default function PostCard({ post }: { post: Post }) {
         </div>
         <div className="flex-1">
           <div className="flex items-center gap-2">
-            <Link href={post.user_id ? `/id${post.user_id}` : '#'}>
+            <Link href={post.author_id ? `/id${post.author_id}` : '#'}>
               <h4 className="text-sm font-semibold text-gray-900 hover:text-blue-600 cursor-pointer transition-colors">
                 {post.user?.name || 'Пользователь'}
               </h4>

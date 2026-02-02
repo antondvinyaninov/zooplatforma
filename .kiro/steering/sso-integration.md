@@ -4,7 +4,21 @@ inclusion: always
 
 # SSO Integration - Правила интеграции авторизации
 
-## ⚠️ КРИТИЧЕСКОЕ ПРАВИЛО: Единая система авторизации
+## 🚨 КРИТИЧЕСКОЕ ПРАВИЛО #1: НИКОГДА НЕ ИСПОЛЬЗУЙ ПОРТ 8000 ДЛЯ АВТОРИЗАЦИИ!
+
+**⛔️ ЗАПРЕЩЕНО:**
+- ❌ `http://localhost:8000/api/auth/login`
+- ❌ `http://localhost:8000/api/auth/me`
+- ❌ `apiClient.post('/api/auth/login', ...)`
+- ❌ Main Backend (8000) для любых операций авторизации
+
+**✅ ПРАВИЛЬНО:**
+- ✅ `http://localhost:7100/api/auth/login`
+- ✅ `http://localhost:7100/api/auth/me`
+- ✅ `authClient.post('/api/auth/login', ...)` (использует порт 7100)
+- ✅ Auth Service (7100) для ВСЕХ операций авторизации
+
+## ⚠️ КРИТИЧЕСКОЕ ПРАВИЛО #2: Единая система авторизации
 
 **Все микросервисы используют SSO (Single Sign-On) через Auth Service (порт 7100)!**
 
@@ -24,18 +38,109 @@ User → Main Frontend (3000) → Auth Service (7100) → JWT Token
             Main (8000)
 ```
 
+**ВАЖНО:** Main Backend (8000) НЕ участвует в процессе авторизации!
+
+## 📝 Примеры: ПРАВИЛЬНО vs НЕПРАВИЛЬНО
+
+### Frontend: API клиент (main/frontend/lib/api.ts)
+
+**❌ НЕПРАВИЛЬНО:**
+```typescript
+// НЕ ДЕЛАЙ ТАК!
+export const authApi = {
+  login: (email: string, password: string) =>
+    apiClient.post('/api/auth/login', { email, password }), // ❌ apiClient = порт 8000
+  
+  me: () =>
+    apiClient.get('/api/auth/me'), // ❌ apiClient = порт 8000
+};
+```
+
+**✅ ПРАВИЛЬНО:**
+```typescript
+// ДЕЛАЙ ТАК!
+export const authApi = {
+  login: (email: string, password: string) =>
+    authClient.post('/api/auth/login', { email, password }), // ✅ authClient = порт 7100
+  
+  me: () =>
+    authClient.get('/api/auth/me'), // ✅ authClient = порт 7100
+};
+```
+
+### Frontend: Прямые fetch запросы
+
+**❌ НЕПРАВИЛЬНО:**
+```typescript
+// НЕ ДЕЛАЙ ТАК!
+const response = await fetch('http://localhost:8000/api/auth/login', { // ❌ порт 8000
+  method: 'POST',
+  body: JSON.stringify({ email, password }),
+});
+```
+
+**✅ ПРАВИЛЬНО:**
+```typescript
+// ДЕЛАЙ ТАК!
+const response = await fetch('http://localhost:7100/api/auth/login', { // ✅ порт 7100
+  method: 'POST',
+  credentials: 'include', // ✅ ВАЖНО для cookies
+  body: JSON.stringify({ email, password }),
+});
+```
+
+### Backend: Проверка авторизации
+
+**❌ НЕПРАВИЛЬНО:**
+```go
+// НЕ ДЕЛАЙ ТАК!
+func handlePets(w http.ResponseWriter, r *http.Request) {
+    // ❌ Локальная проверка JWT
+    tokenString := r.Header.Get("Authorization")
+    token, err := jwt.Parse(tokenString, ...)
+    // ...
+}
+```
+
+**✅ ПРАВИЛЬНО:**
+```go
+// ДЕЛАЙ ТАК!
+import "github.com/zooplatforma/pkg/middleware"
+
+func main() {
+    // ✅ Инициализация middleware с Auth Service
+    middleware.InitAuthMiddleware("http://localhost:7100")
+    
+    // ✅ Применение middleware к защищенным роутам
+    http.HandleFunc("/api/pets", enableCORS(middleware.AuthMiddleware(handlePets)))
+}
+
+func handlePets(w http.ResponseWriter, r *http.Request) {
+    // ✅ Получение user_id из контекста (установлен middleware)
+    userID, ok := r.Context().Value("user_id").(int)
+    if !ok {
+        http.Error(w, "Unauthorized", http.StatusUnauthorized)
+        return
+    }
+    // ...
+}
+```
+
 ## Как работает SSO
 
 ### 1. Авторизация (Auth Service - 7100)
 
 **Endpoint:** `POST http://localhost:7100/api/auth/login`
 
+**⚠️ НЕ `http://localhost:8000/api/auth/login`!**
+
 **Процесс:**
 1. Пользователь вводит email/password на Main Frontend
-2. **Auth Service (7100)** проверяет credentials в `auth/backend/auth.db`
-3. Создается JWT token с данными пользователя и ролями из `user_roles`
-4. Token сохраняется в cookie `auth_token` для домена `localhost`
-5. Frontend получает данные пользователя
+2. **Frontend отправляет запрос НАПРЯМУЮ к Auth Service (7100)**
+3. Auth Service проверяет credentials в `auth/backend/auth.db`
+4. Создается JWT token с данными пользователя и ролями из `user_roles`
+5. Token сохраняется в cookie `auth_token` для домена `localhost`
+6. Frontend получает данные пользователя
 
 **JWT Payload:**
 ```go

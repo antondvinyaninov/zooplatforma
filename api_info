@@ -1,45 +1,62 @@
-# Clinic API Info
+# 🔐 Auth Flow Status
 
-## 1) Clinic backend (provides)
-Source: clinic/backend/main.go
+## ✅ ИСПРАВЛЕНО:
 
-- GET /api/health
-- GET /api/my-clinics
-- POST /api/clinics
-- GET /api/my-patients
-- GET /api/appointments
-- GET /api/organization
-- PUT /api/organization
-- GET /api/members
-- POST /api/members
-- DELETE /api/members
-- GET /api/users/search
-- GET /api/profile
+1. **pkg/middleware/auth.go** - изменены context keys на строки (было `type contextKey string`, стало `const UserIDKey = "userID"`)
+2. **main/frontend/lib/api.ts** - `getAuthToken()` использует прямой `fetch` вместо `authClient` (избегаем цикла)
+3. **main/backend/handlers/likes.go** - GET принимает userID=0 (опциональная авторизация)
+4. **main/backend/main.go** - GET `/api/posts/{id}/like` использует `OptionalAuthMiddleware`
 
-## 2) Clinic frontend (consumes)
+## 🎯 ТЕКУЩЕЕ СОСТОЯНИЕ:
 
-### Main service (port 8000)
-- GET http://localhost:8000/api/auth/me
-- GET /api/main/auth/me (proxy)
-- GET http://localhost:8000/api/users/search?phone=...
-- POST http://localhost:8000/api/users
-- POST http://localhost:8000/api/media/upload
-- POST http://localhost:8000/api/notifications/send
+### ✅ Работает:
+- `/api/posts/{id}/like` (GET) - 200 OK
+- Лайки загружаются корректно (liked=false, count=X)
 
-### Petbase service (port 8100)
-- GET /api/petbase/pets?... (proxy)
-- GET /api/petbase/pets/search?... (proxy)
-- POST http://localhost:8100/api/pets
-- PUT http://localhost:8100/api/pets/:id
-- POST http://localhost:8100/api/pet-events
+### ❌ Всё ещё 401:
+- `/api/messages/unread` - 401 Unauthorized
+- `/api/friends/requests` - 401 Unauthorized  
+- `/api/notifications/unread` - 401 Unauthorized
+- `/api/organizations/my` - 401 Unauthorized
+- `/api/friends` - 401 Unauthorized
 
-### Clinic service (port 8600)
-- GET http://localhost:8600/api/my-clinics
-- POST http://localhost:8600/api/clinics
-- GET http://localhost:8600/api/my-patients
-- GET http://localhost:8600/api/organization
-- PUT http://localhost:8600/api/organization
-- GET http://localhost:8600/api/members
-- POST http://localhost:8600/api/members
-- DELETE http://localhost:8600/api/members
-- GET http://localhost:8600/api/users/search?q=...
+## 🔍 ПРИЧИНА:
+
+**Браузер использует СТАРЫЙ код `api.ts`!**
+
+Новый код уже в файле:
+```typescript
+private async getAuthToken(): Promise<string | null> {
+  // ВАЖНО: используем прямой fetch, а НЕ authClient!
+  const response = await fetch(`${AUTH_URL}/api/auth/me`, {
+    credentials: 'include',
+  });
+  // ...
+}
+```
+
+Но браузер не перезагрузил JavaScript bundle.
+
+## 🚀 РЕШЕНИЕ:
+
+**ОБНОВИ БРАУЗЕР (Cmd+Shift+R или Ctrl+Shift+R)** чтобы загрузить новый код!
+
+После обновления:
+1. `ApiClient.getHeaders()` будет вызывать исправленный `getAuthToken()`
+2. `getAuthToken()` получит токен от Auth Service через `/api/auth/me`
+3. Токен будет добавлен в заголовок `Authorization: Bearer {token}`
+4. Main Backend получит токен и проверит через `pkg/middleware.AuthMiddleware`
+5. Все 401 ошибки исчезнут ✅
+
+## 📋 Проверка после обновления:
+
+Открой консоль браузера и проверь:
+- Network tab → `/api/friends` → Request Headers → должен быть `Authorization: Bearer ...`
+- Network tab → `/api/notifications/unread` → Request Headers → должен быть `Authorization: Bearer ...`
+- Все запросы должны вернуть 200 OK вместо 401
+
+## 🔧 Если всё ещё 401 после обновления:
+
+1. Проверь консоль браузера на ошибки в `getAuthToken()`
+2. Проверь Network tab → `/api/auth/me` → должен вернуть `{"success":true,"data":{"token":"..."}}`
+3. Проверь Main Backend логи: `tail -f main/backend/tmp/main.log`
