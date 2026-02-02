@@ -14,6 +14,24 @@ import (
 	"time"
 )
 
+// convertPlaceholdersUsers converts ? to $1, $2, $3 for PostgreSQL
+func convertPlaceholdersUsers(query string) string {
+	if os.Getenv("ENVIRONMENT") == "production" {
+		result := ""
+		paramNum := 1
+		for _, char := range query {
+			if char == '?' {
+				result += fmt.Sprintf("$%d", paramNum)
+				paramNum++
+			} else {
+				result += string(char)
+			}
+		}
+		return result
+	}
+	return query
+}
+
 func UsersHandler(w http.ResponseWriter, r *http.Request) {
 	w.Header().Set("Content-Type", "application/json")
 
@@ -189,7 +207,7 @@ func handleGetUser(w http.ResponseWriter, _ *http.Request, id int) {
 		user.VerifiedAt = &verifiedAt.String
 	}
 	if createdAt.Valid {
-		user.CreatedAt = &createdAt.String
+		user.CreatedAt = createdAt.String
 	}
 
 	// Устанавливаем LastSeen если есть
@@ -220,7 +238,8 @@ func handleCreateUser(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	result, err := database.DB.Exec("INSERT INTO users (name, email) VALUES (?, ?)", req.Name, req.Email)
+	query := convertPlaceholdersUsers("INSERT INTO users (name, email) VALUES (?, ?)")
+	result, err := database.DB.Exec(query, req.Name, req.Email)
 	if err != nil {
 		sendError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -237,7 +256,8 @@ func handleUpdateUser(w http.ResponseWriter, r *http.Request, id int) {
 		return
 	}
 
-	_, err := database.DB.Exec("UPDATE users SET name = ?, email = ? WHERE id = ?", req.Name, req.Email, id)
+	query := convertPlaceholdersUsers("UPDATE users SET name = ?, email = ? WHERE id = ?")
+	_, err := database.DB.Exec(query, req.Name, req.Email, id)
 	if err != nil {
 		sendError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -247,7 +267,8 @@ func handleUpdateUser(w http.ResponseWriter, r *http.Request, id int) {
 }
 
 func handleDeleteUser(w http.ResponseWriter, _ *http.Request, id int) {
-	_, err := database.DB.Exec("DELETE FROM users WHERE id = ?", id)
+	query := convertPlaceholdersUsers("DELETE FROM users WHERE id = ?")
+	_, err := database.DB.Exec(query, id)
 	if err != nil {
 		sendError(w, err.Error(), http.StatusInternalServerError)
 		return
