@@ -7,8 +7,27 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"time"
 )
+
+// convertPlaceholders converts ? to $1, $2, $3 for PostgreSQL
+func convertPlaceholdersFriends(query string) string {
+	if os.Getenv("ENVIRONMENT") == "production" {
+		result := ""
+		paramNum := 1
+		for _, char := range query {
+			if char == '?' {
+				result += fmt.Sprintf("$%d", paramNum)
+				paramNum++
+			} else {
+				result += string(char)
+			}
+		}
+		return result
+	}
+	return query
+}
 
 // SendFriendRequestHandler - отправить запрос в друзья
 func SendFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
@@ -37,10 +56,11 @@ func SendFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Проверяем, существует ли уже запрос
 	var existingID int
-	err := database.DB.QueryRow(`
+	query := convertPlaceholdersFriends(`
 		SELECT id FROM friendships 
 		WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)
-	`, userID, req.FriendID, req.FriendID, userID).Scan(&existingID)
+	`)
+	err := database.DB.QueryRow(query, userID, req.FriendID, req.FriendID, userID).Scan(&existingID)
 
 	if err == nil {
 		sendErrorResponse(w, "Запрос в друзья уже существует", http.StatusConflict)
@@ -48,10 +68,11 @@ func SendFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Создаем запрос в друзья
-	result, err := database.DB.Exec(`
+	query = convertPlaceholdersFriends(`
 		INSERT INTO friendships (user_id, friend_id, status, created_at, updated_at)
 		VALUES (?, ?, 'pending', ?, ?)
-	`, userID, req.FriendID, time.Now(), time.Now())
+	`)
+	result, err := database.DB.Exec(query, userID, req.FriendID, time.Now(), time.Now())
 
 	if err != nil {
 		sendErrorResponse(w, "Ошибка отправки запроса: "+err.Error(), http.StatusInternalServerError)
@@ -62,9 +83,10 @@ func SendFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Создаем уведомление для получателя запроса
 	var senderName, senderLastName string
-	err = database.DB.QueryRow(`
+	query = convertPlaceholdersFriends(`
 		SELECT name, COALESCE(last_name, '') FROM users WHERE id = ?
-	`, userID).Scan(&senderName, &senderLastName)
+	`)
+	err = database.DB.QueryRow(query, userID).Scan(&senderName, &senderLastName)
 
 	if err == nil {
 		fullName := senderName
@@ -108,11 +130,12 @@ func AcceptFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Обновляем статус запроса (только если текущий пользователь - получатель)
-	result, err := database.DB.Exec(`
+	query := convertPlaceholdersFriends(`
 		UPDATE friendships 
 		SET status = 'accepted', updated_at = ?
 		WHERE id = ? AND friend_id = ? AND status = 'pending'
-	`, time.Now(), req.FriendshipID, userID)
+	`)
+	result, err := database.DB.Exec(query, time.Now(), req.FriendshipID, userID)
 
 	if err != nil {
 		sendErrorResponse(w, "Ошибка принятия запроса: "+err.Error(), http.StatusInternalServerError)
@@ -128,12 +151,13 @@ func AcceptFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 	// Создаем уведомление для отправителя запроса
 	var senderID int
 	var acceptorName, acceptorLastName string
-	err = database.DB.QueryRow(`
+	query = convertPlaceholdersFriends(`
 		SELECT f.user_id, u.name, COALESCE(u.last_name, '')
 		FROM friendships f
 		JOIN users u ON u.id = ?
 		WHERE f.id = ?
-	`, userID, req.FriendshipID).Scan(&senderID, &acceptorName, &acceptorLastName)
+	`)
+	err = database.DB.QueryRow(query, userID, req.FriendshipID).Scan(&senderID, &acceptorName, &acceptorLastName)
 
 	if err == nil {
 		fullName := acceptorName
@@ -176,10 +200,11 @@ func RejectFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Удаляем запрос (только если текущий пользователь - получатель)
-	result, err := database.DB.Exec(`
+	query := convertPlaceholdersFriends(`
 		DELETE FROM friendships 
 		WHERE id = ? AND friend_id = ? AND status = 'pending'
-	`, req.FriendshipID, userID)
+	`)
+	result, err := database.DB.Exec(query, req.FriendshipID, userID)
 
 	if err != nil {
 		sendErrorResponse(w, "Ошибка отклонения запроса: "+err.Error(), http.StatusInternalServerError)
@@ -217,10 +242,11 @@ func RemoveFriendHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Удаляем дружбу (в любом направлении)
-	result, err := database.DB.Exec(`
+	query := convertPlaceholdersFriends(`
 		DELETE FROM friendships 
 		WHERE id = ? AND ((user_id = ? OR friend_id = ?)) AND status = 'accepted'
-	`, req.FriendshipID, userID, userID)
+	`)
+	result, err := database.DB.Exec(query, req.FriendshipID, userID, userID)
 
 	if err != nil {
 		sendErrorResponse(w, "Ошибка удаления из друзей: "+err.Error(), http.StatusInternalServerError)
@@ -252,7 +278,7 @@ func GetFriendsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем всех друзей (где статус accepted) + проверяем онлайн статус
-	rows, err := database.DB.Query(`
+	query := convertPlaceholdersFriends(`
 		SELECT f.id, f.user_id, f.friend_id, f.status, f.created_at, f.updated_at,
 		       u.id, u.name, u.last_name, u.email, u.avatar, u.location,
 		       ua.last_seen,
@@ -270,7 +296,8 @@ func GetFriendsHandler(w http.ResponseWriter, r *http.Request) {
 		LEFT JOIN user_activity ua ON ua.user_id = u.id
 		WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted'
 		ORDER BY f.created_at DESC
-	`, userID, userID, userID)
+	`)
+	rows, err := database.DB.Query(query, userID, userID, userID)
 
 	if err != nil {
 		sendErrorResponse(w, "Ошибка получения друзей: "+err.Error(), http.StatusInternalServerError)
@@ -318,14 +345,15 @@ func GetFriendRequestsHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Получаем входящие запросы (где текущий пользователь - friend_id)
-	rows, err := database.DB.Query(`
+	query := convertPlaceholdersFriends(`
 		SELECT f.id, f.user_id, f.friend_id, f.status, f.created_at, f.updated_at,
 		       u.id, u.name, u.last_name, u.email, u.avatar, u.location
 		FROM friendships f
 		JOIN users u ON u.id = f.user_id
 		WHERE f.friend_id = ? AND f.status = 'pending'
 		ORDER BY f.created_at DESC
-	`, userID)
+	`)
+	rows, err := database.DB.Query(query, userID)
 
 	if err != nil {
 		sendErrorResponse(w, "Ошибка получения запросов: "+err.Error(), http.StatusInternalServerError)
@@ -380,11 +408,12 @@ func GetFriendshipStatusHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Проверяем статус дружбы
 	var friendship models.Friendship
-	err = database.DB.QueryRow(`
+	query := convertPlaceholdersFriends(`
 		SELECT id, user_id, friend_id, status, created_at, updated_at
 		FROM friendships
 		WHERE (user_id = ? AND friend_id = ?) OR (user_id = ? AND friend_id = ?)
-	`, userID, friendID, friendID, userID).Scan(
+	`)
+	err = database.DB.QueryRow(query, userID, friendID, friendID, userID).Scan(
 		&friendship.ID, &friendship.UserID, &friendship.FriendID,
 		&friendship.Status, &friendship.CreatedAt, &friendship.UpdatedAt,
 	)

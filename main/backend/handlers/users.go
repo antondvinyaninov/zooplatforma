@@ -3,9 +3,12 @@ package handlers
 import (
 	"backend/models"
 	"database"
+	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -94,6 +97,24 @@ func handleGetUsers(w http.ResponseWriter, _ *http.Request) {
 }
 
 func handleGetUser(w http.ResponseWriter, _ *http.Request, id int) {
+	// Helper для конвертации ? в $1 для PostgreSQL
+	convertPlaceholders := func(query string) string {
+		if os.Getenv("ENVIRONMENT") == "production" {
+			result := ""
+			paramNum := 1
+			for _, char := range query {
+				if char == '?' {
+					result += fmt.Sprintf("$%d", paramNum)
+					paramNum++
+				} else {
+					result += string(char)
+				}
+			}
+			return result
+		}
+		return query
+	}
+
 	// Получаем данные пользователя из локальной БД Main Backend
 	var user models.User
 	query := `SELECT u.id, u.name, u.last_name, u.email, u.bio, u.phone, u.location, u.avatar, u.cover_photo,
@@ -104,12 +125,19 @@ func handleGetUser(w http.ResponseWriter, _ *http.Request, id int) {
 	          LEFT JOIN user_activity ua ON u.id = ua.user_id
 	          WHERE u.id = ?`
 
-	var lastSeenTime *string
+	query = convertPlaceholders(query)
+
+	var lastSeenTime sql.NullString
+	var bio, phone, location, avatar, coverPhoto sql.NullString
+	var profileVisibility, showPhone, showEmail, allowMessages, showOnline sql.NullString
+	var verified sql.NullBool
+	var verifiedAt, createdAt sql.NullString
+
 	err := database.DB.QueryRow(query, id).Scan(
-		&user.ID, &user.Name, &user.LastName, &user.Email, &user.Bio, &user.Phone,
-		&user.Location, &user.Avatar, &user.CoverPhoto,
-		&user.ProfileVisibility, &user.ShowPhone, &user.ShowEmail, &user.AllowMessages, &user.ShowOnline,
-		&user.Verified, &user.VerifiedAt, &user.CreatedAt,
+		&user.ID, &user.Name, &user.LastName, &user.Email, &bio, &phone,
+		&location, &avatar, &coverPhoto,
+		&profileVisibility, &showPhone, &showEmail, &allowMessages, &showOnline,
+		&verified, &verifiedAt, &createdAt,
 		&lastSeenTime,
 	)
 
@@ -123,9 +151,50 @@ func handleGetUser(w http.ResponseWriter, _ *http.Request, id int) {
 		return
 	}
 
+	// Заполняем NULL-able поля
+	if bio.Valid {
+		user.Bio = bio.String
+	}
+	if phone.Valid {
+		user.Phone = phone.String
+	}
+	if location.Valid {
+		user.Location = location.String
+	}
+	if avatar.Valid {
+		user.Avatar = avatar.String
+	}
+	if coverPhoto.Valid {
+		user.CoverPhoto = coverPhoto.String
+	}
+	if profileVisibility.Valid {
+		user.ProfileVisibility = profileVisibility.String
+	}
+	if showPhone.Valid {
+		user.ShowPhone = showPhone.String
+	}
+	if showEmail.Valid {
+		user.ShowEmail = showEmail.String
+	}
+	if allowMessages.Valid {
+		user.AllowMessages = allowMessages.String
+	}
+	if showOnline.Valid {
+		user.ShowOnline = showOnline.String
+	}
+	if verified.Valid {
+		user.Verified = verified.Bool
+	}
+	if verifiedAt.Valid {
+		user.VerifiedAt = &verifiedAt.String
+	}
+	if createdAt.Valid {
+		user.CreatedAt = &createdAt.String
+	}
+
 	// Устанавливаем LastSeen если есть
-	if lastSeenTime != nil {
-		user.LastSeen = parseTime(*lastSeenTime)
+	if lastSeenTime.Valid {
+		user.LastSeen = parseTime(lastSeenTime.String)
 	}
 
 	// Проверяем онлайн статус (активен в последние 5 минут)

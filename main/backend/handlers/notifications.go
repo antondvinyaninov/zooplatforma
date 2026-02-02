@@ -6,10 +6,29 @@ import (
 	"encoding/json"
 	"fmt"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
 )
+
+// convertPlaceholdersNotif converts ? to $1, $2, $3 for PostgreSQL
+func convertPlaceholdersNotif(query string) string {
+	if os.Getenv("ENVIRONMENT") == "production" {
+		result := ""
+		paramNum := 1
+		for _, char := range query {
+			if char == '?' {
+				result += fmt.Sprintf("$%d", paramNum)
+				paramNum++
+			} else {
+				result += string(char)
+			}
+		}
+		return result
+	}
+	return query
+}
 
 type Notification struct {
 	ID         int          `json:"id"`
@@ -36,7 +55,7 @@ func (h *NotificationsHandler) GetNotifications(w http.ResponseWriter, r *http.R
 		return
 	}
 
-	query := `
+	query := convertPlaceholdersNotif(`
 		SELECT n.id, n.user_id, n.type, n.actor_id, n.entity_type, n.entity_id, 
 		       n.message, n.is_read, n.created_at,
 		       u.id, u.name, u.last_name, u.email, u.avatar
@@ -45,7 +64,7 @@ func (h *NotificationsHandler) GetNotifications(w http.ResponseWriter, r *http.R
 		WHERE n.user_id = ?
 		ORDER BY n.created_at DESC
 		LIMIT 50
-	`
+	`)
 
 	rows, err := h.DB.Query(query, userID)
 	if err != nil {
@@ -105,7 +124,8 @@ func (h *NotificationsHandler) GetUnreadCount(w http.ResponseWriter, r *http.Req
 	}
 
 	var count int
-	err := h.DB.QueryRow("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = 0", userID).Scan(&count)
+	query := convertPlaceholdersNotif("SELECT COUNT(*) FROM notifications WHERE user_id = ? AND is_read = FALSE")
+	err := h.DB.QueryRow(query, userID).Scan(&count)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -139,7 +159,8 @@ func (h *NotificationsHandler) MarkAsRead(w http.ResponseWriter, r *http.Request
 
 	// Проверяем, что уведомление принадлежит пользователю
 	var ownerID int
-	err := h.DB.QueryRow("SELECT user_id FROM notifications WHERE id = ?", notificationID).Scan(&ownerID)
+	query := convertPlaceholdersNotif("SELECT user_id FROM notifications WHERE id = ?")
+	err := h.DB.QueryRow(query, notificationID).Scan(&ownerID)
 	if err != nil {
 		if err == sql.ErrNoRows {
 			http.Error(w, "Notification not found", http.StatusNotFound)
@@ -155,7 +176,8 @@ func (h *NotificationsHandler) MarkAsRead(w http.ResponseWriter, r *http.Request
 	}
 
 	// Отмечаем как прочитанное
-	_, err = h.DB.Exec("UPDATE notifications SET is_read = 1 WHERE id = ?", notificationID)
+	query = convertPlaceholdersNotif("UPDATE notifications SET is_read = TRUE WHERE id = ?")
+	_, err = h.DB.Exec(query, notificationID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -178,7 +200,8 @@ func (h *NotificationsHandler) MarkAllAsRead(w http.ResponseWriter, r *http.Requ
 		return
 	}
 
-	_, err := h.DB.Exec("UPDATE notifications SET is_read = 1 WHERE user_id = ? AND is_read = 0", userID)
+	query := convertPlaceholdersNotif("UPDATE notifications SET is_read = TRUE WHERE user_id = ? AND is_read = FALSE")
+	_, err := h.DB.Exec(query, userID)
 	if err != nil {
 		http.Error(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -200,10 +223,10 @@ func (h *NotificationsHandler) CreateNotification(userID, actorID int, notifType
 		return nil
 	}
 
-	query := `
+	query := convertPlaceholdersNotif(`
 		INSERT INTO notifications (user_id, type, actor_id, entity_type, entity_id, message)
 		VALUES (?, ?, ?, ?, ?, ?)
-	`
+	`)
 
 	_, err := h.DB.Exec(query, userID, notifType, actorID, entityType, entityID, message)
 	return err

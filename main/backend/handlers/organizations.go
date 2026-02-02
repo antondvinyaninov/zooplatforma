@@ -721,7 +721,7 @@ func GetMyOrganizationsHandler(w http.ResponseWriter, r *http.Request) {
 	// Получаем организации где пользователь owner или admin с правом публикации
 	query := `
 		SELECT 
-			o.id, o.name, o.short_name, o.type, o.logo, o.bio,
+			o.id, o.name, o.type, o.logo, o.bio,
 			om.role, om.can_post
 		FROM organizations o
 		INNER JOIN organization_members om ON o.id = om.organization_id
@@ -746,29 +746,24 @@ func GetMyOrganizationsHandler(w http.ResponseWriter, r *http.Request) {
 	for rows.Next() {
 		var id int
 		var name string
-		var shortName, orgType, logo, bio sql.NullString
+		var orgType, logo, bio sql.NullString
 		var role string
 		var canPost bool
 
-		if err := rows.Scan(&id, &name, &shortName, &orgType, &logo, &bio, &role, &canPost); err != nil {
+		if err := rows.Scan(&id, &name, &orgType, &logo, &bio, &role, &canPost); err != nil {
 			log.Printf("❌ Scan error: %v", err)
 			sendJSONError(w, http.StatusInternalServerError, "Failed to scan organization: "+err.Error())
 			return
 		}
 
 		org := map[string]interface{}{
-			"id":         id,
-			"name":       name,
-			"short_name": "",
-			"type":       "",
-			"logo":       nil,
-			"bio":        nil,
-			"role":       role,
-			"can_post":   canPost,
-		}
-
-		if shortName.Valid {
-			org["short_name"] = shortName.String
+			"id":       id,
+			"name":     name,
+			"type":     "",
+			"logo":     nil,
+			"bio":      nil,
+			"role":     role,
+			"can_post": canPost,
 		}
 		if orgType.Valid {
 			org["type"] = orgType.String
