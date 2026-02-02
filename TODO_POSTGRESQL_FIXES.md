@@ -1,6 +1,15 @@
 # TODO: PostgreSQL Syntax Fixes
 
-## Status: ✅ COMPLETED
+## Status: ✅ COMPLETED (with one more fix)
+
+### Latest Fix (commit a0d4d5d):
+18. **Fixed organizations table structure** - added missing columns:
+    - `short_name`, `bio`, `cover_photo`
+    - `address_city`, `address_region`
+    - `is_verified`
+    - `can_post` in organization_members
+19. **Created SQL fix script** - automatically applies on container start
+20. **Updated PostgreSQL migration** - 036_migrate_to_postgresql.sql now has correct structure
 
 ### All Fixes Applied ✅
 1. Main Backend connection to PostgreSQL
