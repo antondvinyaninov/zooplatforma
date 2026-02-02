@@ -167,10 +167,15 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	// Найти пользователя
 	var user User
 	var passwordHash string
+	var avatar sql.NullString
 	err := db.QueryRow(`
 		SELECT id, email, password, name, last_name, avatar
 		FROM users WHERE email = ?
-	`, req.Email).Scan(&user.ID, &user.Email, &passwordHash, &user.Name, &user.LastName, &user.Avatar)
+	`, req.Email).Scan(&user.ID, &user.Email, &passwordHash, &user.Name, &user.LastName, &avatar)
+
+	if avatar.Valid {
+		user.Avatar = avatar.String
+	}
 
 	if err == sql.ErrNoRows {
 		http.Error(w, `{"success":false,"error":"Invalid email or password"}`, http.StatusUnauthorized)
