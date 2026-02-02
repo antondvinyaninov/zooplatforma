@@ -1,5 +1,12 @@
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
-const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL || 'http://localhost:7100';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    ? window.location.origin 
+    : 'http://localhost:8000');
+
+const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL || 
+  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
+    ? window.location.origin 
+    : 'http://localhost:7100');
 
 interface ApiResponse<T> {
   success: boolean;
