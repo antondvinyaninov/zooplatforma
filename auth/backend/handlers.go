@@ -175,7 +175,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: false,
 		Secure:   getCookieSecure(),
 		SameSite: getCookieSameSite(),
-		MaxAge:   86400 * 7,            // 7 дней
+		MaxAge:   86400 * 7, // 7 дней
 	})
 
 	// Ответ
@@ -300,7 +300,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: false,
 		Secure:   getCookieSecure(),
 		SameSite: getCookieSameSite(),
-		MaxAge:   86400 * 7,            // 7 дней
+		MaxAge:   86400 * 7, // 7 дней
 	})
 
 	// Ответ
@@ -349,10 +349,24 @@ func getMeHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Получить пользователя из БД
 	var user User
-	err = db.QueryRow(`
+	var avatar sql.NullString
+	var emailVerified sql.NullBool
+	var createdAt sql.NullString
+
+	err = db.QueryRow(sqlQuery(`
 		SELECT id, email, name, last_name, avatar, email_verified, created_at
 		FROM users WHERE id = ?
-	`, claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &user.LastName, &user.Avatar, &user.EmailVerified, &user.CreatedAt)
+	`), claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &user.LastName, &avatar, &emailVerified, &createdAt)
+
+	if avatar.Valid {
+		user.Avatar = avatar.String
+	}
+	if emailVerified.Valid {
+		user.EmailVerified = emailVerified.Bool
+	}
+	if createdAt.Valid {
+		user.CreatedAt = createdAt.String
+	}
 
 	if err != nil {
 		log.Printf("❌ Failed to get user: %v", err)
@@ -433,10 +447,16 @@ func verifyTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Получить пользователя
 	var user User
-	err = db.QueryRow(`
+	var avatar sql.NullString
+
+	err = db.QueryRow(sqlQuery(`
 		SELECT id, email, name, last_name, avatar
 		FROM users WHERE id = ?
-	`, claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &user.LastName, &user.Avatar)
+	`), claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &user.LastName, &avatar)
+
+	if avatar.Valid {
+		user.Avatar = avatar.String
+	}
 
 	if err != nil {
 		response := map[string]interface{}{
@@ -503,7 +523,7 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 		HttpOnly: false,
 		Secure:   getCookieSecure(),
 		SameSite: getCookieSameSite(), // Lax для localhost
-		MaxAge:   -1,                   // Удалить cookie
+		MaxAge:   -1,                  // Удалить cookie
 	})
 
 	w.Header().Set("Content-Type", "application/json")
