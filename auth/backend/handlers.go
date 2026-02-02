@@ -5,6 +5,7 @@ import (
 	"database/sql"
 	"encoding/hex"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
 	"os"
@@ -15,9 +16,20 @@ import (
 )
 
 var jwtSecret []byte
+var isPostgres bool
+
+// sqlPlaceholder возвращает правильный placeholder для SQL запроса
+func sqlPlaceholder(index int) string {
+	if isPostgres {
+		return fmt.Sprintf("$%d", index)
+	}
+	return "?"
+}
 
 // InitJWTSecret - инициализировать JWT secret (вызывается после загрузки .env)
 func InitJWTSecret() {
+	// Определяем тип БД
+	isPostgres = os.Getenv("ENVIRONMENT") == "production"
 	secret := os.Getenv("JWT_SECRET")
 	if secret == "" {
 		log.Fatal("❌ JWT_SECRET not set in environment")
@@ -74,7 +86,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Проверить существование email
 	var exists bool
-	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)", req.Email).Scan(&exists)
+	err := db.QueryRow("SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)", req.Email).Scan(&exists)
 	if err != nil {
 		log.Printf("❌ Database error: %v", err)
 		http.Error(w, `{"success":false,"error":"Internal server error"}`, http.StatusInternalServerError)
@@ -97,7 +109,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 	// Создать пользователя
 	result, err := db.Exec(`
 		INSERT INTO users (email, password, name, last_name)
-		VALUES (?, ?, ?, ?)
+		VALUES ($1, $2, $3, $4)
 	`, req.Email, string(hashedPassword), req.Name, req.LastName)
 
 	if err != nil {
@@ -168,9 +180,10 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	var passwordHash string
 	var avatar sql.NullString
+
 	err := db.QueryRow(`
 		SELECT id, email, password, name, last_name, avatar
-		FROM users WHERE email = ?
+		FROM users WHERE email = $1
 	`, req.Email).Scan(&user.ID, &user.Email, &passwordHash, &user.Name, &user.LastName, &avatar)
 
 	if avatar.Valid {
@@ -196,7 +209,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Загрузить роли из user_roles
 	roles := []string{}
-	rows, err := db.Query("SELECT role FROM user_roles WHERE user_id = ?", user.ID)
+	rows, err := db.Query("SELECT role FROM user_roles WHERE user_id = $1", user.ID)
 	if err != nil {
 		log.Printf("❌ Failed to load roles: %v", err)
 	} else {
@@ -290,7 +303,7 @@ func getMeHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	err = db.QueryRow(`
 		SELECT id, email, name, last_name, avatar, email_verified, created_at
-		FROM users WHERE id = ?
+		FROM users WHERE id = $1
 	`, claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &user.LastName, &user.Avatar, &user.EmailVerified, &user.CreatedAt)
 
 	if err != nil {
@@ -301,7 +314,7 @@ func getMeHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Загрузить роли из user_roles
 	roles := []string{}
-	rows, err := db.Query("SELECT role FROM user_roles WHERE user_id = ?", user.ID)
+	rows, err := db.Query("SELECT role FROM user_roles WHERE user_id = $1", user.ID)
 	if err != nil {
 		log.Printf("❌ Failed to load roles: %v", err)
 	} else {
@@ -374,7 +387,7 @@ func verifyTokenHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	err = db.QueryRow(`
 		SELECT id, email, name, last_name, avatar
-		FROM users WHERE id = ?
+		FROM users WHERE id = $1
 	`, claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &user.LastName, &user.Avatar)
 
 	if err != nil {
@@ -391,7 +404,7 @@ func verifyTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Загрузить роли из user_roles
 	roles := []string{}
-	rows, err := db.Query("SELECT role FROM user_roles WHERE user_id = ?", user.ID)
+	rows, err := db.Query("SELECT role FROM user_roles WHERE user_id = $1", user.ID)
 	if err != nil {
 		log.Printf("❌ Failed to load roles: %v", err)
 	} else {
