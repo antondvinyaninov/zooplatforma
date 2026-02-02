@@ -26,7 +26,13 @@ func main() {
 	var err error
 	dbPath := os.Getenv("DATABASE_PATH")
 	if dbPath == "" {
-		dbPath = "./auth.db"
+		// Production: используем Volume
+		if os.Getenv("ENVIRONMENT") == "production" {
+			dbPath = "/app/auth-data/auth.db"
+		} else {
+			// Development: локальный файл
+			dbPath = "./auth.db"
+		}
 	}
 
 	db, err = sql.Open("sqlite3", dbPath)
