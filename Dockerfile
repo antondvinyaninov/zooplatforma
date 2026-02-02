@@ -162,6 +162,10 @@ case $SERVICE in
       PGPASSWORD=${DATABASE_PASSWORD:-lmLG7k2ed4vas19} psql -h ${DATABASE_HOST:-zooplatforma-db} -U ${DATABASE_USER:-zp} -d ${DATABASE_NAME:-zp-db} -f /app/fix_posts_table.sql || echo "⚠️ Posts fix failed (maybe already applied)"
     fi
     
+    # Запускаем nginx
+    echo "🚀 Starting nginx..."
+    nginx
+    
     # Запускаем Auth Service (порт 7100)
     echo "🚀 Starting Auth Service..."
     /app/auth-backend &
