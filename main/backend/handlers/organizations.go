@@ -5,8 +5,10 @@ import (
 	"database"
 	"database/sql"
 	"encoding/json"
+	"fmt"
 	"log"
 	"net/http"
+	"os"
 	"strconv"
 	"strings"
 	"time"
@@ -697,6 +699,25 @@ func GetMyOrganizationsHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("✅ userID extracted: %d", userID)
 
+	// Helper для конвертации ? в $1, $2 для PostgreSQL
+	convertPlaceholders := func(query string) string {
+		if os.Getenv("ENVIRONMENT") == "production" {
+			// PostgreSQL - конвертируем ? в $1, $2, $3...
+			result := ""
+			paramNum := 1
+			for _, char := range query {
+				if char == '?' {
+					result += fmt.Sprintf("$%d", paramNum)
+					paramNum++
+				} else {
+					result += string(char)
+				}
+			}
+			return result
+		}
+		return query // SQLite - оставляем как есть
+	}
+
 	// Получаем организации где пользователь owner или admin с правом публикации
 	query := `
 		SELECT 
@@ -706,9 +727,11 @@ func GetMyOrganizationsHandler(w http.ResponseWriter, r *http.Request) {
 		INNER JOIN organization_members om ON o.id = om.organization_id
 		WHERE om.user_id = ? 
 		AND om.role IN ('owner', 'admin')
-		AND om.can_post = 1
+		AND om.can_post = TRUE
 		ORDER BY o.name ASC
 	`
+
+	query = convertPlaceholders(query)
 
 	log.Printf("🔍 Executing query for userID=%d", userID)
 	rows, err := database.DB.Query(query, userID)
