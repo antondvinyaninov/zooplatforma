@@ -350,19 +350,15 @@ func getMeHandler(w http.ResponseWriter, r *http.Request) {
 	// Получить пользователя из БД
 	var user User
 	var avatar sql.NullString
-	var emailVerified sql.NullBool
 	var createdAt sql.NullString
 
 	err = db.QueryRow(sqlQuery(`
-		SELECT id, email, name, last_name, avatar, email_verified, created_at
+		SELECT id, email, name, last_name, avatar, created_at
 		FROM users WHERE id = ?
-	`), claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &user.LastName, &avatar, &emailVerified, &createdAt)
+	`), claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &user.LastName, &avatar, &createdAt)
 
 	if avatar.Valid {
 		user.Avatar = avatar.String
-	}
-	if emailVerified.Valid {
-		user.EmailVerified = emailVerified.Bool
 	}
 	if createdAt.Valid {
 		user.CreatedAt = createdAt.String
