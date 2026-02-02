@@ -108,7 +108,60 @@ func fixOrganizationsTable() error {
 }
 
 func createTablesPostgreSQL() error {
-	// PostgreSQL использует SERIAL для auto-increment
+	log.Println("🔄 Applying PostgreSQL migration 036...")
+
+	// Читаем файл миграции
+	migrationPath := "database/migrations/036_migrate_to_postgresql.sql"
+
+	// Пробуем разные пути (для запуска из разных директорий)
+	paths := []string{
+		migrationPath,
+		"../../" + migrationPath,
+		"../../../" + migrationPath,
+	}
+
+	var migrationSQL []byte
+	var err error
+
+	for _, path := range paths {
+		migrationSQL, err = os.ReadFile(path)
+		if err == nil {
+			log.Printf("📄 Found migration file: %s", path)
+			break
+		}
+	}
+
+	if err != nil {
+		log.Printf("⚠️ Migration file not found, using basic schema")
+		// Fallback - создаем минимальные таблицы
+		return createBasicTablesPostgreSQL()
+	}
+
+	// Применяем миграцию
+	_, err = DB.Exec(string(migrationSQL))
+	if err != nil {
+		// Если ошибка "already exists" - это нормально
+		if strings.Contains(err.Error(), "already exists") {
+			log.Println("✅ PostgreSQL tables already exist")
+		} else {
+			return fmt.Errorf("failed to apply PostgreSQL migration: %w", err)
+		}
+	} else {
+		log.Println("✅ PostgreSQL migration 036 applied successfully")
+	}
+
+	// Применяем fix для organizations table (на случай если миграция была старая)
+	if err := fixOrganizationsTable(); err != nil {
+		log.Printf("⚠️ Organizations table fix failed (maybe already applied): %v", err)
+	} else {
+		log.Println("✅ Organizations table fix applied successfully")
+	}
+
+	return nil
+}
+
+// createBasicTablesPostgreSQL создает минимальные таблицы если миграция не найдена
+func createBasicTablesPostgreSQL() error {
 	query := `
 	CREATE TABLE IF NOT EXISTS users (
 		id SERIAL PRIMARY KEY,
@@ -140,18 +193,10 @@ func createTablesPostgreSQL() error {
 	`
 	_, err := DB.Exec(query)
 	if err != nil {
-		return fmt.Errorf("failed to create PostgreSQL tables: %w", err)
+		return fmt.Errorf("failed to create basic PostgreSQL tables: %w", err)
 	}
 
-	log.Println("✅ PostgreSQL tables created successfully")
-
-	// Применяем fix для organizations table
-	if err := fixOrganizationsTable(); err != nil {
-		log.Printf("⚠️ Organizations table fix failed (maybe already applied): %v", err)
-	} else {
-		log.Println("✅ Organizations table fix applied successfully")
-	}
-
+	log.Println("✅ Basic PostgreSQL tables created")
 	return nil
 }
 
