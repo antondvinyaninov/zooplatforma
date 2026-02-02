@@ -168,14 +168,14 @@ func GetChatMessagesHandler(db *sql.DB) http.HandlerFunc {
 		log.Printf("✅ User %d is in chat %d, fetching messages...", userID, chatID)
 
 		// Получаем сообщения
-		query := `
+		query := ConvertPlaceholders(`
 			SELECT 
 				m.id, m.chat_id, m.sender_id, m.receiver_id, 
 				m.content, m.is_read, m.read_at, m.created_at
 			FROM messages m
 			WHERE m.chat_id = ?
 			ORDER BY m.created_at ASC
-		`
+		`)
 
 		rows, err := db.Query(query, chatID)
 		if err != nil {
@@ -704,6 +704,7 @@ func userExists(db *sql.DB, userID int) (bool, error) {
 func getUserByID(db *sql.DB, userID int) (*models.User, error) {
 	var user models.User
 	var lastSeen sql.NullTime
+	var avatar, coverPhoto, bio, location, phone sql.NullString
 
 	err := db.QueryRow(ConvertPlaceholders(`
 		SELECT u.id, u.email, u.name, u.last_name, u.avatar, u.cover_photo, u.bio, 
@@ -712,13 +713,30 @@ func getUserByID(db *sql.DB, userID int) (*models.User, error) {
 		LEFT JOIN user_activity ua ON u.id = ua.user_id
 		WHERE u.id = ?
 	`), userID).Scan(
-		&user.ID, &user.Email, &user.Name, &user.LastName, &user.Avatar,
-		&user.CoverPhoto, &user.Bio, &user.Location, &user.Phone,
+		&user.ID, &user.Email, &user.Name, &user.LastName, &avatar,
+		&coverPhoto, &bio, &location, &phone,
 		&user.CreatedAt, &lastSeen,
 	)
 
 	if err != nil {
 		return nil, err
+	}
+
+	// Обрабатываем NULL значения
+	if avatar.Valid {
+		user.Avatar = avatar.String
+	}
+	if coverPhoto.Valid {
+		user.CoverPhoto = coverPhoto.String
+	}
+	if bio.Valid {
+		user.Bio = bio.String
+	}
+	if location.Valid {
+		user.Location = location.String
+	}
+	if phone.Valid {
+		user.Phone = phone.String
 	}
 
 	// Устанавливаем last_seen если есть
