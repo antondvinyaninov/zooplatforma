@@ -147,10 +147,10 @@ func GrantRoleHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Создаем роль
-		result, err := db.Exec(`
+		result, err := db.Exec(ConvertPlaceholders(`
 			INSERT INTO user_roles (user_id, role, granted_by, granted_at, expires_at, is_active, notes)
 			VALUES (?, ?, ?, ?, ?, 1, ?)
-		`, req.UserID, req.Role, currentUserID, time.Now(), expiresAt, req.Notes)
+		`), req.UserID, req.Role, currentUserID, time.Now(), expiresAt, req.Notes)
 
 		if err != nil {
 			log.Printf("❌ Error granting role: %v", err)
@@ -164,8 +164,8 @@ func GrantRoleHandler(db *sql.DB) http.HandlerFunc {
 
 		// Получаем email администратора и имя пользователя для лога
 		var adminEmail, userName string
-		db.QueryRow("SELECT email FROM users WHERE id = ?", currentUserID).Scan(&adminEmail)
-		db.QueryRow("SELECT name FROM users WHERE id = ?", req.UserID).Scan(&userName)
+		db.QueryRow(ConvertPlaceholders("SELECT email FROM users WHERE id = ?"), currentUserID).Scan(&adminEmail)
+		db.QueryRow(ConvertPlaceholders("SELECT name FROM users WHERE id = ?"), req.UserID).Scan(&userName)
 
 		// Создаём лог
 		ipAddress := r.RemoteAddr
@@ -229,11 +229,11 @@ func RevokeRoleHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Деактивируем роль
-		result, err := db.Exec(`
+		result, err := db.Exec(ConvertPlaceholders(`
 			UPDATE user_roles 
 			SET is_active = 0
 			WHERE user_id = ? AND role = ? AND is_active = 1
-		`, req.UserID, req.Role)
+		`), req.UserID, req.Role)
 
 		if err != nil {
 			log.Printf("❌ Error revoking role: %v", err)
@@ -251,8 +251,8 @@ func RevokeRoleHandler(db *sql.DB) http.HandlerFunc {
 
 		// Получаем email администратора и имя пользователя для лога
 		var adminEmail, userName string
-		db.QueryRow("SELECT email FROM users WHERE id = ?", currentUserID).Scan(&adminEmail)
-		db.QueryRow("SELECT name FROM users WHERE id = ?", req.UserID).Scan(&userName)
+		db.QueryRow(ConvertPlaceholders("SELECT email FROM users WHERE id = ?"), currentUserID).Scan(&adminEmail)
+		db.QueryRow(ConvertPlaceholders("SELECT name FROM users WHERE id = ?"), req.UserID).Scan(&userName)
 
 		// Создаём лог
 		ipAddress := r.RemoteAddr
@@ -325,22 +325,22 @@ func GetAllRolesHandler(db *sql.DB) http.HandlerFunc {
 
 func hasRole(db *sql.DB, userID int, role string) bool {
 	var count int
-	err := db.QueryRow(`
+	err := db.QueryRow(ConvertPlaceholders(`
 		SELECT COUNT(*) FROM user_roles 
 		WHERE user_id = ? AND role = ? AND is_active = 1
 		AND (expires_at IS NULL OR expires_at > ?)
-	`, userID, role, time.Now()).Scan(&count)
+	`), userID, role, time.Now()).Scan(&count)
 
 	return err == nil && count > 0
 }
 
 func getUserActiveRoles(db *sql.DB, userID int) ([]string, error) {
-	rows, err := db.Query(`
+	rows, err := db.Query(ConvertPlaceholders(`
 		SELECT role FROM user_roles 
 		WHERE user_id = ? AND is_active = 1
 		AND (expires_at IS NULL OR expires_at > ?)
 		ORDER BY granted_at DESC
-	`, userID, time.Now())
+	`), userID, time.Now())
 
 	if err != nil {
 		return nil, err

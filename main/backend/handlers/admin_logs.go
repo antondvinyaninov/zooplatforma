@@ -97,10 +97,10 @@ func AdminLogsHandler(w http.ResponseWriter, r *http.Request) {
 
 // CreateAdminLog создаёт запись в логе
 func CreateAdminLog(adminID int, adminEmail, actionType, targetType string, targetID int, targetName, details, ipAddress, userAgent string) error {
-	_, err := database.DB.Exec(`
+	_, err := database.DB.Exec(ConvertPlaceholders(`
 		INSERT INTO admin_logs (admin_id, admin_email, action_type, target_type, target_id, target_name, details, ip_address, user_agent)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`, adminID, adminEmail, actionType, targetType, targetID, targetName, details, ipAddress, userAgent)
+	`), adminID, adminEmail, actionType, targetType, targetID, targetName, details, ipAddress, userAgent)
 
 	return err
 }

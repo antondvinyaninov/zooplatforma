@@ -42,10 +42,10 @@ func CreateReportHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Проверяем, не жаловался ли пользователь уже на этот объект
 	var existingReport int
-	err := database.DB.QueryRow(`
+	err := database.DB.QueryRow(ConvertPlaceholders(`
 		SELECT COUNT(*) FROM reports 
 		WHERE reporter_id = ? AND target_type = ? AND target_id = ? AND status = 'pending'
-	`, userID, req.TargetType, req.TargetID).Scan(&existingReport)
+	`), userID, req.TargetType, req.TargetID).Scan(&existingReport)
 
 	if err == nil && existingReport > 0 {
 		sendErrorResponse(w, "Вы уже пожаловались на этот контент", http.StatusConflict)
@@ -53,10 +53,10 @@ func CreateReportHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Создаём жалобу
-	result, err := database.DB.Exec(`
+	result, err := database.DB.Exec(ConvertPlaceholders(`
 		INSERT INTO reports (reporter_id, target_type, target_id, reason, description, status, created_at)
 		VALUES (?, ?, ?, ?, ?, 'pending', ?)
-	`, userID, req.TargetType, req.TargetID, req.Reason, req.Description, time.Now())
+	`), userID, req.TargetType, req.TargetID, req.Reason, req.Description, time.Now())
 
 	if err != nil {
 		sendErrorResponse(w, "Ошибка создания жалобы: "+err.Error(), http.StatusInternalServerError)

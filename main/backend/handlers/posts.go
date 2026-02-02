@@ -168,10 +168,10 @@ func checkCanEditPost(userID int, post *models.Post) bool {
 	// Если пост от организации - проверяем членство с правами
 	if post.AuthorType == "organization" {
 		var role string
-		err := database.DB.QueryRow(`
+		err := database.DB.QueryRow(ConvertPlaceholders(`
 			SELECT role FROM organization_members 
 			WHERE organization_id = ? AND user_id = ?
-		`, post.AuthorID, userID).Scan(&role)
+		`), post.AuthorID, userID).Scan(&role)
 
 		if err == nil && (role == "owner" || role == "admin" || role == "moderator") {
 			log.Printf("✅ checkCanEditPost: post %d by org %d, user %d has role %s, can_edit=true", post.ID, post.AuthorID, userID, role)
@@ -700,10 +700,10 @@ func createPost(w http.ResponseWriter, r *http.Request) {
 	if req.AuthorType == "organization" && req.OrganizationID != nil {
 		// Проверяем права пользователя на публикацию от имени организации
 		var canPost bool
-		err := database.DB.QueryRow(`
+		err := database.DB.QueryRow(ConvertPlaceholders(`
 			SELECT can_post FROM organization_members
 			WHERE organization_id = ? AND user_id = ?
-		`, *req.OrganizationID, userID).Scan(&canPost)
+		`), *req.OrganizationID, userID).Scan(&canPost)
 
 		if err != nil || !canPost {
 			sendErrorResponse(w, "Нет прав на публикацию от имени этой организации", http.StatusForbidden)

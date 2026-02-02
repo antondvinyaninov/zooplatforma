@@ -41,8 +41,7 @@ func createPollForPost(postID int, pollReq *models.CreatePollRequest) error {
 			continue // Пропускаем пустые варианты
 		}
 
-		_, err := database.DB.Exec(
-			"INSERT INTO poll_options (poll_id, option_text, option_order) VALUES (?, ?, ?)",
+		_, err := database.DB.Exec(ConvertPlaceholders("INSERT INTO poll_options (poll_id, option_text, option_order) VALUES (?, ?, ?)"),
 			pollID, optionText, i,
 		)
 		if err != nil {
@@ -275,9 +274,9 @@ func VoteHandler(w http.ResponseWriter, r *http.Request) {
 	// Если пользователь уже голосовал и разрешено изменение, удаляем старые голоса
 	if previousVotes > 0 && poll.AllowVoteChanges {
 		// Уменьшаем счетчики для старых вариантов
-		database.DB.Exec(`UPDATE poll_options 
+		database.DB.Exec(ConvertPlaceholders(`UPDATE poll_options 
 		                  SET votes_count = votes_count - 1 
-		                  WHERE id IN (SELECT option_id FROM poll_votes WHERE poll_id = ? AND user_id = ?)`,
+		                  WHERE id IN (SELECT option_id FROM poll_votes WHERE poll_id = ? AND user_id = ?)`),
 			pollID, userID)
 
 		// Удаляем старые голоса
@@ -345,9 +344,9 @@ func handleUnvote(w http.ResponseWriter, pollID int, userID int) {
 	}
 
 	// Уменьшаем счетчики для вариантов
-	database.DB.Exec(`UPDATE poll_options 
+	database.DB.Exec(ConvertPlaceholders(`UPDATE poll_options 
 	                  SET votes_count = votes_count - 1 
-	                  WHERE id IN (SELECT option_id FROM poll_votes WHERE poll_id = ? AND user_id = ?)`,
+	                  WHERE id IN (SELECT option_id FROM poll_votes WHERE poll_id = ? AND user_id = ?)`),
 		pollID, userID)
 
 	// Удаляем голоса

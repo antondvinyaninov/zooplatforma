@@ -44,7 +44,7 @@ func VerifyUserHandler(db *sql.DB) http.HandlerFunc {
 
 		// Проверяем, не верифицирован ли уже
 		var alreadyVerified bool
-		err = db.QueryRow("SELECT verified FROM users WHERE id = ?", req.UserID).Scan(&alreadyVerified)
+		err = db.QueryRow(ConvertPlaceholders("SELECT verified FROM users WHERE id = ?"), req.UserID).Scan(&alreadyVerified)
 		if err != nil {
 			log.Printf("❌ Error checking verification status: %v", err)
 			http.Error(w, "Failed to check verification status", http.StatusInternalServerError)
@@ -58,11 +58,11 @@ func VerifyUserHandler(db *sql.DB) http.HandlerFunc {
 
 		// Верифицируем пользователя
 		now := time.Now()
-		_, err = db.Exec(`
+		_, err = db.Exec(ConvertPlaceholders(`
 			UPDATE users 
-			SET verified = 1, verified_at = ?, verified_by = ?
+			SET verified = TRUE, verified_at = ?, verified_by = ?
 			WHERE id = ?
-		`, now, currentUserID, req.UserID)
+		`), now, currentUserID, req.UserID)
 
 		if err != nil {
 			log.Printf("❌ Error verifying user: %v", err)
@@ -74,8 +74,8 @@ func VerifyUserHandler(db *sql.DB) http.HandlerFunc {
 
 		// Получаем email администратора и имя пользователя для лога
 		var adminEmail, userName string
-		db.QueryRow("SELECT email FROM users WHERE id = ?", currentUserID).Scan(&adminEmail)
-		db.QueryRow("SELECT name FROM users WHERE id = ?", req.UserID).Scan(&userName)
+		db.QueryRow(ConvertPlaceholders("SELECT email FROM users WHERE id = ?"), currentUserID).Scan(&adminEmail)
+		db.QueryRow(ConvertPlaceholders("SELECT name FROM users WHERE id = ?"), req.UserID).Scan(&userName)
 
 		// Создаём лог
 		ipAddress := r.RemoteAddr
@@ -126,11 +126,11 @@ func UnverifyUserHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Снимаем верификацию
-		_, err := db.Exec(`
+		_, err := db.Exec(ConvertPlaceholders(`
 			UPDATE users 
-			SET verified = 0, verified_at = NULL, verified_by = NULL
+			SET verified = FALSE, verified_at = NULL, verified_by = NULL
 			WHERE id = ?
-		`, req.UserID)
+		`), req.UserID)
 
 		if err != nil {
 			log.Printf("❌ Error unverifying user: %v", err)
@@ -142,8 +142,8 @@ func UnverifyUserHandler(db *sql.DB) http.HandlerFunc {
 
 		// Получаем email администратора и имя пользователя для лога
 		var adminEmail, userName string
-		db.QueryRow("SELECT email FROM users WHERE id = ?", currentUserID).Scan(&adminEmail)
-		db.QueryRow("SELECT name FROM users WHERE id = ?", req.UserID).Scan(&userName)
+		db.QueryRow(ConvertPlaceholders("SELECT email FROM users WHERE id = ?"), currentUserID).Scan(&adminEmail)
+		db.QueryRow(ConvertPlaceholders("SELECT name FROM users WHERE id = ?"), req.UserID).Scan(&userName)
 
 		// Создаём лог
 		ipAddress := r.RemoteAddr
@@ -182,7 +182,7 @@ func GetVerifiedUsersHandler(db *sql.DB) http.HandlerFunc {
 		`
 
 		if verifiedOnly {
-			query += " WHERE verified = 1"
+			query += " WHERE verified = TRUE"
 		}
 
 		query += " ORDER BY created_at DESC"
@@ -273,11 +273,11 @@ func GetUserVerificationStatusHandler(db *sql.DB) http.HandlerFunc {
 		var verifiedAt sql.NullString
 		var verifiedBy sql.NullInt64
 
-		err = db.QueryRow(`
+		err = db.QueryRow(ConvertPlaceholders(`
 			SELECT verified, verified_at, verified_by
 			FROM users
 			WHERE id = ?
-		`, userID).Scan(&verified, &verifiedAt, &verifiedBy)
+		`), userID).Scan(&verified, &verifiedAt, &verifiedBy)
 
 		if err != nil {
 			if err == sql.ErrNoRows {
@@ -311,13 +311,13 @@ func GetUserVerificationStatusHandler(db *sql.DB) http.HandlerFunc {
 func hasModeratorRights(db *sql.DB, userID int) bool {
 	// Проверяем, есть ли у пользователя роль moderator или superadmin
 	var count int
-	err := db.QueryRow(`
+	err := db.QueryRow(ConvertPlaceholders(`
 		SELECT COUNT(*) FROM user_roles 
 		WHERE user_id = ? 
 		AND (role = 'moderator' OR role = 'superadmin')
 		AND is_active = 1
 		AND (expires_at IS NULL OR expires_at > ?)
-	`, userID, time.Now()).Scan(&count)
+	`), userID, time.Now()).Scan(&count)
 
 	return err == nil && count > 0
 }

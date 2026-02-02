@@ -200,12 +200,12 @@ func createComment(w http.ResponseWriter, r *http.Request) {
 	// Создаем уведомление для автора поста
 	var postAuthorID int
 	var commenterLastName sql.NullString
-	err = database.DB.QueryRow(`
+	err = database.DB.QueryRow(ConvertPlaceholders(`
 		SELECT p.author_id, u.last_name 
 		FROM posts p 
 		JOIN users u ON u.id = ? 
 		WHERE p.id = ?
-	`, userID, postID).Scan(&postAuthorID, &commenterLastName)
+	`), userID, postID).Scan(&postAuthorID, &commenterLastName)
 
 	if err == nil && postAuthorID != userID {
 		// Формируем имя комментатора

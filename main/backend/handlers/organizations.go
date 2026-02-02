@@ -71,10 +71,10 @@ func CreateOrganizationHandler(w http.ResponseWriter, r *http.Request) {
 	orgID, _ := result.LastInsertId()
 
 	// Добавляем создателя как owner
-	_, err = database.DB.Exec(`
+	_, err = database.DB.Exec(ConvertPlaceholders(`
 		INSERT INTO organization_members (organization_id, user_id, role, can_post, can_edit, can_manage_members)
 		VALUES (?, ?, 'owner', 1, 1, 1)
-	`, orgID, userID)
+	`), orgID, userID)
 
 	if err != nil {
 		sendJSONError(w, http.StatusInternalServerError, "Failed to add owner: "+err.Error())
@@ -231,10 +231,10 @@ func UpdateOrganizationHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Проверяем права доступа
 	var canEdit bool
-	err := database.DB.QueryRow(`
+	err := database.DB.QueryRow(ConvertPlaceholders(`
 		SELECT can_edit FROM organization_members
 		WHERE organization_id = ? AND user_id = ?
-	`, orgID, userID).Scan(&canEdit)
+	`), orgID, userID).Scan(&canEdit)
 
 	if err == sql.ErrNoRows || !canEdit {
 		sendJSONError(w, http.StatusForbidden, "You don't have permission to edit this organization")
@@ -503,10 +503,10 @@ func AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Проверяем права доступа (только owner и admin могут добавлять)
 	var canManage bool
-	err := database.DB.QueryRow(`
+	err := database.DB.QueryRow(ConvertPlaceholders(`
 		SELECT can_manage_members FROM organization_members
 		WHERE organization_id = ? AND user_id = ?
-	`, req.OrganizationID, userID).Scan(&canManage)
+	`), req.OrganizationID, userID).Scan(&canManage)
 
 	if err == sql.ErrNoRows || !canManage {
 		sendJSONError(w, http.StatusForbidden, "You don't have permission to manage members")
@@ -515,9 +515,9 @@ func AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Проверяем, что пользователь еще не является участником
 	var exists bool
-	err = database.DB.QueryRow(`
+	err = database.DB.QueryRow(ConvertPlaceholders(`
 		SELECT EXISTS(SELECT 1 FROM organization_members WHERE organization_id = ? AND user_id = ?)
-	`, req.OrganizationID, req.UserID).Scan(&exists)
+	`), req.OrganizationID, req.UserID).Scan(&exists)
 
 	if err != nil {
 		sendJSONError(w, http.StatusInternalServerError, "Database error: "+err.Error())
@@ -535,10 +535,10 @@ func AddMemberHandler(w http.ResponseWriter, r *http.Request) {
 	canManageMembers := req.Role == "owner" || req.Role == "admin"
 
 	// Добавляем участника
-	_, err = database.DB.Exec(`
+	_, err = database.DB.Exec(ConvertPlaceholders(`
 		INSERT INTO organization_members (organization_id, user_id, role, position, can_post, can_edit, can_manage_members)
 		VALUES (?, ?, ?, ?, ?, ?, ?)
-	`, req.OrganizationID, req.UserID, req.Role, req.Position, canPost, canEdit, canManageMembers)
+	`), req.OrganizationID, req.UserID, req.Role, req.Position, canPost, canEdit, canManageMembers)
 
 	if err != nil {
 		sendJSONError(w, http.StatusInternalServerError, "Failed to add member: "+err.Error())
@@ -582,10 +582,10 @@ func UpdateMemberHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Проверяем права доступа
 	var canManage bool
-	err = database.DB.QueryRow(`
+	err = database.DB.QueryRow(ConvertPlaceholders(`
 		SELECT can_manage_members FROM organization_members
 		WHERE organization_id = ? AND user_id = ?
-	`, orgID, userID).Scan(&canManage)
+	`), orgID, userID).Scan(&canManage)
 
 	if err == sql.ErrNoRows || !canManage {
 		sendJSONError(w, http.StatusForbidden, "You don't have permission to manage members")
@@ -598,11 +598,11 @@ func UpdateMemberHandler(w http.ResponseWriter, r *http.Request) {
 	canManageMembers := req.Role == "owner" || req.Role == "admin"
 
 	// Обновляем участника
-	_, err = database.DB.Exec(`
+	_, err = database.DB.Exec(ConvertPlaceholders(`
 		UPDATE organization_members 
 		SET role = ?, position = ?, can_post = ?, can_edit = ?, can_manage_members = ?
 		WHERE id = ?
-	`, req.Role, req.Position, canPost, canEdit, canManageMembers, req.MemberID)
+	`), req.Role, req.Position, canPost, canEdit, canManageMembers, req.MemberID)
 
 	if err != nil {
 		sendJSONError(w, http.StatusInternalServerError, "Failed to update member: "+err.Error())
@@ -637,9 +637,9 @@ func RemoveMemberHandler(w http.ResponseWriter, r *http.Request) {
 	// Получаем информацию об участнике
 	var orgID, memberUserID int
 	var memberRole string
-	err := database.DB.QueryRow(`
+	err := database.DB.QueryRow(ConvertPlaceholders(`
 		SELECT organization_id, user_id, role FROM organization_members WHERE id = ?
-	`, req.MemberID).Scan(&orgID, &memberUserID, &memberRole)
+	`), req.MemberID).Scan(&orgID, &memberUserID, &memberRole)
 
 	if err == sql.ErrNoRows {
 		sendJSONError(w, http.StatusNotFound, "Member not found")
@@ -654,10 +654,10 @@ func RemoveMemberHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Проверяем права доступа
 	var canManage bool
-	err = database.DB.QueryRow(`
+	err = database.DB.QueryRow(ConvertPlaceholders(`
 		SELECT can_manage_members FROM organization_members
 		WHERE organization_id = ? AND user_id = ?
-	`, orgID, userID).Scan(&canManage)
+	`), orgID, userID).Scan(&canManage)
 
 	if err == sql.ErrNoRows || !canManage {
 		sendJSONError(w, http.StatusForbidden, "You don't have permission to manage members")

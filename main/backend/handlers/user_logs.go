@@ -23,10 +23,10 @@ type UserLog struct {
 
 // CreateUserLog создаёт запись в логе пользователя
 func CreateUserLog(db *sql.DB, userID int, actionType, actionDetails, ipAddress, userAgent string) error {
-	_, err := db.Exec(`
+	_, err := db.Exec(ConvertPlaceholders(`
 		INSERT INTO user_logs (user_id, action_type, action_details, ip_address, user_agent)
 		VALUES (?, ?, ?, ?, ?)
-	`, userID, actionType, actionDetails, ipAddress, userAgent)
+	`), userID, actionType, actionDetails, ipAddress, userAgent)
 
 	return err
 }
@@ -117,38 +117,38 @@ func GetUserStorageStatsHandler(db *sql.DB) http.HandlerFunc {
 
 		// Количество постов
 		var postsCount int
-		db.QueryRow("SELECT COUNT(*) FROM posts WHERE user_id = ?", userID).Scan(&postsCount)
+		db.QueryRow(ConvertPlaceholders("SELECT COUNT(*) FROM posts WHERE user_id = ?"), userID).Scan(&postsCount)
 		stats["posts_count"] = postsCount
 
 		// Количество комментариев
 		var commentsCount int
-		db.QueryRow("SELECT COUNT(*) FROM comments WHERE user_id = ?", userID).Scan(&commentsCount)
+		db.QueryRow(ConvertPlaceholders("SELECT COUNT(*) FROM comments WHERE user_id = ?"), userID).Scan(&commentsCount)
 		stats["comments_count"] = commentsCount
 
 		// Количество медиа файлов и их размер
 		var mediaCount int
 		var mediaSize int64
-		db.QueryRow("SELECT COUNT(*), COALESCE(SUM(file_size), 0) FROM user_media WHERE user_id = ?", userID).Scan(&mediaCount, &mediaSize)
+		db.QueryRow(ConvertPlaceholders("SELECT COUNT(*), COALESCE(SUM(file_size), 0) FROM user_media WHERE user_id = ?"), userID).Scan(&mediaCount, &mediaSize)
 		stats["media_count"] = mediaCount
 		stats["media_size_bytes"] = mediaSize
 		stats["media_size_mb"] = float64(mediaSize) / 1024 / 1024
 
 		// Количество питомцев
 		var petsCount int
-		db.QueryRow("SELECT COUNT(*) FROM pets WHERE user_id = ?", userID).Scan(&petsCount)
+		db.QueryRow(ConvertPlaceholders("SELECT COUNT(*) FROM pets WHERE user_id = ?"), userID).Scan(&petsCount)
 		stats["pets_count"] = petsCount
 
 		// Количество друзей
 		var friendsCount int
-		db.QueryRow(`
+		db.QueryRow(ConvertPlaceholders(`
 			SELECT COUNT(*) FROM friendships 
 			WHERE (user_id = ? OR friend_id = ?) AND status = 'accepted'
-		`, userID, userID).Scan(&friendsCount)
+		`), userID, userID).Scan(&friendsCount)
 		stats["friends_count"] = friendsCount
 
 		// Количество организаций
 		var orgsCount int
-		db.QueryRow("SELECT COUNT(*) FROM organization_members WHERE user_id = ?", userID).Scan(&orgsCount)
+		db.QueryRow(ConvertPlaceholders("SELECT COUNT(*) FROM organization_members WHERE user_id = ?"), userID).Scan(&orgsCount)
 		stats["organizations_count"] = orgsCount
 
 		w.Header().Set("Content-Type", "application/json")

@@ -341,10 +341,10 @@ func loadAnnouncementRelations(a *models.PetAnnouncement) {
 
 	// Загружаем питомца
 	var pet models.PetDetail
-	err = database.DB.QueryRow(`
+	err = database.DB.QueryRow(ConvertPlaceholders(`
 		SELECT id, user_id, name, species, breed, gender, birth_date, color, photo, photos, created_at
 		FROM pets WHERE id = ?
-	`, a.PetID).Scan(
+	`), a.PetID).Scan(
 		&pet.ID, &pet.UserID, &pet.Name, &pet.Species, &pet.Breed, &pet.Gender,
 		&pet.BirthDate, &pet.Color, &pet.Photo, &pet.Photos, &pet.CreatedAt,
 	)
@@ -353,12 +353,12 @@ func loadAnnouncementRelations(a *models.PetAnnouncement) {
 	}
 
 	// Загружаем публикации
-	rows, err := database.DB.Query(`
+	rows, err := database.DB.Query(ConvertPlaceholders(`
 		SELECT id, announcement_id, author_id, post_type, content, media_urls, donation_amount, created_at
 		FROM announcement_posts
 		WHERE announcement_id = ?
 		ORDER BY created_at DESC
-	`, a.ID)
+	`), a.ID)
 	if err == nil {
 		defer rows.Close()
 		posts := []models.AnnouncementPost{}
@@ -373,12 +373,12 @@ func loadAnnouncementRelations(a *models.PetAnnouncement) {
 
 	// Загружаем пожертвования (для сборов)
 	if a.Type == "fundraising" {
-		rows, err := database.DB.Query(`
+		rows, err := database.DB.Query(ConvertPlaceholders(`
 			SELECT id, announcement_id, donor_id, donor_name, amount, message, is_anonymous, created_at
 			FROM announcement_donations
 			WHERE announcement_id = ?
 			ORDER BY created_at DESC
-		`, a.ID)
+		`), a.ID)
 		if err == nil {
 			defer rows.Close()
 			donations := []models.AnnouncementDonation{}

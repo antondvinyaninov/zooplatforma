@@ -75,12 +75,12 @@ func toggleLike(w http.ResponseWriter, r *http.Request, postID int, userID int) 
 		// Создаем уведомление для автора поста
 		var postAuthorID int
 		var likerName, likerLastName sql.NullString
-		err = database.DB.QueryRow(`
+		err = database.DB.QueryRow(ConvertPlaceholders(`
 			SELECT p.author_id, u.name, u.last_name 
 			FROM posts p 
 			JOIN users u ON u.id = ? 
 			WHERE p.id = ?
-		`, userID, postID).Scan(&postAuthorID, &likerName, &likerLastName)
+		`), userID, postID).Scan(&postAuthorID, &likerName, &likerLastName)
 
 		if err == nil && postAuthorID != userID {
 			// Формируем имя лайкнувшего

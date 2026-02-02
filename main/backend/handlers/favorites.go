@@ -124,10 +124,10 @@ func addFavorite(w http.ResponseWriter, r *http.Request, userID int) {
 	}
 
 	// Добавляем в избранное (UNIQUE constraint предотвратит дубликаты)
-	result, err := database.DB.Exec(`
+	result, err := database.DB.Exec(ConvertPlaceholders(`
 		INSERT INTO favorites (user_id, pet_id, created_at)
 		VALUES (?, ?, CURRENT_TIMESTAMP)
-	`, userID, req.PetID)
+	`), userID, req.PetID)
 
 	if err != nil {
 		// Проверяем, не является ли это ошибкой дубликата
@@ -155,10 +155,10 @@ func addFavorite(w http.ResponseWriter, r *http.Request, userID int) {
 
 // removeFavorite удаляет питомца из избранного
 func removeFavorite(w http.ResponseWriter, _ *http.Request, userID int, petID int) {
-	result, err := database.DB.Exec(`
+	result, err := database.DB.Exec(ConvertPlaceholders(`
 		DELETE FROM favorites
 		WHERE user_id = ? AND pet_id = ?
-	`, userID, petID)
+	`), userID, petID)
 
 	if err != nil {
 		log.Printf("Error removing favorite: %v", err)

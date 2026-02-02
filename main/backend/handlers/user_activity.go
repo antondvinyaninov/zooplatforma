@@ -10,14 +10,14 @@ import (
 
 // UpdateUserActivity обновляет активность пользователя (вспомогательная функция)
 func UpdateUserActivity(db *sql.DB, userID int, ipAddress, userAgent string) error {
-	_, err := db.Exec(`
+	_, err := db.Exec(ConvertPlaceholders(`
 		INSERT INTO user_activity (user_id, last_seen, ip_address, user_agent)
 		VALUES (?, ?, ?, ?)
 		ON CONFLICT(user_id) DO UPDATE SET
 			last_seen = excluded.last_seen,
 			ip_address = excluded.ip_address,
 			user_agent = excluded.user_agent
-	`, userID, time.Now(), ipAddress, userAgent)
+	`), userID, time.Now(), ipAddress, userAgent)
 
 	return err
 }
@@ -54,11 +54,11 @@ func GetOnlineUsersCountHandler(db *sql.DB) http.HandlerFunc {
 		fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
 
 		var onlineCount int
-		err := db.QueryRow(`
+		err := db.QueryRow(ConvertPlaceholders(`
 			SELECT COUNT(DISTINCT user_id) 
 			FROM user_activity 
 			WHERE last_seen >= ?
-		`, fiveMinutesAgo).Scan(&onlineCount)
+		`), fiveMinutesAgo).Scan(&onlineCount)
 
 		if err != nil {
 			log.Printf("❌ Error getting online users count: %v", err)
@@ -84,19 +84,19 @@ func GetUserActivityStatsHandler(db *sql.DB) http.HandlerFunc {
 		// Онлайн сейчас (последние 5 минут)
 		fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
 		var onlineNow int
-		db.QueryRow("SELECT COUNT(*) FROM user_activity WHERE last_seen >= ?", fiveMinutesAgo).Scan(&onlineNow)
+		db.QueryRow(ConvertPlaceholders("SELECT COUNT(*) FROM user_activity WHERE last_seen >= ?"), fiveMinutesAgo).Scan(&onlineNow)
 		stats["online_now"] = onlineNow
 
 		// Активны за последний час
 		oneHourAgo := time.Now().Add(-1 * time.Hour)
 		var activeLastHour int
-		db.QueryRow("SELECT COUNT(*) FROM user_activity WHERE last_seen >= ?", oneHourAgo).Scan(&activeLastHour)
+		db.QueryRow(ConvertPlaceholders("SELECT COUNT(*) FROM user_activity WHERE last_seen >= ?"), oneHourAgo).Scan(&activeLastHour)
 		stats["active_last_hour"] = activeLastHour
 
 		// Активны за последние 24 часа
 		oneDayAgo := time.Now().Add(-24 * time.Hour)
 		var activeLast24h int
-		db.QueryRow("SELECT COUNT(*) FROM user_activity WHERE last_seen >= ?", oneDayAgo).Scan(&activeLast24h)
+		db.QueryRow(ConvertPlaceholders("SELECT COUNT(*) FROM user_activity WHERE last_seen >= ?"), oneDayAgo).Scan(&activeLast24h)
 		stats["active_last_24h"] = activeLast24h
 
 		// Всего пользователей

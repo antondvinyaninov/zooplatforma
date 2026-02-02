@@ -306,10 +306,10 @@ func SendMessageHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Создаем сообщение
-		result, err := db.Exec(`
+		result, err := db.Exec(ConvertPlaceholders(`
 			INSERT INTO messages (chat_id, sender_id, receiver_id, content, created_at)
 			VALUES (?, ?, ?, ?, ?)
-		`, chatID, userID, req.ReceiverID, req.Content, time.Now())
+		`), chatID, userID, req.ReceiverID, req.Content, time.Now())
 
 		if err != nil {
 			log.Printf("❌ Error creating message: %v", err)
@@ -320,11 +320,11 @@ func SendMessageHandler(db *sql.DB) http.HandlerFunc {
 		messageID, _ := result.LastInsertId()
 
 		// Обновляем last_message в чате
-		_, err = db.Exec(`
+		_, err = db.Exec(ConvertPlaceholders(`
 			UPDATE chats 
 			SET last_message_id = ?, last_message_at = ?
 			WHERE id = ?
-		`, messageID, time.Now(), chatID)
+		`), messageID, time.Now(), chatID)
 
 		if err != nil {
 			log.Printf("⚠️ Warning: Failed to update chat last_message: %v", err)
@@ -355,11 +355,11 @@ func GetUnreadCountHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		var count int
-		err := db.QueryRow(`
+		err := db.QueryRow(ConvertPlaceholders(`
 			SELECT COUNT(*) 
 			FROM messages 
 			WHERE receiver_id = ? AND is_read = FALSE
-		`, userID).Scan(&count)
+		`), userID).Scan(&count)
 
 		if err != nil {
 			log.Printf("❌ Error counting unread messages: %v", err)
@@ -428,10 +428,10 @@ func SendMediaMessageHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Создаем сообщение
-		result, err := db.Exec(`
+		result, err := db.Exec(ConvertPlaceholders(`
 			INSERT INTO messages (chat_id, sender_id, receiver_id, content, created_at)
 			VALUES (?, ?, ?, ?, ?)
-		`, chatID, userID, receiverID, content, time.Now())
+		`), chatID, userID, receiverID, content, time.Now())
 
 		if err != nil {
 			log.Printf("❌ Error creating message: %v", err)
@@ -471,10 +471,10 @@ func SendMediaMessageHandler(db *sql.DB) http.HandlerFunc {
 			}
 
 			// Создаем запись в БД
-			attachResult, err := db.Exec(`
+			attachResult, err := db.Exec(ConvertPlaceholders(`
 				INSERT INTO message_attachments (message_id, file_path, file_type, file_size, created_at)
 				VALUES (?, ?, ?, ?, ?)
-			`, messageID, filePath, fileType, fileHeader.Size, time.Now())
+			`), messageID, filePath, fileType, fileHeader.Size, time.Now())
 
 			if err != nil {
 				log.Printf("❌ Error creating attachment: %v", err)
@@ -493,11 +493,11 @@ func SendMediaMessageHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Обновляем last_message в чате
-		_, err = db.Exec(`
+		_, err = db.Exec(ConvertPlaceholders(`
 			UPDATE chats 
 			SET last_message_id = ?, last_message_at = ?
 			WHERE id = ?
-		`, messageID, time.Now(), chatID)
+		`), messageID, time.Now(), chatID)
 
 		if err != nil {
 			log.Printf("⚠️ Warning: Failed to update chat last_message: %v", err)
@@ -531,20 +531,20 @@ func getOrCreateChat(db *sql.DB, user1ID, user2ID int) (int, error) {
 
 	// Ищем существующий чат
 	var chatID int
-	err := db.QueryRow(`
+	err := db.QueryRow(ConvertPlaceholders(`
 		SELECT id FROM chats 
 		WHERE (user1_id = ? AND user2_id = ?) OR (user1_id = ? AND user2_id = ?)
-	`, user1ID, user2ID, user2ID, user1ID).Scan(&chatID)
+	`), user1ID, user2ID, user2ID, user1ID).Scan(&chatID)
 
 	if err == nil {
 		return chatID, nil
 	}
 
 	// Создаем новый чат
-	result, err := db.Exec(`
+	result, err := db.Exec(ConvertPlaceholders(`
 		INSERT INTO chats (user1_id, user2_id, created_at)
 		VALUES (?, ?, ?)
-	`, user1ID, user2ID, time.Now())
+	`), user1ID, user2ID, time.Now())
 
 	if err != nil {
 		return 0, err
@@ -556,20 +556,20 @@ func getOrCreateChat(db *sql.DB, user1ID, user2ID int) (int, error) {
 
 func isUserInChat(db *sql.DB, chatID, userID int) bool {
 	var count int
-	err := db.QueryRow(`
+	err := db.QueryRow(ConvertPlaceholders(`
 		SELECT COUNT(*) FROM chats 
 		WHERE id = ? AND (user1_id = ? OR user2_id = ?)
-	`, chatID, userID, userID).Scan(&count)
+	`), chatID, userID, userID).Scan(&count)
 
 	return err == nil && count > 0
 }
 
 func getMessageByID(db *sql.DB, messageID int) (*models.Message, error) {
 	var msg models.Message
-	err := db.QueryRow(`
+	err := db.QueryRow(ConvertPlaceholders(`
 		SELECT id, chat_id, sender_id, receiver_id, content, is_read, read_at, created_at
 		FROM messages WHERE id = ?
-	`, messageID).Scan(
+	`), messageID).Scan(
 		&msg.ID, &msg.ChatID, &msg.SenderID, &msg.ReceiverID,
 		&msg.Content, &msg.IsRead, &msg.ReadAt, &msg.CreatedAt,
 	)
@@ -601,12 +601,12 @@ log.Printf("⚠️ Failed to get attachments for message %d: %v", msg.ID, err)
 }
 
 func getMessageAttachments(db *sql.DB, messageID int) ([]models.MessageAttachment, error) {
-	rows, err := db.Query(`
+	rows, err := db.Query(ConvertPlaceholders(`
 		SELECT id, message_id, file_path, file_type, file_size, created_at
 		FROM message_attachments
 		WHERE message_id = ?
 		ORDER BY created_at ASC
-	`, messageID)
+	`), messageID)
 
 	if err != nil {
 		return nil, err
@@ -659,20 +659,20 @@ func saveUploadedFile(file multipart.File, filename string) (string, error) {
 
 func getUnreadCount(db *sql.DB, chatID, userID int) (int, error) {
 	var count int
-	err := db.QueryRow(`
+	err := db.QueryRow(ConvertPlaceholders(`
 		SELECT COUNT(*) FROM messages 
 		WHERE chat_id = ? AND receiver_id = ? AND is_read = FALSE
-	`, chatID, userID).Scan(&count)
+	`), chatID, userID).Scan(&count)
 
 	return count, err
 }
 
 func markMessagesAsRead(db *sql.DB, chatID, userID int) {
-	_, err := db.Exec(`
+	_, err := db.Exec(ConvertPlaceholders(`
 		UPDATE messages 
 		SET is_read = TRUE, read_at = ?
 		WHERE chat_id = ? AND receiver_id = ? AND is_read = FALSE
-	`, time.Now(), chatID, userID)
+	`), time.Now(), chatID, userID)
 
 	if err != nil {
 		log.Printf("⚠️ Warning: Failed to mark messages as read: %v", err)
@@ -681,7 +681,7 @@ func markMessagesAsRead(db *sql.DB, chatID, userID int) {
 
 func userExists(db *sql.DB, userID int) (bool, error) {
 	var count int
-	err := db.QueryRow("SELECT COUNT(*) FROM users WHERE id = ?", userID).Scan(&count)
+	err := db.QueryRow(ConvertPlaceholders("SELECT COUNT(*) FROM users WHERE id = ?"), userID).Scan(&count)
 	return count > 0, err
 }
 
@@ -689,13 +689,13 @@ func getUserByID(db *sql.DB, userID int) (*models.User, error) {
 	var user models.User
 	var lastSeen sql.NullTime
 
-	err := db.QueryRow(`
+	err := db.QueryRow(ConvertPlaceholders(`
 		SELECT u.id, u.email, u.name, u.last_name, u.avatar, u.cover_photo, u.bio, 
 		       u.location, u.phone, u.created_at, ua.last_seen
 		FROM users u
 		LEFT JOIN user_activity ua ON u.id = ua.user_id
 		WHERE u.id = ?
-	`, userID).Scan(
+	`), userID).Scan(
 		&user.ID, &user.Email, &user.Name, &user.LastName, &user.Avatar,
 		&user.CoverPhoto, &user.Bio, &user.Location, &user.Phone,
 		&user.CreatedAt, &lastSeen,
