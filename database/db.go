@@ -82,6 +82,31 @@ func InitSQLite(path string) error {
 	return createTablesSQLite()
 }
 
+// fixOrganizationsTable добавляет недостающие колонки в таблицу organizations
+func fixOrganizationsTable() error {
+	fixes := []string{
+		"ALTER TABLE organizations ADD COLUMN IF NOT EXISTS short_name TEXT",
+		"ALTER TABLE organizations ADD COLUMN IF NOT EXISTS bio TEXT",
+		"ALTER TABLE organizations ADD COLUMN IF NOT EXISTS cover_photo TEXT",
+		"ALTER TABLE organizations ADD COLUMN IF NOT EXISTS address_city TEXT",
+		"ALTER TABLE organizations ADD COLUMN IF NOT EXISTS address_region TEXT",
+		"ALTER TABLE organizations ADD COLUMN IF NOT EXISTS is_verified BOOLEAN DEFAULT FALSE",
+		"ALTER TABLE organization_members ADD COLUMN IF NOT EXISTS can_post BOOLEAN DEFAULT FALSE",
+		"UPDATE organization_members SET can_post = TRUE WHERE role IN ('owner', 'admin') AND can_post IS NULL",
+	}
+
+	for _, fix := range fixes {
+		if _, err := DB.Exec(fix); err != nil {
+			// Игнорируем ошибки "column already exists"
+			if !strings.Contains(err.Error(), "already exists") && !strings.Contains(err.Error(), "duplicate column") {
+				return fmt.Errorf("failed to apply fix: %s - %w", fix, err)
+			}
+		}
+	}
+
+	return nil
+}
+
 func createTablesPostgreSQL() error {
 	// PostgreSQL использует SERIAL для auto-increment
 	query := `
@@ -119,6 +144,14 @@ func createTablesPostgreSQL() error {
 	}
 
 	log.Println("✅ PostgreSQL tables created successfully")
+
+	// Применяем fix для organizations table
+	if err := fixOrganizationsTable(); err != nil {
+		log.Printf("⚠️ Organizations table fix failed (maybe already applied): %v", err)
+	} else {
+		log.Println("✅ Organizations table fix applied successfully")
+	}
+
 	return nil
 }
 

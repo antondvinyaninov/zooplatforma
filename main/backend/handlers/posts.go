@@ -266,8 +266,17 @@ func getAllPosts(w http.ResponseWriter, r *http.Request) {
 	query += ` ORDER BY is_friend DESC, p.created_at DESC LIMIT ?`
 	args = append(args, limit)
 
+	// Конвертируем плейсхолдеры для PostgreSQL
+	query = ConvertPlaceholders(query)
+
+	log.Printf("🔍 Executing query with %d args", len(args))
+	log.Printf("📝 Query: %s", query)
+
 	rows, err := database.DB.Query(query, args...)
 	if err != nil {
+		log.Printf("❌ Query error: %v", err)
+		log.Printf("❌ Query was: %s", query)
+		log.Printf("❌ Args were: %v", args)
 		sendErrorResponse(w, "Ошибка получения постов: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -716,8 +725,19 @@ func createPost(w http.ResponseWriter, r *http.Request) {
 
 	query := `INSERT INTO posts (author_id, author_type, content, attached_pets, attachments, tags, status, scheduled_at) 
 	          VALUES (?, ?, ?, ?, ?, ?, ?, ?)`
+
+	// Конвертируем плейсхолдеры для PostgreSQL
+	query = ConvertPlaceholders(query)
+
+	log.Printf("🔍 Creating post: authorID=%d, authorType=%s, status=%s", authorID, authorType, status)
+	log.Printf("📝 Query: %s", query)
+
 	result, err := database.DB.Exec(query, authorID, authorType, req.Content, string(attachedPetsJSON), string(attachmentsJSON), string(tagsJSON), status, scheduledAt)
 	if err != nil {
+		log.Printf("❌ Create post error: %v", err)
+		log.Printf("❌ Query was: %s", query)
+		log.Printf("❌ Args: authorID=%d, authorType=%s, content=%s, attachedPets=%s, attachments=%s, tags=%s, status=%s, scheduledAt=%v",
+			authorID, authorType, req.Content, string(attachedPetsJSON), string(attachmentsJSON), string(tagsJSON), status, scheduledAt)
 		sendErrorResponse(w, "Ошибка создания поста: "+err.Error(), http.StatusInternalServerError)
 		return
 	}

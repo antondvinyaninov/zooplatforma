@@ -6,6 +6,7 @@ import (
 	"database/sql"
 	"encoding/json"
 	"fmt"
+	"log"
 	"net/http"
 	"os"
 	"time"
@@ -297,9 +298,15 @@ func GetFriendsHandler(w http.ResponseWriter, r *http.Request) {
 		WHERE (f.user_id = ? OR f.friend_id = ?) AND f.status = 'accepted'
 		ORDER BY f.created_at DESC
 	`)
+
+	log.Printf("🔍 GetFriendsHandler: userID=%d", userID)
+	log.Printf("📝 Query: %s", query)
+
 	rows, err := database.DB.Query(query, userID, userID, userID)
 
 	if err != nil {
+		log.Printf("❌ GetFriends error: %v", err)
+		log.Printf("❌ Query was: %s", query)
 		sendErrorResponse(w, "Ошибка получения друзей: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
