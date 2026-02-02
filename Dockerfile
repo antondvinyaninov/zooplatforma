@@ -72,14 +72,23 @@ COPY shared ./shared
 # Копируем main/frontend
 COPY main/frontend ./main/frontend
 
+# Копируем petbase/frontend
+COPY petbase/frontend ./petbase/frontend
+
 # Устанавливаем зависимости shared (если нужно)
 RUN cd /app/shared && npm install || true
 
 # Устанавливаем зависимости main/frontend
 RUN cd /app/main/frontend && npm install
 
+# Устанавливаем зависимости petbase/frontend
+RUN cd /app/petbase/frontend && npm install
+
 # Собираем Next.js (для production)
 RUN cd /app/main/frontend && npm run build
+
+# Собираем PetBase Next.js (для production)
+RUN cd /app/petbase/frontend && npm run build
 
 # Runtime образ
 FROM node:20-alpine
@@ -105,6 +114,19 @@ COPY --from=next-builder /app/main/frontend/tsconfig.json /app/frontend/tsconfig
 COPY --from=next-builder /app/main/frontend/next-env.d.ts /app/frontend/next-env.d.ts
 COPY --from=next-builder /app/main/frontend/postcss.config.mjs /app/frontend/postcss.config.mjs
 COPY --from=next-builder /app/main/frontend/tailwind.config.ts /app/frontend/tailwind.config.ts
+
+# Копируем PetBase Next.js
+COPY --from=next-builder /app/petbase/frontend/.next /app/petbase-frontend/.next
+COPY --from=next-builder /app/petbase/frontend/app /app/petbase-frontend/app
+COPY --from=next-builder /app/petbase/frontend/lib /app/petbase-frontend/lib
+COPY --from=next-builder /app/petbase/frontend/public /app/petbase-frontend/public
+COPY --from=next-builder /app/petbase/frontend/node_modules /app/petbase-frontend/node_modules
+COPY --from=next-builder /app/petbase/frontend/package.json /app/petbase-frontend/package.json
+COPY --from=next-builder /app/petbase/frontend/next.config.ts /app/petbase-frontend/next.config.ts
+COPY --from=next-builder /app/petbase/frontend/tsconfig.json /app/petbase-frontend/tsconfig.json
+COPY --from=next-builder /app/petbase/frontend/next-env.d.ts /app/petbase-frontend/next-env.d.ts
+COPY --from=next-builder /app/petbase/frontend/postcss.config.mjs /app/petbase-frontend/postcss.config.mjs
+COPY --from=next-builder /app/petbase/frontend/tailwind.config.ts /app/petbase-frontend/tailwind.config.ts
 
 # Копируем миграции БД
 COPY database/migrations /app/migrations
@@ -160,10 +182,15 @@ case $SERVICE in
     /app/main-backend &
     BACKEND_PID=$!
     
-    # Запускаем frontend (production режим)
+    # Запускаем Main frontend (production режим, порт 3000)
     echo "🚀 Starting Main Frontend..."
-    cd /app/frontend && NEXT_PUBLIC_API_URL=http://localhost:8000 NEXT_PUBLIC_AUTH_URL=http://localhost:7100 npm start &
+    cd /app/frontend && PORT=3000 NEXT_PUBLIC_API_URL=http://localhost:8000 NEXT_PUBLIC_AUTH_URL=http://localhost:7100 npm start &
     FRONTEND_PID=$!
+    
+    # Запускаем PetBase frontend (production режим, порт 4100)
+    echo "🚀 Starting PetBase Frontend..."
+    cd /app/petbase-frontend && PORT=4100 npm start &
+    PETBASE_FRONTEND_PID=$!
     
     # Ждем любого процесса
     wait -n
