@@ -66,13 +66,17 @@ FROM node:20-alpine AS next-builder
 
 WORKDIR /app
 
-# Копируем весь проект для сборки фронтенда
-COPY main/frontend ./main/frontend
+# Копируем shared package (включая .tgz файл)
 COPY shared ./shared
 
-# Устанавливаем зависимости
-RUN cd /app/main/frontend && npm install && \
-    cd /app/shared && npm install
+# Копируем main/frontend
+COPY main/frontend ./main/frontend
+
+# Устанавливаем зависимости shared (если нужно)
+RUN cd /app/shared && npm install || true
+
+# Устанавливаем зависимости main/frontend
+RUN cd /app/main/frontend && npm install
 
 # Собираем Next.js (для production)
 RUN cd /app/main/frontend && npm run build
