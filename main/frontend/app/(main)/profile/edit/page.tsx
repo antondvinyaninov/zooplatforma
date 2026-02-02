@@ -56,8 +56,8 @@ export default function EditProfilePage() {
         allow_messages: user.allow_messages || 'everyone',
         show_online: user.show_online || 'yes',
       });
-      setAvatarPreview(user.avatar ? `http://localhost:8000${user.avatar}` : null);
-      setCoverPreview(user.cover_photo ? `http://localhost:8000${user.cover_photo}` : null);
+      setAvatarPreview(user.avatar || null);
+      setCoverPreview(user.cover_photo || null);
     }
   }, [user, isLoading, isAuthenticated, router]);
 
@@ -93,17 +93,17 @@ export default function EditProfilePage() {
         // Обновляем данные пользователя
         await refreshUser();
         // Устанавливаем правильный URL с сервера
-        setAvatarPreview(`http://localhost:8000${response.data.avatar_url}`);
+        setAvatarPreview(response.data.avatar_url);
         toast.success('Аватар успешно обновлен!');
       } else {
         toast.error(response.error || 'Ошибка загрузки аватара');
         // Возвращаем старый аватар
-        setAvatarPreview(user?.avatar ? `http://localhost:8000${user.avatar}` : null);
+        setAvatarPreview(user?.avatar || null);
       }
     } catch (error) {
       console.error('Ошибка загрузки аватара:', error);
       toast.error('Ошибка загрузки аватара');
-      setAvatarPreview(user?.avatar ? `http://localhost:8000${user.avatar}` : null);
+      setAvatarPreview(user?.avatar || null);
     } finally {
       setIsUploadingAvatar(false);
     }
@@ -141,17 +141,17 @@ export default function EditProfilePage() {
         // Обновляем данные пользователя
         await refreshUser();
         // Устанавливаем правильный URL с сервера
-        setCoverPreview(`http://localhost:8000${response.data.cover_url}`);
+        setCoverPreview(response.data.cover_url);
         toast.success('Обложка успешно обновлена!');
       } else {
         toast.error(response.error || 'Ошибка загрузки обложки');
         // Возвращаем старую обложку
-        setCoverPreview(user?.cover_photo ? `http://localhost:8000${user.cover_photo}` : null);
+        setCoverPreview(user?.cover_photo || null);
       }
     } catch (error) {
       console.error('Ошибка загрузки обложки:', error);
       toast.error('Ошибка загрузки обложки');
-      setCoverPreview(user?.cover_photo ? `http://localhost:8000${user.cover_photo}` : null);
+      setCoverPreview(user?.cover_photo || null);
     } finally {
       setIsUploadingCover(false);
     }

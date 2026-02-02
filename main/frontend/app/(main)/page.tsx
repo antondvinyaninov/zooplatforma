@@ -12,7 +12,7 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
   if (metkaId) {
     try {
       // Получаем данные поста для SEO
-      const response = await fetch(`http://localhost:8000/api/posts/${metkaId}`, {
+      const response = await fetch(`/api/posts/${metkaId}`, {
         cache: 'no-store',
       });
 
@@ -37,15 +37,15 @@ export async function generateMetadata({ searchParams }: Props): Promise<Metadat
           openGraph: {
             title: `${authorName}: ${description}`,
             description: description,
-            images: image ? [`http://localhost:8000${image}`] : [],
+            images: image ? [image] : [],
             type: 'article',
-            url: `http://localhost:3000/?metka=${metkaId}`,
+            url: `/?metka=${metkaId}`,
           },
           twitter: {
             card: 'summary_large_image',
             title: `${authorName}: ${description}`,
             description: description,
-            images: image ? [`http://localhost:8000${image}`] : [],
+            images: image ? [image] : [],
           },
         };
       }
