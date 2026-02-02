@@ -85,36 +85,29 @@
 
 ## Next Steps:
 
-### 1. Apply Corrected Migration to EasyPanel 🔴 URGENT
-**Steps:**
-1. Connect to EasyPanel PostgreSQL database
-2. Drop all existing tables (they have wrong schema):
-   ```sql
-   DROP TABLE IF EXISTS posts CASCADE;
-   DROP TABLE IF EXISTS friendships CASCADE;
-   DROP TABLE IF EXISTS notifications CASCADE;
-   DROP TABLE IF EXISTS user_activity CASCADE;
-   DROP TABLE IF EXISTS user_sessions CASCADE;
-   DROP TABLE IF EXISTS user_activity_log CASCADE;
-   DROP TABLE IF EXISTS user_stats CASCADE;
-   DROP TABLE IF EXISTS polls CASCADE;
-   DROP TABLE IF EXISTS poll_options CASCADE;
-   DROP TABLE IF EXISTS poll_votes CASCADE;
-   DROP TABLE IF EXISTS post_pets CASCADE;
-   DROP TABLE IF EXISTS comments CASCADE;
-   -- Drop all other tables...
-   ```
-3. Run corrected migration:
-   ```bash
-   psql -h <host> -U zp -d zp-db -f database/migrations/036_migrate_to_postgresql.sql
-   ```
-4. Verify tables created:
-   ```sql
-   \dt
-   \d posts
-   \d friendships
-   \d user_activity
-   ```
+### 1. Wait for EasyPanel Deploy ⏳ AUTOMATIC
+**Status:** Миграция применится автоматически!
+
+**Что произойдет:**
+1. ✅ EasyPanel получит новый код из GitHub
+2. ✅ Пересоберет Docker контейнер
+3. ✅ При запуске `database/db.go` автоматически:
+   - Прочитает `database/migrations/036_migrate_to_postgresql.sql`
+   - Применит ВСЮ миграцию (все таблицы и колонки)
+   - Создаст правильную структуру БД
+4. ✅ Приложение заработает!
+
+**Логи для проверки:**
+```
+🔄 Applying PostgreSQL migration 036...
+📄 Found migration file: database/migrations/036_migrate_to_postgresql.sql
+✅ PostgreSQL migration 036 applied successfully
+```
+
+**Если что-то пойдет не так:**
+- Проверь логи EasyPanel
+- Миграция применяется при каждом запуске (безопасно - использует `CREATE TABLE IF NOT EXISTS`)
+- Если таблицы уже существуют - просто пропустит создание
 
 ### 2. Test All Endpoints 🧪
 After migration applied:
