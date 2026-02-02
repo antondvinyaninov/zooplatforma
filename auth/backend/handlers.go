@@ -168,9 +168,9 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	var passwordHash string
 	err := db.QueryRow(`
-		SELECT id, email, password, name, last_name, avatar, email_verified
+		SELECT id, email, password, name, last_name, avatar
 		FROM users WHERE email = ?
-	`, req.Email).Scan(&user.ID, &user.Email, &passwordHash, &user.Name, &user.LastName, &user.Avatar, &user.EmailVerified)
+	`, req.Email).Scan(&user.ID, &user.Email, &passwordHash, &user.Name, &user.LastName, &user.Avatar)
 
 	if err == sql.ErrNoRows {
 		http.Error(w, `{"success":false,"error":"Invalid email or password"}`, http.StatusUnauthorized)
