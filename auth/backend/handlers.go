@@ -96,7 +96,7 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Создать пользователя
 	result, err := db.Exec(`
-		INSERT INTO users (email, password_hash, name, last_name)
+		INSERT INTO users (email, password, name, last_name)
 		VALUES (?, ?, ?, ?)
 	`, req.Email, string(hashedPassword), req.Name, req.LastName)
 
@@ -168,7 +168,7 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 	var user User
 	var passwordHash string
 	err := db.QueryRow(`
-		SELECT id, email, password_hash, name, last_name, avatar, email_verified
+		SELECT id, email, password, name, last_name, avatar, email_verified
 		FROM users WHERE email = ?
 	`, req.Email).Scan(&user.ID, &user.Email, &passwordHash, &user.Name, &user.LastName, &user.Avatar, &user.EmailVerified)
 
