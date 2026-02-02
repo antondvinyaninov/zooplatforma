@@ -172,10 +172,10 @@ func (h *MediaHandler) UploadMedia(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Сохраняем в БД
-	query := `
+	query := ConvertPlaceholders(`
 		INSERT INTO user_media (user_id, file_name, original_name, file_path, file_size, mime_type, media_type, width, height)
 		VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?)
-	`
+	`)
 	fmt.Printf("💾 [UPLOAD] Сохранение в БД: user_id=%d, file_name=%s, media_type=%s\n", userID, fileName, mediaType)
 
 	result, err := h.DB.Exec(query, userID, fileName, header.Filename, relativePath, fileSize, mimeType, mediaType, width, height)
@@ -228,15 +228,15 @@ func (h *MediaHandler) GetUserMedia(w http.ResponseWriter, r *http.Request) {
 	mediaType := r.URL.Query().Get("type")
 
 	// Формируем запрос
-	query := `
+	query := ConvertPlaceholders(`
 		SELECT id, user_id, file_name, original_name, file_path, file_size, mime_type, media_type, width, height, duration, uploaded_at
 		FROM user_media
 		WHERE user_id = ?
-	`
+	`)
 	args := []interface{}{userID}
 
 	if mediaType != "" {
-		query += " AND media_type = ?"
+		query = strings.TrimSuffix(query, ")") + " AND media_type = " + ConvertPlaceholders("?") + ")"
 		args = append(args, mediaType)
 	}
 
@@ -288,7 +288,7 @@ func (h *MediaHandler) GetMediaFile(w http.ResponseWriter, r *http.Request) {
 
 	// Получаем информацию о файле из БД
 	var media models.UserMedia
-	query := `SELECT file_path, mime_type FROM user_media WHERE id = ?`
+	query := ConvertPlaceholders(`SELECT file_path, mime_type FROM user_media WHERE id = ?`)
 	err = h.DB.QueryRow(query, mediaID).Scan(&media.FilePath, &media.MimeType)
 	if err == sql.ErrNoRows {
 		http.NotFound(w, r)
@@ -339,7 +339,7 @@ func (h *MediaHandler) DeleteMedia(w http.ResponseWriter, r *http.Request) {
 	// Проверяем, что файл принадлежит пользователю
 	var filePath string
 	var ownerID int
-	query := `SELECT user_id, file_path FROM user_media WHERE id = ?`
+	query := ConvertPlaceholders(`SELECT user_id, file_path FROM user_media WHERE id = ?`)
 	err = h.DB.QueryRow(query, mediaID).Scan(&ownerID, &filePath)
 	if err == sql.ErrNoRows {
 		sendErrorResponse(w, "Media not found", http.StatusNotFound)
@@ -360,7 +360,7 @@ func (h *MediaHandler) DeleteMedia(w http.ResponseWriter, r *http.Request) {
 	os.Remove(fullPath)
 
 	// Удаляем из БД
-	_, err = h.DB.Exec("DELETE FROM user_media WHERE id = ?", mediaID)
+	_, err = h.DB.Exec(ConvertPlaceholders("DELETE FROM user_media WHERE id = ?"), mediaID)
 	if err != nil {
 		sendErrorResponse(w, "Failed to delete from database", http.StatusInternalServerError)
 		return
@@ -383,7 +383,7 @@ func (h *MediaHandler) GetMediaStats(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	query := `
+	query := ConvertPlaceholders(`
 		SELECT 
 			COUNT(*) as total_files,
 			COALESCE(SUM(file_size), 0) as total_size,
@@ -392,7 +392,7 @@ func (h *MediaHandler) GetMediaStats(w http.ResponseWriter, r *http.Request) {
 			COALESCE(SUM(CASE WHEN media_type = 'document' THEN 1 ELSE 0 END), 0) as docs_count
 		FROM user_media
 		WHERE user_id = ?
-	`
+	`)
 
 	var stats models.MediaStats
 	err := h.DB.QueryRow(query, userID).Scan(
