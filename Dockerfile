@@ -123,7 +123,15 @@ case $SERVICE in
     exec /app/auth-backend
     ;;
   main)
-    # На EasyPanel nginx уже есть, запускаем только backend и frontend
+    # Запускаем Auth Service (порт 7100)
+    echo "🚀 Starting Auth Service..."
+    /app/auth-backend &
+    AUTH_PID=$!
+    
+    # Ждем пока Auth Service запустится
+    sleep 2
+    
+    # Запускаем Main Backend (порт 8000)
     echo "🚀 Starting Main Backend..."
     /app/main-backend &
     BACKEND_PID=$!
