@@ -13,8 +13,18 @@ export function useUnreadMessages() {
 
     const fetchUnreadCount = async () => {
       try {
+        const token = localStorage.getItem('auth_token');
+        const headers: HeadersInit = {
+          'Content-Type': 'application/json',
+        };
+        
+        if (token) {
+          headers['Authorization'] = `Bearer ${token}`;
+        }
+        
         const response = await fetch('/api/messages/unread', {
           credentials: 'include',
+          headers,
         });
 
         if (response.ok) {
