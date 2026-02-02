@@ -14,8 +14,68 @@ CREATE TABLE IF NOT EXISTS users (
     location TEXT,
     website TEXT,
     verified BOOLEAN DEFAULT FALSE,
+    -- Analytics fields (from migration 010)
+    registered_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    last_login_at TIMESTAMP,
+    login_count INTEGER DEFAULT 0,
+    total_sessions INTEGER DEFAULT 0,
+    analytics_consent BOOLEAN DEFAULT TRUE,
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- User sessions table (from migration 010)
+CREATE TABLE IF NOT EXISTS user_sessions (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    started_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    ended_at TIMESTAMP,
+    duration_seconds INTEGER,
+    pages_viewed INTEGER DEFAULT 0,
+    actions_count INTEGER DEFAULT 0,
+    device_type TEXT,
+    browser TEXT,
+    ip_address TEXT,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- User activity log table (from migration 010)
+CREATE TABLE IF NOT EXISTS user_activity_log (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    session_id INTEGER,
+    action_type TEXT NOT NULL,
+    entity_type TEXT,
+    entity_id INTEGER,
+    metadata TEXT,
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (session_id) REFERENCES user_sessions(id) ON DELETE SET NULL
+);
+
+-- User activity table (simplified version for online status)
+CREATE TABLE IF NOT EXISTS user_activity (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL UNIQUE,
+    last_seen TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- User stats table (from migration 010)
+CREATE TABLE IF NOT EXISTS user_stats (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    date DATE NOT NULL,
+    sessions_count INTEGER DEFAULT 0,
+    total_time_seconds INTEGER DEFAULT 0,
+    posts_created INTEGER DEFAULT 0,
+    comments_added INTEGER DEFAULT 0,
+    likes_given INTEGER DEFAULT 0,
+    profile_views INTEGER DEFAULT 0,
+    messages_sent INTEGER DEFAULT 0,
+    pets_added INTEGER DEFAULT 0,
+    UNIQUE(user_id, date),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- User media table
@@ -35,15 +95,29 @@ CREATE TABLE IF NOT EXISTS user_media (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Posts table
+-- Posts table (COMPLETE schema from SQLite migrations 001 + 002)
 CREATE TABLE IF NOT EXISTS posts (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    content TEXT NOT NULL,
-    status TEXT DEFAULT 'published',
+    author_id INTEGER NOT NULL,                  -- Changed from user_id to author_id
+    author_type TEXT NOT NULL DEFAULT 'user',    -- 'user' or 'organization'
+    content TEXT DEFAULT '',
+    attached_pets TEXT DEFAULT '[]',             -- JSON array of PetIDs
+    attachments TEXT DEFAULT '[]',               -- JSON array of media files
+    tags TEXT DEFAULT '[]',                      -- JSON array of tags
+    status TEXT DEFAULT 'published' CHECK(status IN ('published', 'scheduled', 'draft')),
+    scheduled_at TIMESTAMP,                      -- For scheduled posts
+    is_deleted BOOLEAN DEFAULT FALSE,            -- Soft delete
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
+);
+
+-- Post-pets relation table (from migration 001)
+CREATE TABLE IF NOT EXISTS post_pets (
+    post_id INTEGER NOT NULL,
+    pet_id INTEGER NOT NULL,
+    PRIMARY KEY (post_id, pet_id),
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
+    FOREIGN KEY (pet_id) REFERENCES pets(id) ON DELETE CASCADE
 );
 
 -- Likes table
@@ -57,12 +131,13 @@ CREATE TABLE IF NOT EXISTS likes (
     FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
 );
 
--- Comments table
+-- Comments table (COMPLETE schema)
 CREATE TABLE IF NOT EXISTS comments (
     id SERIAL PRIMARY KEY,
     post_id INTEGER NOT NULL,
     user_id INTEGER NOT NULL,
     content TEXT NOT NULL,
+    is_deleted BOOLEAN DEFAULT FALSE,            -- Soft delete
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
     FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE,
@@ -87,7 +162,20 @@ CREATE TABLE IF NOT EXISTS pets (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Friends table
+-- Friendships table (from migration 009)
+CREATE TABLE IF NOT EXISTS friendships (
+    id SERIAL PRIMARY KEY,
+    user_id INTEGER NOT NULL,
+    friend_id INTEGER NOT NULL,
+    status TEXT NOT NULL DEFAULT 'pending', -- pending, accepted, rejected, blocked
+    created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    updated_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(user_id, friend_id),
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (friend_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
+-- Friends table (legacy - keeping for compatibility)
 CREATE TABLE IF NOT EXISTS friends (
     id SERIAL PRIMARY KEY,
     user_id_1 INTEGER NOT NULL,
@@ -146,17 +234,19 @@ CREATE TABLE IF NOT EXISTS user_roles (
     FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
--- Notifications table
+-- Notifications table (from migration 025 - COMPLETE schema)
 CREATE TABLE IF NOT EXISTS notifications (
     id SERIAL PRIMARY KEY,
-    user_id INTEGER NOT NULL,
-    type TEXT NOT NULL,
-    title TEXT NOT NULL,
-    message TEXT,
-    data JSONB,
-    read BOOLEAN DEFAULT FALSE,
+    user_id INTEGER NOT NULL,                    -- Who receives the notification
+    type TEXT NOT NULL,                          -- Type: comment, like, friend_request, friend_accepted
+    actor_id INTEGER NOT NULL,                   -- Who performed the action
+    entity_type TEXT,                            -- Entity type: post, comment, friendship
+    entity_id INTEGER,                           -- Entity ID
+    message TEXT NOT NULL,                       -- Notification text
+    is_read BOOLEAN DEFAULT FALSE,               -- Read status
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
-    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+    FOREIGN KEY (actor_id) REFERENCES users(id) ON DELETE CASCADE
 );
 
 -- Favorites table
@@ -262,32 +352,126 @@ CREATE TABLE IF NOT EXISTS service_health (
     created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 );
 
+-- Polls tables (from migration 004)
+CREATE TABLE IF NOT EXISTS polls (
+    id SERIAL PRIMARY KEY,
+    post_id INTEGER NOT NULL,
+    question TEXT NOT NULL,
+    multiple_choice BOOLEAN NOT NULL DEFAULT FALSE,
+    allow_vote_changes BOOLEAN NOT NULL DEFAULT FALSE,
+    expires_at TIMESTAMP,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (post_id) REFERENCES posts(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS poll_options (
+    id SERIAL PRIMARY KEY,
+    poll_id INTEGER NOT NULL,
+    option_text TEXT NOT NULL,
+    votes_count INTEGER NOT NULL DEFAULT 0,
+    option_order INTEGER NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE
+);
+
+CREATE TABLE IF NOT EXISTS poll_votes (
+    id SERIAL PRIMARY KEY,
+    poll_id INTEGER NOT NULL,
+    option_id INTEGER NOT NULL,
+    user_id INTEGER NOT NULL,
+    created_at TIMESTAMP NOT NULL DEFAULT CURRENT_TIMESTAMP,
+    UNIQUE(poll_id, option_id, user_id),
+    FOREIGN KEY (poll_id) REFERENCES polls(id) ON DELETE CASCADE,
+    FOREIGN KEY (option_id) REFERENCES poll_options(id) ON DELETE CASCADE,
+    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+);
+
 -- Create indexes for better performance
 CREATE INDEX IF NOT EXISTS idx_users_email ON users(email);
 CREATE INDEX IF NOT EXISTS idx_users_created_at ON users(created_at);
+
+-- User sessions indexes
+CREATE INDEX IF NOT EXISTS idx_user_sessions_user_id ON user_sessions(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_started_at ON user_sessions(started_at);
+CREATE INDEX IF NOT EXISTS idx_user_sessions_ended_at ON user_sessions(ended_at);
+
+-- User activity log indexes
+CREATE INDEX IF NOT EXISTS idx_activity_user_id ON user_activity_log(user_id);
+CREATE INDEX IF NOT EXISTS idx_activity_session_id ON user_activity_log(session_id);
+CREATE INDEX IF NOT EXISTS idx_activity_action_type ON user_activity_log(action_type);
+CREATE INDEX IF NOT EXISTS idx_activity_created_at ON user_activity_log(created_at);
+CREATE INDEX IF NOT EXISTS idx_activity_entity ON user_activity_log(entity_type, entity_id);
+
+-- User stats indexes
+CREATE INDEX IF NOT EXISTS idx_user_stats_user_id ON user_stats(user_id);
+CREATE INDEX IF NOT EXISTS idx_user_stats_date ON user_stats(date);
+
+-- User media indexes
 CREATE INDEX IF NOT EXISTS idx_user_media_user_id ON user_media(user_id);
 CREATE INDEX IF NOT EXISTS idx_user_media_type ON user_media(media_type);
 CREATE INDEX IF NOT EXISTS idx_user_media_uploaded ON user_media(uploaded_at);
-CREATE INDEX IF NOT EXISTS idx_posts_user_id ON posts(user_id);
-CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at);
+
+-- Posts indexes
+CREATE INDEX IF NOT EXISTS idx_posts_author ON posts(author_id, author_type);
+CREATE INDEX IF NOT EXISTS idx_posts_created_at ON posts(created_at DESC);
 CREATE INDEX IF NOT EXISTS idx_posts_status ON posts(status);
+CREATE INDEX IF NOT EXISTS idx_posts_is_deleted ON posts(is_deleted);
+
+-- Post-pets indexes
+CREATE INDEX IF NOT EXISTS idx_post_pets_pet ON post_pets(pet_id);
+
+-- Likes indexes
 CREATE INDEX IF NOT EXISTS idx_likes_user_id ON likes(user_id);
 CREATE INDEX IF NOT EXISTS idx_likes_post_id ON likes(post_id);
+
+-- Comments indexes
 CREATE INDEX IF NOT EXISTS idx_comments_post_id ON comments(post_id);
 CREATE INDEX IF NOT EXISTS idx_comments_user_id ON comments(user_id);
+
+-- Pets indexes
 CREATE INDEX IF NOT EXISTS idx_pets_user_id ON pets(user_id);
+
+-- Friendships indexes
+CREATE INDEX IF NOT EXISTS idx_friendships_user_id ON friendships(user_id);
+CREATE INDEX IF NOT EXISTS idx_friendships_friend_id ON friendships(friend_id);
+CREATE INDEX IF NOT EXISTS idx_friendships_status ON friendships(status);
+
+-- Friends indexes (legacy)
 CREATE INDEX IF NOT EXISTS idx_friends_user_id_1 ON friends(user_id_1);
 CREATE INDEX IF NOT EXISTS idx_friends_user_id_2 ON friends(user_id_2);
+
+-- Organizations indexes
 CREATE INDEX IF NOT EXISTS idx_organizations_type ON organizations(type);
 CREATE INDEX IF NOT EXISTS idx_organizations_city ON organizations(city);
+
+-- Organization members indexes
 CREATE INDEX IF NOT EXISTS idx_org_members_org_id ON organization_members(organization_id);
 CREATE INDEX IF NOT EXISTS idx_org_members_user_id ON organization_members(user_id);
+
+-- User roles indexes
 CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles(user_id);
+
+-- Notifications indexes
 CREATE INDEX IF NOT EXISTS idx_notifications_user_id ON notifications(user_id);
-CREATE INDEX IF NOT EXISTS idx_notifications_read ON notifications(read);
+CREATE INDEX IF NOT EXISTS idx_notifications_is_read ON notifications(is_read);
+CREATE INDEX IF NOT EXISTS idx_notifications_created_at ON notifications(created_at DESC);
+CREATE INDEX IF NOT EXISTS idx_notifications_user_unread ON notifications(user_id, is_read);
+
+-- Messages indexes
 CREATE INDEX IF NOT EXISTS idx_messages_sender_id ON messages(sender_id);
 CREATE INDEX IF NOT EXISTS idx_messages_recipient_id ON messages(recipient_id);
+
+-- Breeds indexes
 CREATE INDEX IF NOT EXISTS idx_breeds_species_id ON breeds(species_id);
+
+-- Polls indexes
+CREATE INDEX IF NOT EXISTS idx_polls_post_id ON polls(post_id);
+CREATE INDEX IF NOT EXISTS idx_poll_options_poll_id ON poll_options(poll_id);
+CREATE INDEX IF NOT EXISTS idx_poll_votes_poll_id ON poll_votes(poll_id);
+CREATE INDEX IF NOT EXISTS idx_poll_votes_user_id ON poll_votes(user_id);
+CREATE INDEX IF NOT EXISTS idx_poll_votes_option_id ON poll_votes(option_id);
+
+-- Clinic indexes
 CREATE INDEX IF NOT EXISTS idx_clinic_appointments_clinic_id ON clinic_appointments(clinic_id);
 CREATE INDEX IF NOT EXISTS idx_clinic_appointments_pet_id ON clinic_appointments(pet_id);
 CREATE INDEX IF NOT EXISTS idx_clinic_patients_clinic_id ON clinic_patients(clinic_id);
