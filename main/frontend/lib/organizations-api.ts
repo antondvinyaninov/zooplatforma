@@ -1,6 +1,9 @@
 // API клиент для работы с организациями
 
-const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const API_URL = process.env.NEXT_PUBLIC_API_URL || 
+  (typeof window !== 'undefined' && process.env.NODE_ENV === 'production'
+    ? '' // Пустая строка = относительные пути (/api/...)
+    : 'http://localhost:8000');
 
 export interface Organization {
   id: number;

@@ -62,7 +62,7 @@ export default function MessengerPage() {
     }
 
     try {
-      const response = await fetch(`http://localhost:8000/api/chats/${chatId}/messages`, {
+      const response = await fetch(`/api/chats/${chatId}/messages`, {
         credentials: 'include',
       });
 
@@ -84,7 +84,7 @@ export default function MessengerPage() {
     
     setIsFetchingChats(true);
     try {
-      const response = await fetch('http://localhost:8000/api/chats', {
+      const response = await fetch('/api/chats', {
         credentials: 'include',
       });
 
@@ -117,7 +117,7 @@ export default function MessengerPage() {
     setSending(true);
     
     try {
-      const response = await fetch(`http://localhost:8000/api/messages/send`, {
+      const response = await fetch(`/api/messages/send`, {
         method: 'POST',
         headers: {
           'Content-Type': 'application/json',
@@ -134,7 +134,7 @@ export default function MessengerPage() {
         
         // Если это был временный чат (ID < 0), нужно обновить список чатов
         if (selectedChatId < 0) {
-          const updatedChatsResponse = await fetch('http://localhost:8000/api/chats', {
+          const updatedChatsResponse = await fetch('/api/chats', {
             credentials: 'include',
           });
           
@@ -185,7 +185,7 @@ export default function MessengerPage() {
         formData.append('media', file);
       });
 
-      const response = await fetch('http://localhost:8000/api/messages/send-media', {
+      const response = await fetch('/api/messages/send-media', {
         method: 'POST',
         credentials: 'include',
         body: formData,
@@ -196,7 +196,7 @@ export default function MessengerPage() {
         
         if (selectedChatId < 0) {
           await fetchChats();
-          const updatedChatsResponse = await fetch('http://localhost:8000/api/chats', {
+          const updatedChatsResponse = await fetch('/api/chats', {
             credentials: 'include',
           });
           
