@@ -732,7 +732,9 @@ func createPost(w http.ResponseWriter, r *http.Request) {
 	log.Printf("🔍 Creating post: authorID=%d, authorType=%s, status=%s", authorID, authorType, status)
 	log.Printf("📝 Query: %s", query)
 
-	result, err := database.DB.Exec(query, authorID, authorType, req.Content, string(attachedPetsJSON), string(attachmentsJSON), string(tagsJSON), status, scheduledAt)
+	var postID int64
+	var err error
+	err = database.DB.QueryRow(query+" RETURNING id", authorID, authorType, req.Content, string(attachedPetsJSON), string(attachmentsJSON), string(tagsJSON), status, scheduledAt).Scan(&postID)
 	if err != nil {
 		log.Printf("❌ Create post error: %v", err)
 		log.Printf("❌ Query was: %s", query)
@@ -741,8 +743,6 @@ func createPost(w http.ResponseWriter, r *http.Request) {
 		sendErrorResponse(w, "Ошибка создания поста: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
-
-	postID, _ := result.LastInsertId()
 
 	// Добавляем связи в post_pets для быстрых запросов
 	for _, petID := range req.AttachedPets {

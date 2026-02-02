@@ -307,18 +307,18 @@ func SendMessageHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Создаем сообщение
-		result, err := db.Exec(ConvertPlaceholders(`
+		var messageID int
+		err = db.QueryRow(ConvertPlaceholders(`
 			INSERT INTO messages (chat_id, sender_id, receiver_id, content, created_at)
 			VALUES (?, ?, ?, ?, ?)
-		`), chatID, userID, req.ReceiverID, req.Content, time.Now())
+			RETURNING id
+		`), chatID, userID, req.ReceiverID, req.Content, time.Now()).Scan(&messageID)
 
 		if err != nil {
 			log.Printf("❌ Error creating message: %v", err)
 			http.Error(w, "Failed to send message", http.StatusInternalServerError)
 			return
 		}
-
-		messageID, _ := result.LastInsertId()
 
 		// Обновляем last_message в чате
 		_, err = db.Exec(ConvertPlaceholders(`
@@ -332,7 +332,7 @@ func SendMessageHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Получаем созданное сообщение
-		message, err := getMessageByID(db, int(messageID))
+		message, err := getMessageByID(db, messageID)
 		if err != nil {
 			log.Printf("❌ Error fetching created message: %v", err)
 			http.Error(w, "Message sent but failed to fetch", http.StatusInternalServerError)
@@ -429,18 +429,18 @@ func SendMediaMessageHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Создаем сообщение
-		result, err := db.Exec(ConvertPlaceholders(`
+		var messageID int
+		err = db.QueryRow(ConvertPlaceholders(`
 			INSERT INTO messages (chat_id, sender_id, receiver_id, content, created_at)
 			VALUES (?, ?, ?, ?, ?)
-		`), chatID, userID, receiverID, content, time.Now())
+			RETURNING id
+		`), chatID, userID, receiverID, content, time.Now()).Scan(&messageID)
 
 		if err != nil {
 			log.Printf("❌ Error creating message: %v", err)
 			http.Error(w, "Failed to send message", http.StatusInternalServerError)
 			return
 		}
-
-		messageID, _ := result.LastInsertId()
 
 		// Сохраняем файлы и создаем attachments
 		var attachments []models.MessageAttachment
@@ -472,20 +472,21 @@ func SendMediaMessageHandler(db *sql.DB) http.HandlerFunc {
 			}
 
 			// Создаем запись в БД
-			attachResult, err := db.Exec(ConvertPlaceholders(`
+			var attachID int
+			err = db.QueryRow(ConvertPlaceholders(`
 				INSERT INTO message_attachments (message_id, file_path, file_type, file_size, created_at)
 				VALUES (?, ?, ?, ?, ?)
-			`), messageID, filePath, fileType, fileHeader.Size, time.Now())
+				RETURNING id
+			`), messageID, filePath, fileType, fileHeader.Size, time.Now()).Scan(&attachID)
 
 			if err != nil {
 				log.Printf("❌ Error creating attachment: %v", err)
 				continue
 			}
 
-			attachID, _ := attachResult.LastInsertId()
 			attachments = append(attachments, models.MessageAttachment{
-				ID:        int(attachID),
-				MessageID: int(messageID),
+				ID:        attachID,
+				MessageID: messageID,
 				FilePath:  filePath,
 				FileType:  fileType,
 				FileSize:  int(fileHeader.Size),
@@ -505,7 +506,7 @@ func SendMediaMessageHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Получаем созданное сообщение
-		message, err := getMessageByID(db, int(messageID))
+		message, err := getMessageByID(db, messageID)
 		if err != nil {
 			log.Printf("❌ Error fetching created message: %v", err)
 			http.Error(w, "Message sent but failed to fetch", http.StatusInternalServerError)
@@ -542,17 +543,18 @@ func getOrCreateChat(db *sql.DB, user1ID, user2ID int) (int, error) {
 	}
 
 	// Создаем новый чат
-	result, err := db.Exec(ConvertPlaceholders(`
+	var newChatID int
+	err = db.QueryRow(ConvertPlaceholders(`
 		INSERT INTO chats (user1_id, user2_id, created_at)
 		VALUES (?, ?, ?)
-	`), user1ID, user2ID, time.Now())
+		RETURNING id
+	`), user1ID, user2ID, time.Now()).Scan(&newChatID)
 
 	if err != nil {
 		return 0, err
 	}
 
-	id, err := result.LastInsertId()
-	return int(id), err
+	return newChatID, nil
 }
 
 func isUserInChat(db *sql.DB, chatID, userID int) bool {
