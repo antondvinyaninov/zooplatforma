@@ -62,8 +62,18 @@ export default function MessengerPage() {
     }
 
     try {
+      const token = localStorage.getItem('auth_token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch(`/api/chats/${chatId}/messages`, {
         credentials: 'include',
+        headers,
       });
 
       if (response.ok) {
@@ -84,8 +94,18 @@ export default function MessengerPage() {
     
     setIsFetchingChats(true);
     try {
+      const token = localStorage.getItem('auth_token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch('/api/chats', {
         credentials: 'include',
+        headers,
       });
 
       if (response.ok) {
@@ -117,11 +137,18 @@ export default function MessengerPage() {
     setSending(true);
     
     try {
+      const token = localStorage.getItem('auth_token');
+      const headers: HeadersInit = {
+        'Content-Type': 'application/json',
+      };
+      
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch(`/api/messages/send`, {
         method: 'POST',
-        headers: {
-          'Content-Type': 'application/json',
-        },
+        headers,
         credentials: 'include',
         body: JSON.stringify({
           receiver_id: selectedChat.other_user.id,
@@ -136,6 +163,7 @@ export default function MessengerPage() {
         if (selectedChatId < 0) {
           const updatedChatsResponse = await fetch('/api/chats', {
             credentials: 'include',
+            headers,
           });
           
           if (updatedChatsResponse.ok) {
@@ -174,6 +202,7 @@ export default function MessengerPage() {
     setSending(true);
 
     try {
+      const token = localStorage.getItem('auth_token');
       const formData = new FormData();
       formData.append('receiver_id', selectedChat.other_user.id.toString());
       
@@ -185,9 +214,15 @@ export default function MessengerPage() {
         formData.append('media', file);
       });
 
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+
       const response = await fetch('/api/messages/send-media', {
         method: 'POST',
         credentials: 'include',
+        headers,
         body: formData,
       });
 
@@ -198,6 +233,7 @@ export default function MessengerPage() {
           await fetchChats();
           const updatedChatsResponse = await fetch('/api/chats', {
             credentials: 'include',
+            headers,
           });
           
           if (updatedChatsResponse.ok) {
