@@ -26,6 +26,29 @@ func sqlPlaceholder(index int) string {
 	return "?"
 }
 
+// getCookieDomain возвращает правильный домен для cookie
+func getCookieDomain() string {
+	if os.Getenv("ENVIRONMENT") == "production" {
+		// В production используем домен из переменной окружения или пустую строку
+		// Пустая строка означает что cookie будет работать для текущего домена
+		return ""
+	}
+	return "localhost"
+}
+
+// getCookieSecure возвращает правильное значение Secure для cookie
+func getCookieSecure() bool {
+	return os.Getenv("ENVIRONMENT") == "production"
+}
+
+// getCookieSameSite возвращает правильное значение SameSite для cookie
+func getCookieSameSite() http.SameSite {
+	if os.Getenv("ENVIRONMENT") == "production" {
+		return http.SameSiteNoneMode // None для cross-origin в production
+	}
+	return http.SameSiteLaxMode // Lax для localhost
+}
+
 // InitJWTSecret - инициализировать JWT secret (вызывается после загрузки .env)
 func InitJWTSecret() {
 	// Определяем тип БД
@@ -148,10 +171,10 @@ func registerHandler(w http.ResponseWriter, r *http.Request) {
 		Name:     "auth_token",
 		Value:    token,
 		Path:     "/",
-		Domain:   "localhost",          // Явно указываем localhost
-		HttpOnly: false,                // false чтобы JS мог читать (для отладки)
-		Secure:   false,                // false для localhost
-		SameSite: http.SameSiteLaxMode, // Lax для localhost (None требует Secure=true)
+		Domain:   getCookieDomain(),
+		HttpOnly: false,
+		Secure:   getCookieSecure(),
+		SameSite: getCookieSameSite(),
 		MaxAge:   86400 * 7,            // 7 дней
 	})
 
@@ -273,10 +296,10 @@ func loginHandler(w http.ResponseWriter, r *http.Request) {
 		Name:     "auth_token",
 		Value:    token,
 		Path:     "/",
-		Domain:   "localhost",          // Явно указываем localhost
-		HttpOnly: false,                // false чтобы JS мог читать (для отладки)
-		Secure:   false,                // false для localhost
-		SameSite: http.SameSiteLaxMode, // Lax для localhost (None требует Secure=true)
+		Domain:   getCookieDomain(),
+		HttpOnly: false,
+		Secure:   getCookieSecure(),
+		SameSite: getCookieSameSite(),
 		MaxAge:   86400 * 7,            // 7 дней
 	})
 
@@ -476,10 +499,10 @@ func logoutHandler(w http.ResponseWriter, r *http.Request) {
 		Name:     "auth_token",
 		Value:    "",
 		Path:     "/",
-		Domain:   "localhost",
+		Domain:   getCookieDomain(),
 		HttpOnly: false,
-		Secure:   false,
-		SameSite: http.SameSiteLaxMode, // Lax для localhost
+		Secure:   getCookieSecure(),
+		SameSite: getCookieSameSite(), // Lax для localhost
 		MaxAge:   -1,                   // Удалить cookie
 	})
 
