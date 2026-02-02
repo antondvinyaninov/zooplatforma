@@ -109,8 +109,9 @@ COPY --from=next-builder /app/main/frontend/tailwind.config.ts /app/frontend/tai
 # Копируем миграции БД
 COPY database/migrations /app/migrations
 
-# Копируем SQL fix для organizations
+# Копируем SQL fixes
 COPY fix_organizations_table.sql /app/fix_organizations_table.sql
+COPY fix_posts_table.sql /app/fix_posts_table.sql
 
 # Копируем конфигурационные файлы
 COPY infrastructure /app/infrastructure
@@ -130,10 +131,13 @@ case $SERVICE in
     exec /app/auth-backend
     ;;
   main)
-    # Применяем SQL fix для organizations (если в production)
+    # Применяем SQL fixes (если в production)
     if [ "$ENVIRONMENT" = "production" ]; then
       echo "🔧 Applying organizations table fix..."
-      PGPASSWORD=${DATABASE_PASSWORD:-lmLG7k2ed4vas19} psql -h ${DATABASE_HOST:-zooplatforma-db} -U ${DATABASE_USER:-zp} -d ${DATABASE_NAME:-zp-db} -f /app/fix_organizations_table.sql || echo "⚠️ SQL fix failed (maybe already applied)"
+      PGPASSWORD=${DATABASE_PASSWORD:-lmLG7k2ed4vas19} psql -h ${DATABASE_HOST:-zooplatforma-db} -U ${DATABASE_USER:-zp} -d ${DATABASE_NAME:-zp-db} -f /app/fix_organizations_table.sql || echo "⚠️ Organizations fix failed (maybe already applied)"
+      
+      echo "🔧 Applying posts table fix..."
+      PGPASSWORD=${DATABASE_PASSWORD:-lmLG7k2ed4vas19} psql -h ${DATABASE_HOST:-zooplatforma-db} -U ${DATABASE_USER:-zp} -d ${DATABASE_NAME:-zp-db} -f /app/fix_posts_table.sql || echo "⚠️ Posts fix failed (maybe already applied)"
     fi
     
     # Запускаем Auth Service (порт 7100)

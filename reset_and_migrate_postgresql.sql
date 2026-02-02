@@ -1,0 +1,35 @@
+-- Reset PostgreSQL database and apply correct migration
+-- WARNING: This will DELETE ALL DATA!
+
+-- Drop all tables in correct order (respecting foreign keys)
+DROP TABLE IF EXISTS poll_votes CASCADE;
+DROP TABLE IF EXISTS poll_options CASCADE;
+DROP TABLE IF EXISTS polls CASCADE;
+DROP TABLE IF EXISTS post_pets CASCADE;
+DROP TABLE IF EXISTS medical_records CASCADE;
+DROP TABLE IF EXISTS clinic_patients CASCADE;
+DROP TABLE IF EXISTS clinic_appointments CASCADE;
+DROP TABLE IF EXISTS service_health CASCADE;
+DROP TABLE IF EXISTS messages CASCADE;
+DROP TABLE IF EXISTS favorites CASCADE;
+DROP TABLE IF EXISTS notifications CASCADE;
+DROP TABLE IF EXISTS user_roles CASCADE;
+DROP TABLE IF EXISTS organization_members CASCADE;
+DROP TABLE IF EXISTS organizations CASCADE;
+DROP TABLE IF EXISTS friendships CASCADE;
+DROP TABLE IF EXISTS friends CASCADE;
+DROP TABLE IF EXISTS user_stats CASCADE;
+DROP TABLE IF EXISTS user_activity CASCADE;
+DROP TABLE IF EXISTS user_activity_log CASCADE;
+DROP TABLE IF EXISTS user_sessions CASCADE;
+DROP TABLE IF EXISTS comments CASCADE;
+DROP TABLE IF EXISTS likes CASCADE;
+DROP TABLE IF EXISTS posts CASCADE;
+DROP TABLE IF EXISTS pets CASCADE;
+DROP TABLE IF EXISTS pet_cards CASCADE;
+DROP TABLE IF EXISTS breeds CASCADE;
+DROP TABLE IF EXISTS species CASCADE;
+DROP TABLE IF EXISTS user_media CASCADE;
+DROP TABLE IF EXISTS users CASCADE;
+
+-- Now the database is clean, migration will create all tables with correct structure

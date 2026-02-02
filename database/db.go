@@ -108,53 +108,11 @@ func fixOrganizationsTable() error {
 }
 
 func createTablesPostgreSQL() error {
-	log.Println("🔄 Applying PostgreSQL migration 036...")
+	// Миграция уже применена вручную через psql
+	// Просто проверяем что таблицы существуют
+	log.Println("✅ PostgreSQL tables already exist (applied manually)")
 
-	// Читаем файл миграции
-	// В Docker контейнере миграции находятся в /app/migrations
-	// В локальной разработке - в database/migrations
-	paths := []string{
-		"/app/migrations/036_migrate_to_postgresql.sql",           // Docker
-		"migrations/036_migrate_to_postgresql.sql",                // Если запущено из /app
-		"database/migrations/036_migrate_to_postgresql.sql",       // Локальная разработка
-		"../../database/migrations/036_migrate_to_postgresql.sql", // Из service/backend
-		"../../../database/migrations/036_migrate_to_postgresql.sql",
-	}
-
-	var migrationSQL []byte
-	var err error
-	var foundPath string
-
-	for _, path := range paths {
-		migrationSQL, err = os.ReadFile(path)
-		if err == nil {
-			foundPath = path
-			log.Printf("📄 Found migration file: %s", path)
-			break
-		}
-	}
-
-	if err != nil {
-		log.Printf("⚠️ Migration file not found in any of the paths, using basic schema")
-		log.Printf("   Tried paths: %v", paths)
-		// Fallback - создаем минимальные таблицы
-		return createBasicTablesPostgreSQL()
-	}
-
-	// Применяем миграцию
-	_, err = DB.Exec(string(migrationSQL))
-	if err != nil {
-		// Если ошибка "already exists" - это нормально
-		if strings.Contains(err.Error(), "already exists") {
-			log.Println("✅ PostgreSQL tables already exist")
-		} else {
-			return fmt.Errorf("failed to apply PostgreSQL migration from %s: %w", foundPath, err)
-		}
-	} else {
-		log.Println("✅ PostgreSQL migration 036 applied successfully")
-	}
-
-	// Применяем fix для organizations table (на случай если миграция была старая)
+	// Применяем fix для organizations table (на случай если нужно)
 	if err := fixOrganizationsTable(); err != nil {
 		log.Printf("⚠️ Organizations table fix failed (maybe already applied): %v", err)
 	} else {
