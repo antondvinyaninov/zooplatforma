@@ -84,7 +84,7 @@ RUN cd /app/main/frontend && npm run build
 # Runtime образ
 FROM node:20-alpine
 
-RUN apk add --no-cache ca-certificates nginx
+RUN apk add --no-cache ca-certificates nginx postgresql-client
 
 WORKDIR /app
 
@@ -109,6 +109,9 @@ COPY --from=next-builder /app/main/frontend/tailwind.config.ts /app/frontend/tai
 # Копируем миграции БД
 COPY database/migrations /app/migrations
 
+# Копируем SQL fix для organizations
+COPY fix_organizations_table.sql /app/fix_organizations_table.sql
+
 # Копируем конфигурационные файлы
 COPY infrastructure /app/infrastructure
 
@@ -127,6 +130,12 @@ case $SERVICE in
     exec /app/auth-backend
     ;;
   main)
+    # Применяем SQL fix для organizations (если в production)
+    if [ "$ENVIRONMENT" = "production" ]; then
+      echo "🔧 Applying organizations table fix..."
+      PGPASSWORD=${DATABASE_PASSWORD:-lmLG7k2ed4vas19} psql -h ${DATABASE_HOST:-zooplatforma-db} -U ${DATABASE_USER:-zp} -d ${DATABASE_NAME:-zp-db} -f /app/fix_organizations_table.sql || echo "⚠️ SQL fix failed (maybe already applied)"
+    fi
+    
     # Запускаем Auth Service (порт 7100)
     echo "🚀 Starting Auth Service..."
     /app/auth-backend &
