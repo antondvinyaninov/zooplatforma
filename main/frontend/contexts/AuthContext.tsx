@@ -32,6 +32,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const checkAuth = async () => {
       try {
+        // Проверяем есть ли токен в localStorage
+        const storedToken = localStorage.getItem('auth_token');
+        if (!storedToken) {
+          if (mounted) {
+            setIsLoading(false);
+          }
+          return;
+        }
+
         // Простой запрос к Auth Service
         const response = await authApi.me();
         
@@ -40,10 +49,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
           const user = userData.user || userData;
           
           setUser(user);
-          setToken('authenticated');
+          setToken(storedToken);
+        } else {
+          // Токен невалидный - удаляем
+          localStorage.removeItem('auth_token');
         }
       } catch (error) {
         console.error('Auth check failed:', error);
+        localStorage.removeItem('auth_token');
       } finally {
         if (mounted) {
           setIsLoading(false);
@@ -62,8 +75,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await authApi.login(email, password);
     
     if (response.success && response.data) {
-      const { user } = response.data;
-      setToken('authenticated'); // Токен в cookie, просто флаг
+      const responseData = response.data as any;
+      const user = responseData.user;
+      const token = responseData.token;
+      
+      // Сохраняем токен в localStorage
+      if (token) {
+        localStorage.setItem('auth_token', token);
+      }
+      
+      setToken(token || 'authenticated');
       setUser(user);
       return { success: true };
     }
@@ -75,8 +96,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     const response = await authApi.register(name, email, password);
     
     if (response.success && response.data) {
-      const { user } = response.data;
-      setToken('authenticated'); // Токен в cookie, просто флаг
+      const responseData = response.data as any;
+      const user = responseData.user;
+      const token = responseData.token;
+      
+      // Сохраняем токен в localStorage
+      if (token) {
+        localStorage.setItem('auth_token', token);
+      }
+      
+      setToken(token || 'authenticated');
       setUser(user);
       return { success: true };
     }
@@ -86,6 +115,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const logout = async () => {
     await authApi.logout();
+    // Удаляем токен из localStorage
+    localStorage.removeItem('auth_token');
     setToken(null);
     setUser(null);
   };

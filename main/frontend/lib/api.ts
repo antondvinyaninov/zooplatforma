@@ -26,8 +26,13 @@ export class ApiClient {
       'Content-Type': 'application/json',
     };
 
-    // ✅ ВАЖНО: Cookie auth_token автоматически отправляется браузером через credentials: 'include'
-    // Не нужно добавлять Authorization header - используем HttpOnly cookie
+    // Получаем токен из localStorage
+    if (typeof window !== 'undefined') {
+      const token = localStorage.getItem('auth_token');
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+    }
 
     return headers;
   }
