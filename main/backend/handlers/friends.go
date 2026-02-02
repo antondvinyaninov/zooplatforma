@@ -284,7 +284,7 @@ func GetFriendsHandler(w http.ResponseWriter, r *http.Request) {
 		       u.id, u.name, u.last_name, u.email, u.avatar, u.location,
 		       ua.last_seen,
 		       CASE 
-		           WHEN ua.last_seen IS NOT NULL AND datetime(ua.last_seen) > datetime('now', '-5 minutes') THEN 1
+		           WHEN ua.last_seen IS NOT NULL AND ua.last_seen > NOW() - INTERVAL '5 minutes' THEN 1
 		           ELSE 0
 		       END as is_online
 		FROM friendships f

@@ -123,7 +123,7 @@ func GetAdminLogStats(w http.ResponseWriter, r *http.Request) {
 
 	// Логи за последние 24 часа
 	var logsLast24h int
-	database.DB.QueryRow("SELECT COUNT(*) FROM admin_logs WHERE created_at >= datetime('now', '-1 day')").Scan(&logsLast24h)
+	database.DB.QueryRow("SELECT COUNT(*) FROM admin_logs WHERE created_at >= NOW() - INTERVAL '1 day'").Scan(&logsLast24h)
 	stats["logs_last_24h"] = logsLast24h
 
 	// Количество по типам действий

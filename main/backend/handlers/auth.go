@@ -100,8 +100,9 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 
 	// ✅ Синхронизируем пользователя с основной БД
 	_, err = database.DB.Exec(ConvertPlaceholders(`
-		INSERT OR IGNORE INTO users (id, name, email, created_at)
-		VALUES (?, ?, ?, datetime('now'))
+		INSERT INTO users (id, name, email, created_at)
+		VALUES (?, ?, ?, NOW())
+		ON CONFLICT (id) DO NOTHING
 	`), authResp.Data.User.ID, authResp.Data.User.Name, authResp.Data.User.Email)
 
 	if err != nil {
