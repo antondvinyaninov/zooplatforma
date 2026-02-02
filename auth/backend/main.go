@@ -117,7 +117,7 @@ func initDatabase() error {
 	}
 
 	// Таблица user_roles для ролей пользователей
-	_, err := db.Exec(`
+	_, err = db.Exec(`
 		CREATE TABLE IF NOT EXISTS user_roles (
 			id INTEGER PRIMARY KEY AUTOINCREMENT,
 			user_id INTEGER NOT NULL,
