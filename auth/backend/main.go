@@ -88,6 +88,34 @@ func main() {
 }
 
 func initDatabase() error {
+	// Создать таблицу users
+	_, err := db.Exec(`
+		CREATE TABLE IF NOT EXISTS users (
+			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			name TEXT NOT NULL,
+			last_name TEXT,
+			email TEXT UNIQUE NOT NULL,
+			password TEXT NOT NULL,
+			bio TEXT,
+			phone TEXT,
+			location TEXT,
+			avatar TEXT,
+			cover_photo TEXT,
+			profile_visibility TEXT DEFAULT 'public',
+			show_phone TEXT DEFAULT 'friends',
+			show_email TEXT DEFAULT 'friends',
+			allow_messages TEXT DEFAULT 'everyone',
+			show_online TEXT DEFAULT 'yes',
+			verified BOOLEAN DEFAULT 0,
+			verified_at DATETIME,
+			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			last_seen DATETIME
+		)
+	`)
+	if err != nil {
+		return err
+	}
+
 	// Таблица user_roles для ролей пользователей
 	_, err := db.Exec(`
 		CREATE TABLE IF NOT EXISTS user_roles (
@@ -177,7 +205,7 @@ func initDatabase() error {
 		)
 	`)
 
-	log.Println("✅ Database initialized (using shared database/data.db)")
+	log.Println("✅ Auth database initialized")
 	return err
 }
 
