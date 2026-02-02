@@ -265,8 +265,9 @@ export default function MessengerPage() {
             }
           }
         } else {
-          // Обычный чат - просто перезагружаем сообщения
+          // Обычный чат - перезагружаем сообщения и список чатов
           fetchMessages(selectedChatId);
+          fetchChats();
         }
       }
     } catch (error) {
