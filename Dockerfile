@@ -133,6 +133,7 @@ case $SERVICE in
     
     # Запускаем Main Backend (порт 8000)
     echo "🚀 Starting Main Backend..."
+    export AUTH_SERVICE_URL=http://localhost:7100
     /app/main-backend &
     BACKEND_PID=$!
     
