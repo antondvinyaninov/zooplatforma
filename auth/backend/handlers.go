@@ -20,6 +20,221 @@ var isPostgres bool
 
 // sqlPlaceholder возвращает правильный placeholder для SQL запроса
 func sqlPlaceholder(index int) string {
+	if isPostgres {
+		return fmt.Sprintf("$%d", index)
+	}
+	return "?"
+}
+
+// InitJWTSecret - инициализировать JWT secret (вызывается после загрузки .env)
+func InitJWTSecret() {
+	// Определяем тип БД
+	isPostgres = os.Getenv("ENVIRONMENT") == "production"
+	secret := os.Getenv("JWT_SECRET")
+	if secret == "" {
+		log.Fatal("❌ JWT_SECRET not set in environment")
+	}
+	jwtSecret = []byte(secret)
+	log.Printf("✅ JWT Secret initialized")
+}
+
+// Claims - JWT claims
+type Claims struct {
+	UserID int    `json:"user_id"`
+	Email  string `json:"email"`
+	Role   string `json:"role"`
+	jwt.RegisteredClaims
+}
+
+// User - структура пользователя
+type User struct {
+	ID            int     `json:"id"`
+	Email         string  `json:"email"`
+	Name          string  `json:"name"`
+	LastName      string  `json:"last_name"`
+	Avatar        string  `json:"avatar"`
+	Bio           string  `json:"bio"`
+	Phone         string  `json:"phone"`
+	DateOfBirth   *string `json:"date_of_birth,omitempty"`
+	Gender        string  `json:"gender"`
+	City          string  `json:"city"`
+	Country       string  `json:"country"`
+	Role          string  `json:"role"`
+	EmailVerified bool    `json:"email_verified"`
+	CreatedAt     string  `json:"created_at"`
+}
+
+// registerHandler - регистрация нового пользователя
+func registerHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+		Name     string `json:"name"`
+		LastName string `json:"last_name"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"success":false,"error":"Invalid JSON"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Валидация
+	if req.Email == "" || req.Password == "" || req.Name == "" {
+		http.Error(w, `{"success":false,"error":"Email, password and name are required"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Проверить существование email
+	var exists bool
+	var checkQuery string
+	if isPostgres {
+		checkQuery = "SELECT EXISTS(SELECT 1 FROM users WHERE email = $1)"
+	} else {
+		checkQuery = "SELECT EXISTS(SELECT 1 FROM users WHERE email = ?)"
+	}
+	err := db.QueryRow(checkQuery, req.Email).Scan(&exists)
+	if err != nil {
+		log.Printf("❌ Database error: %v", err)
+		http.Error(w, `{"success":false,"error":"Internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	if exists {
+		http.Error(w, `{"success":false,"error":"Email already exists"}`, http.StatusConflict)
+		return
+	}
+
+	// Хешировать пароль
+	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	if err != nil {
+		log.Printf("❌ Failed to hash password: %v", err)
+		http.Error(w, `{"success":false,"error":"Internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Создать пользователя
+	var insertQuery string
+	if isPostgres {
+		insertQuery = `
+			INSERT INTO users (email, password, name, last_name)
+			VALUES ($1, $2, $3, $4)
+		`
+	} else {
+		insertQuery = `
+			INSERT INTO users (email, password, name, last_name)
+			VALUES (?, ?, ?, ?)
+		`
+	}
+	result, err := db.Exec(insertQuery, req.Email, string(hashedPassword), req.Name, req.LastName)
+
+	if err != nil {
+		log.Printf("❌ Failed to create user: %v", err)
+		http.Error(w, `{"success":false,"error":"Failed to create user"}`, http.StatusInternalServerError)
+		return
+	}
+
+	userID, _ := result.LastInsertId()
+
+	// Создать JWT токен
+	token, err := createJWT(int(userID), req.Email, "user")
+	if err != nil {
+		log.Printf("❌ Failed to create token: %v", err)
+		http.Error(w, `{"success":false,"error":"Failed to create token"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Установить cookie с токеном (для работы между портами localhost)
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    token,
+		Path:     "/",
+		Domain:   "localhost",          // Явно указываем localhost
+		HttpOnly: false,                // false чтобы JS мог читать (для отладки)
+		Secure:   false,                // false для localhost
+		SameSite: http.SameSiteLaxMode, // Lax для localhost (None требует Secure=true)
+		MaxAge:   86400 * 7,            // 7 дней
+	})
+
+	// Ответ
+	user := User{
+		ID:       int(userID),
+		Email:    req.Email,
+		Name:     req.Name,
+		LastName: req.LastName,
+		Role:     "user",
+	}
+
+	response := map[string]interface{}{
+		"success": true,
+		"data": map[string]interface{}{
+			"token": token,
+			"user":  user,
+		},
+		"message": "User registered successfully",
+	}
+
+	w.Header().Set("Content-Type", "application/json")
+	json.NewEncoder(w).Encode(response)
+
+	log.Printf("✅ User registered: %s", req.Email)
+}
+
+// loginHandler - вход в систему
+func loginHandler(w http.ResponseWriter, r *http.Request) {
+	var req struct {
+		Email    string `json:"email"`
+		Password string `json:"password"`
+	}
+
+	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {
+		http.Error(w, `{"success":false,"error":"Invalid JSON"}`, http.StatusBadRequest)
+		return
+	}
+
+	// Найти пользователя
+	var user User
+	var passwordHash string
+	var avatar sql.NullString
+
+	var selectQuery string
+	if isPostgres {
+		selectQuery = `
+			SELECT id, email, password, name, last_name, avatar
+			FROM users WHERE email = $1
+		`
+	} else {
+		selectQuery = `
+			SELECT id, email, password, name, last_name, avatar
+			FROM users WHERE email = ?
+		`
+	}
+
+	err := db.QueryRow(selectQuery, req.Email).Scan(&user.ID, &user.Email, &passwordHash, &user.Name, &user.LastName, &avatar)
+
+	if avatar.Valid {
+		user.Avatar = avatar.String
+	}
+
+	if err == sql.ErrNoRows {
+		http.Error(w, `{"success":false,"error":"Invalid email or password"}`, http.StatusUnauthorized)
+		return
+	}
+
+	if err != nil {
+		log.Printf("❌ Database error: %v", err)
+		http.Error(w, `{"success":false,"error":"Internal server error"}`, http.StatusInternalServerError)
+		return
+	}
+
+	// Проверить пароль
+	if err := bcrypt.CompareHashAndPassword([]byte(passwordHash), []byte(req.Password)); err != nil {
+		http.Error(w, `{"success":false,"error":"Invalid email or password"}`, http.StatusUnauthorized)
+		return
+	}
+
+	// Загрузить роли из user_roles
+	roles := []string{}
+	rows, err := db.Query(sqlQuery("SELECT role FROM user_roles WHERE user_id = ?"), user.ID)
 	if err != nil {
 		log.Printf("❌ Failed to load roles: %v", err)
 	} else {
@@ -111,7 +326,10 @@ func getMeHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Получить пользователя из БД
 	var user User
-	err = db.QueryRow(sqlQuery(`SELECT id, email, name, last_name, avatar, email_verified, created_at FROM users WHERE id = ?`), claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &user.LastName, &user.Avatar, &user.EmailVerified, &user.CreatedAt)
+	err = db.QueryRow(`
+		SELECT id, email, name, last_name, avatar, email_verified, created_at
+		FROM users WHERE id = ?
+	`, claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &user.LastName, &user.Avatar, &user.EmailVerified, &user.CreatedAt)
 
 	if err != nil {
 		log.Printf("❌ Failed to get user: %v", err)
@@ -192,7 +410,10 @@ func verifyTokenHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Получить пользователя
 	var user User
-	err = db.QueryRow(sqlQuery(`SELECT id, email, name, last_name, avatar FROM users WHERE id = ?`), claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &user.LastName, &user.Avatar)
+	err = db.QueryRow(`
+		SELECT id, email, name, last_name, avatar
+		FROM users WHERE id = ?
+	`, claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &user.LastName, &user.Avatar)
 
 	if err != nil {
 		response := map[string]interface{}{
