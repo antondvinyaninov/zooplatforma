@@ -29,7 +29,11 @@ export function useUnreadMessages() {
 
         if (response.ok) {
           const data = await response.json();
-          setUnreadCount(data.count || 0);
+          if (data.success && data.data) {
+            setUnreadCount(data.data.count || 0);
+          } else {
+            setUnreadCount(0);
+          }
         } else if (response.status === 401) {
           // Пользователь не авторизован - это нормально
           setUnreadCount(0);

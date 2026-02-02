@@ -178,24 +178,24 @@ func GetChatMessagesHandler(db *sql.DB) http.HandlerFunc {
 			rowCount++
 			var msg models.Message
 			var readAtStr, createdAtStr sql.NullString
-			
+
 			err := rows.Scan(
-&msg.ID, &msg.ChatID, &msg.SenderID, &msg.ReceiverID,
+				&msg.ID, &msg.ChatID, &msg.SenderID, &msg.ReceiverID,
 				&msg.Content, &msg.IsRead, &readAtStr, &createdAtStr,
 			)
 			if err != nil {
 				log.Printf("❌ Error scanning message row %d: %v", rowCount, err)
 				continue
 			}
-			
+
 			// Парсим даты
 			if createdAtStr.Valid {
 				// Пробуем разные форматы
 				formats := []string{
-					time.RFC3339Nano,                      // 2006-01-02T15:04:05.999999999Z07:00
-					time.RFC3339,                          // 2006-01-02T15:04:05Z07:00
-					"2006-01-02 15:04:05.999999-07:00",   // SQLite с микросекундами
-					"2006-01-02 15:04:05",                 // SQLite без микросекунд
+					time.RFC3339Nano,                   // 2006-01-02T15:04:05.999999999Z07:00
+					time.RFC3339,                       // 2006-01-02T15:04:05Z07:00
+					"2006-01-02 15:04:05.999999-07:00", // SQLite с микросекундами
+					"2006-01-02 15:04:05",              // SQLite без микросекунд
 				}
 				var t time.Time
 				var err error
@@ -210,7 +210,7 @@ func GetChatMessagesHandler(db *sql.DB) http.HandlerFunc {
 					log.Printf("⚠️ Failed to parse created_at: %s, error: %v", createdAtStr.String, err)
 				}
 			}
-			
+
 			if readAtStr.Valid {
 				formats := []string{
 					time.RFC3339Nano,
@@ -230,23 +230,23 @@ func GetChatMessagesHandler(db *sql.DB) http.HandlerFunc {
 			}
 			log.Printf("✅ Scanned message %d: ID=%d, Content=%s", rowCount, msg.ID, msg.Content)
 
-		// FIXME: Moved sender/attachments loading outside loop to avoid SQLite deadlock
+			// FIXME: Moved sender/attachments loading outside loop to avoid SQLite deadlock
 			messages = append(messages, msg)
-log.Printf("✅ Message %d added to list", msg.ID)
+			log.Printf("✅ Message %d added to list", msg.ID)
 		}
 
-	log.Printf("✅ Scanned %d messages, now loading senders and attachments...", len(messages))
+		log.Printf("✅ Scanned %d messages, now loading senders and attachments...", len(messages))
 
-	// Загружаем отправителей и attachments после закрытия rows
-	for i := range messages {
-		log.Printf("🔍 Loading data for message %d", messages[i].ID)
-		sender, err := getUserByID(db, messages[i].SenderID)
-		if err == nil {
-			messages[i].Sender = sender
+		// Загружаем отправителей и attachments после закрытия rows
+		for i := range messages {
+			log.Printf("🔍 Loading data for message %d", messages[i].ID)
+			sender, err := getUserByID(db, messages[i].SenderID)
+			if err == nil {
+				messages[i].Sender = sender
+			}
+			attachments, _ := getMessageAttachments(db, messages[i].ID)
+			messages[i].Attachments = attachments
 		}
-		attachments, _ := getMessageAttachments(db, messages[i].ID)
-		messages[i].Attachments = attachments
-	}
 
 		// Отмечаем все сообщения как прочитанные
 		go markMessagesAsRead(db, chatID, userID)
@@ -363,12 +363,12 @@ func GetUnreadCountHandler(db *sql.DB) http.HandlerFunc {
 
 		if err != nil {
 			log.Printf("❌ Error counting unread messages: %v", err)
-			http.Error(w, "Failed to count unread messages", http.StatusInternalServerError)
+			sendErrorResponse(w, "Failed to count unread messages", http.StatusInternalServerError)
 			return
 		}
 
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]int{"count": count})
+		log.Printf("✅ Unread messages count: user_id=%d, count=%d", userID, count)
+		sendSuccessResponse(w, map[string]int{"count": count})
 	}
 }
 
@@ -582,19 +582,19 @@ func getMessageByID(db *sql.DB, messageID int) (*models.Message, error) {
 	sender, err := getUserByID(db, msg.SenderID)
 	if err == nil {
 		msg.Sender = sender
-log.Printf("✅ Sender loaded: %s", sender.Name)
-} else {
-log.Printf("⚠️ Failed to get sender for message %d: %v", msg.ID, err)
+		log.Printf("✅ Sender loaded: %s", sender.Name)
+	} else {
+		log.Printf("⚠️ Failed to get sender for message %d: %v", msg.ID, err)
 	}
 
-log.Printf("🔍 Getting attachments for message %d", msg.ID)
+	log.Printf("🔍 Getting attachments for message %d", msg.ID)
 	// Получаем attachments
 	attachments, err := getMessageAttachments(db, messageID)
 	if err == nil {
 		msg.Attachments = attachments
-log.Printf("✅ Attachments loaded: %d items", len(attachments))
-} else {
-log.Printf("⚠️ Failed to get attachments for message %d: %v", msg.ID, err)
+		log.Printf("✅ Attachments loaded: %d items", len(attachments))
+	} else {
+		log.Printf("⚠️ Failed to get attachments for message %d: %v", msg.ID, err)
 	}
 
 	return &msg, nil
