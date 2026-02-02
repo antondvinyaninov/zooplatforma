@@ -21,6 +21,7 @@ export default function MessengerPage() {
   const [sending, setSending] = useState(false);
   const [isFetchingChats, setIsFetchingChats] = useState(false);
   const chatsLoaded = useRef(false);
+  const queryParamProcessed = useRef(false);
 
   // Проверка авторизации
   useEffect(() => {
@@ -48,11 +49,15 @@ export default function MessengerPage() {
 
   // Обработка query параметра ?user=ID для открытия чата с конкретным пользователем
   useEffect(() => {
+    // Ждем пока чаты загрузятся и проверяем что еще не обработали
+    if (loading || !user || queryParamProcessed.current) return;
+    
     // Безопасное получение query параметра
     const urlParams = new URLSearchParams(window.location.search);
     const userIdParam = urlParams.get('user');
     
-    if (userIdParam && chats.length > 0 && !selectedChatId) {
+    if (userIdParam) {
+      queryParamProcessed.current = true; // Помечаем что обработали
       const targetUserId = parseInt(userIdParam);
       
       // Ищем существующий чат с этим пользователем
@@ -62,9 +67,11 @@ export default function MessengerPage() {
       
       if (existingChat) {
         // Открываем существующий чат
+        console.log('Opening existing chat:', existingChat.id);
         setSelectedChatId(existingChat.id);
       } else {
         // Создаем временный чат (с отрицательным ID)
+        console.log('Creating temporary chat for user:', targetUserId);
         const tempChat: Chat = {
           id: -targetUserId, // Временный ID
           other_user: {
@@ -83,9 +90,10 @@ export default function MessengerPage() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [chats, selectedChatId, user?.id]);
+  }, [loading, chats.length, user]);
 
   const fetchUserData = async (userId: number) => {
+    console.log('Fetching user data for:', userId);
     try {
       const token = localStorage.getItem('auth_token');
       const headers: HeadersInit = {
@@ -103,17 +111,22 @@ export default function MessengerPage() {
       
       if (response.ok) {
         const data = await response.json();
+        console.log('User data received:', data);
         
         // Обновляем временный чат с реальными данными пользователя
         setChats(prev => prev.map(chat => {
           if (chat.id === -userId) {
+            const userData = data.success ? data.data : null;
+            console.log('Updating temp chat with user data:', userData);
             return {
               ...chat,
-              other_user: data.success ? data.data : chat.other_user,
+              other_user: userData || chat.other_user,
             };
           }
           return chat;
         }));
+      } else {
+        console.error('Failed to fetch user data:', response.status);
       }
     } catch (error) {
       console.error('Failed to fetch user data:', error);
