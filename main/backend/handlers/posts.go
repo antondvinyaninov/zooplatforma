@@ -829,9 +829,10 @@ func updatePost(w http.ResponseWriter, r *http.Request, postID int) {
 	attachmentsJSON, _ := json.Marshal(req.Attachments)
 	tagsJSON, _ := json.Marshal(req.Tags)
 
-	query := `UPDATE posts SET content = ?, attached_pets = ?, attachments = ?, tags = ?, updated_at = ? WHERE id = ?`
+	query := ConvertPlaceholders(`UPDATE posts SET content = ?, attached_pets = ?, attachments = ?, tags = ?, updated_at = ? WHERE id = ?`)
 	_, err = database.DB.Exec(query, req.Content, string(attachedPetsJSON), string(attachmentsJSON), string(tagsJSON), time.Now().Format("2006-01-02 15:04:05"), postID)
 	if err != nil {
+		log.Printf("❌ updatePost: Error updating post: %v", err)
 		sendErrorResponse(w, "Ошибка обновления поста: "+err.Error(), http.StatusInternalServerError)
 		return
 	}
@@ -956,7 +957,7 @@ func scanPost(rows interface {
 
 // getPostByID получает пост по ID
 func getPostByID(postID int, userID int) (models.Post, error) {
-	query := `
+	query := ConvertPlaceholders(`
 		SELECT p.id, p.author_id, p.author_type, p.content, p.attached_pets, 
 		       p.attachments, p.tags, p.status, p.scheduled_at, p.created_at, p.updated_at,
 		       o.name as org_name, o.short_name as org_short_name, o.logo as org_logo,
@@ -964,12 +965,13 @@ func getPostByID(postID int, userID int) (models.Post, error) {
 		FROM posts p
 		LEFT JOIN organizations o ON p.author_id = o.id AND p.author_type = 'organization'
 		WHERE p.id = ? AND p.is_deleted = FALSE
-	`
+	`)
 
 	var post models.Post
 	var orgName, orgShortName, orgLogo sql.NullString
 	var attachedPetsJSON, attachmentsJSON, tagsJSON, scheduledAt sql.NullString
 
+	log.Printf("🔍 getPostByID: postID=%d, userID=%d", postID, userID)
 	err := database.DB.QueryRow(query, postID).Scan(
 		&post.ID, &post.AuthorID, &post.AuthorType, &post.Content,
 		&attachedPetsJSON, &attachmentsJSON, &tagsJSON,
@@ -979,8 +981,11 @@ func getPostByID(postID int, userID int) (models.Post, error) {
 	)
 
 	if err != nil {
+		log.Printf("❌ getPostByID: Error scanning post: %v", err)
 		return post, err
 	}
+
+	log.Printf("✅ getPostByID: Found post id=%d, author_type=%s, author_id=%d", post.ID, post.AuthorType, post.AuthorID)
 
 	// Парсим JSON поля
 	if attachedPetsJSON.Valid && attachedPetsJSON.String != "" {
