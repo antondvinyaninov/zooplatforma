@@ -198,7 +198,7 @@ export const usersApi = {
       formData.append('avatar', compressedFile);
       
       // Получаем токен из localStorage
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const headers: HeadersInit = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -245,7 +245,7 @@ export const usersApi = {
       formData.append('cover', compressedFile);
       
       // Получаем токен из localStorage
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const headers: HeadersInit = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -283,7 +283,7 @@ export const usersApi = {
   deleteAvatar: async (): Promise<ApiResponse<{ message: string }>> => {
     try {
       // Получаем токен из localStorage
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const headers: HeadersInit = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
@@ -320,7 +320,7 @@ export const usersApi = {
   deleteCover: async (): Promise<ApiResponse<{ message: string }>> => {
     try {
       // Получаем токен из localStorage
-      const token = localStorage.getItem('token');
+      const token = localStorage.getItem('auth_token');
       const headers: HeadersInit = {};
       if (token) {
         headers['Authorization'] = `Bearer ${token}`;
