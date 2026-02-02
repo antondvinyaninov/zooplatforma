@@ -99,7 +99,7 @@ export default function UserProfilePage() {
       const postsResponse = await postsApi.getUserPosts(userId, { limit: 20, offset });
       
       if (postsResponse.success && postsResponse.data) {
-        setPosts(prev => [...prev, ...postsResponse.data]);
+        setPosts(prev => [...prev, ...(postsResponse.data || [])]);
         setHasMore(postsResponse.data.length === 20);
         setOffset(prev => prev + postsResponse.data.length);
       }
