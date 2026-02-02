@@ -68,8 +68,11 @@ export default function PostsFeed({ activeFilter = 'for-you' }: PostsFeedProps) 
   };
 
   useEffect(() => {
-    loadPosts();
-  }, [activeFilter]);
+    // Ждем пока AuthContext загрузится перед загрузкой постов
+    if (!isLoading) {
+      loadPosts();
+    }
+  }, [activeFilter, isLoading]);
 
   return (
     <div className="space-y-2.5">
