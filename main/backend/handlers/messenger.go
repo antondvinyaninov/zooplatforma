@@ -28,12 +28,12 @@ func GetChatsHandler(db *sql.DB) http.HandlerFunc {
 		}
 
 		// Оптимизированный запрос с JOIN вместо N+1 запросов
-		query := `
+		query := ConvertPlaceholders(`
 			SELECT 
 				c.id, c.user1_id, c.user2_id, c.last_message_id, c.last_message_at, c.created_at,
 				u.id as other_user_id, u.name, u.last_name, u.avatar, 
-CASE WHEN ua.last_seen IS NOT NULL AND (julianday('now') - julianday(ua.last_seen)) * 24 * 60 < 5 THEN 1 ELSE 0 END as is_online,
-ua.last_seen,
+				CASE WHEN ua.last_seen IS NOT NULL AND ua.last_seen > NOW() - INTERVAL '5 minutes' THEN 1 ELSE 0 END as is_online,
+				ua.last_seen,
 				m.id as msg_id, m.sender_id, m.content, m.is_read, m.created_at as msg_created_at,
 				COALESCE((
 					SELECT COUNT(*) 
@@ -48,14 +48,15 @@ ua.last_seen,
 				END = u.id
 			)
 			LEFT JOIN user_activity ua ON u.id = ua.user_id
-LEFT JOIN messages m ON c.last_message_id = m.id
+			LEFT JOIN messages m ON c.last_message_id = m.id
 			WHERE c.user1_id = ? OR c.user2_id = ?
 			ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
-		`
+		`)
 
+		log.Printf("🔍 GetChatsHandler: userID=%d", userID)
 		rows, err := db.Query(query, userID, userID, userID, userID)
 		if err != nil {
-			log.Printf("Error fetching chats: %v", err)
+			log.Printf("❌ Error fetching chats: %v", err)
 			http.Error(w, "Failed to fetch chats", http.StatusInternalServerError)
 			return
 		}
