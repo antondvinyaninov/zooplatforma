@@ -1,7 +1,7 @@
 'use client';
 
 import { useEffect, useState, useRef } from 'react';
-import { useRouter, useSearchParams } from 'next/navigation';
+import { useRouter } from 'next/navigation';
 import { useAuth } from '@/contexts/AuthContext';
 import ChatList from './components/ChatList';
 import ChatHeader from './components/ChatHeader';
@@ -11,7 +11,6 @@ import { Chat, Message } from './types';
 
 export default function MessengerPage() {
   const router = useRouter();
-  const searchParams = useSearchParams();
   const { user, isLoading: authLoading } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
   const [loading, setLoading] = useState(true);
@@ -49,7 +48,9 @@ export default function MessengerPage() {
 
   // Обработка query параметра ?user=ID для открытия чата с конкретным пользователем
   useEffect(() => {
-    const userIdParam = searchParams.get('user');
+    // Безопасное получение query параметра
+    const urlParams = new URLSearchParams(window.location.search);
+    const userIdParam = urlParams.get('user');
     
     if (userIdParam && chats.length > 0 && !selectedChatId) {
       const targetUserId = parseInt(userIdParam);
@@ -66,22 +67,12 @@ export default function MessengerPage() {
         // Создаем временный чат (с отрицательным ID)
         const tempChat: Chat = {
           id: -targetUserId, // Временный ID
-          user1_id: user?.id || 0,
-          user2_id: targetUserId,
           other_user: {
             id: targetUserId,
             name: 'Загрузка...',
-            email: '',
-            avatar: null,
-            last_name: null,
-            location: null,
-            is_online: 0,
-            last_seen: null,
+            last_name: '',
           },
-          last_message: null,
-          last_message_at: null,
           unread_count: 0,
-          created_at: new Date().toISOString(),
         };
         
         setChats(prev => [tempChat, ...prev]);
@@ -92,7 +83,7 @@ export default function MessengerPage() {
       }
     }
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [searchParams, chats, selectedChatId, user?.id]);
+  }, [chats, selectedChatId, user?.id]);
 
   const fetchUserData = async (userId: number) => {
     try {
