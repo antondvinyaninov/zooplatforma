@@ -100,8 +100,8 @@ export default function UserProfilePage() {
       
       if (postsResponse.success && postsResponse.data) {
         setPosts(prev => [...prev, ...(postsResponse.data || [])]);
-        setHasMore(postsResponse.data.length === 20);
-        setOffset(prev => prev + postsResponse.data.length);
+        setHasMore((postsResponse.data?.length || 0) === 20);
+        setOffset(prev => prev + (postsResponse.data?.length || 0));
       }
     } catch (error) {
       console.error('Ошибка загрузки постов:', error);
