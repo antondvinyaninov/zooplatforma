@@ -91,7 +91,7 @@ func UploadAvatarHandler(w http.ResponseWriter, r *http.Request) {
 	avatarURL := fmt.Sprintf("/uploads/users/%d/avatars/%s", userID, fileName)
 
 	// Обновляем аватар в базе данных
-	query := `UPDATE users SET avatar = ? WHERE id = ?`
+	query := ConvertPlaceholders(`UPDATE users SET avatar = ? WHERE id = ?`)
 	_, err = database.DB.Exec(query, avatarURL, userID)
 	if err != nil {
 		logSystemEvent("error", "profile", "upload_avatar", fmt.Sprintf("Ошибка обновления БД: %v", err), &userID, ipAddress)
@@ -186,7 +186,7 @@ func UploadCoverPhotoHandler(w http.ResponseWriter, r *http.Request) {
 	coverURL := fmt.Sprintf("/uploads/users/%d/covers/%s", userID, fileName)
 
 	// Обновляем обложку в базе данных
-	query := `UPDATE users SET cover_photo = ? WHERE id = ?`
+	query := ConvertPlaceholders(`UPDATE users SET cover_photo = ? WHERE id = ?`)
 	_, err = database.DB.Exec(query, coverURL, userID)
 	if err != nil {
 		logSystemEvent("error", "profile", "upload_cover", fmt.Sprintf("Ошибка обновления БД: %v", err), &userID, ipAddress)
@@ -219,7 +219,7 @@ func DeleteAvatarHandler(w http.ResponseWriter, r *http.Request) {
 	ipAddress := r.RemoteAddr
 
 	// Обновляем аватар в базе данных (устанавливаем NULL)
-	query := `UPDATE users SET avatar = NULL WHERE id = ?`
+	query := ConvertPlaceholders(`UPDATE users SET avatar = NULL WHERE id = ?`)
 	_, err := database.DB.Exec(query, userID)
 	if err != nil {
 		logSystemEvent("error", "profile", "delete_avatar", fmt.Sprintf("Ошибка обновления БД: %v", err), &userID, ipAddress)
@@ -251,7 +251,7 @@ func DeleteCoverPhotoHandler(w http.ResponseWriter, r *http.Request) {
 	ipAddress := r.RemoteAddr
 
 	// Обновляем обложку в базе данных (устанавливаем NULL)
-	query := `UPDATE users SET cover_photo = NULL WHERE id = ?`
+	query := ConvertPlaceholders(`UPDATE users SET cover_photo = NULL WHERE id = ?`)
 	_, err := database.DB.Exec(query, userID)
 	if err != nil {
 		logSystemEvent("error", "profile", "delete_cover", fmt.Sprintf("Ошибка обновления БД: %v", err), &userID, ipAddress)
