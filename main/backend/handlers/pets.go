@@ -218,7 +218,7 @@ func deletePet(w http.ResponseWriter, r *http.Request, petID int) {
 
 	// Проверяем, что питомец принадлежит пользователю
 	var ownerID int
-	err := database.DB.QueryRow("SELECT user_id FROM pets WHERE id = ?", petID).Scan(&ownerID)
+	err := database.DB.QueryRow(ConvertPlaceholders("SELECT user_id FROM pets WHERE id = ?"), petID).Scan(&ownerID)
 	if err != nil {
 		sendErrorResponse(w, "Питомец не найден", http.StatusNotFound)
 		return
@@ -229,7 +229,7 @@ func deletePet(w http.ResponseWriter, r *http.Request, petID int) {
 		return
 	}
 
-	_, err = database.DB.Exec("DELETE FROM pets WHERE id = ?", petID)
+	_, err = database.DB.Exec(ConvertPlaceholders("DELETE FROM pets WHERE id = ?"), petID)
 	if err != nil {
 		sendErrorResponse(w, "Ошибка удаления питомца: "+err.Error(), http.StatusInternalServerError)
 		return

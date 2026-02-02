@@ -303,7 +303,7 @@ func DeleteOrganizationHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Проверяем, что пользователь - владелец
 	var ownerID int
-	err := database.DB.QueryRow("SELECT owner_user_id FROM organizations WHERE id = ?", orgID).Scan(&ownerID)
+	err := database.DB.QueryRow(ConvertPlaceholders("SELECT owner_user_id FROM organizations WHERE id = ?"), orgID).Scan(&ownerID)
 	if err == sql.ErrNoRows {
 		sendJSONError(w, http.StatusNotFound, "Organization not found")
 		return
@@ -313,7 +313,7 @@ func DeleteOrganizationHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = database.DB.Exec("DELETE FROM organizations WHERE id = ?", orgID)
+	_, err = database.DB.Exec(ConvertPlaceholders("DELETE FROM organizations WHERE id = ?"), orgID)
 	if err != nil {
 		sendJSONError(w, http.StatusInternalServerError, "Failed to delete organization: "+err.Error())
 		return
@@ -574,7 +574,7 @@ func UpdateMemberHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Получаем organization_id участника
 	var orgID int
-	err := database.DB.QueryRow("SELECT organization_id FROM organization_members WHERE id = ?", req.MemberID).Scan(&orgID)
+	err := database.DB.QueryRow(ConvertPlaceholders("SELECT organization_id FROM organization_members WHERE id = ?"), req.MemberID).Scan(&orgID)
 	if err == sql.ErrNoRows {
 		sendJSONError(w, http.StatusNotFound, "Member not found")
 		return
@@ -665,7 +665,7 @@ func RemoveMemberHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Удаляем участника
-	_, err = database.DB.Exec("DELETE FROM organization_members WHERE id = ?", req.MemberID)
+	_, err = database.DB.Exec(ConvertPlaceholders("DELETE FROM organization_members WHERE id = ?"), req.MemberID)
 	if err != nil {
 		sendJSONError(w, http.StatusInternalServerError, "Failed to remove member: "+err.Error())
 		return

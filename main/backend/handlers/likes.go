@@ -43,7 +43,7 @@ func LikesHandler(w http.ResponseWriter, r *http.Request) {
 func toggleLike(w http.ResponseWriter, r *http.Request, postID int, userID int) {
 	// Проверяем, есть ли уже лайк
 	var exists bool
-	err := database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = ?)", userID, postID).Scan(&exists)
+	err := database.DB.QueryRow(ConvertPlaceholders("SELECT EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = ?)"), userID, postID).Scan(&exists)
 	if err != nil {
 		sendErrorResponse(w, "Ошибка проверки лайка: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -54,7 +54,7 @@ func toggleLike(w http.ResponseWriter, r *http.Request, postID int, userID int) 
 
 	if exists {
 		// Удаляем лайк
-		_, err = database.DB.Exec("DELETE FROM likes WHERE user_id = ? AND post_id = ?", userID, postID)
+		_, err = database.DB.Exec(ConvertPlaceholders("DELETE FROM likes WHERE user_id = ? AND post_id = ?"), userID, postID)
 		if err != nil {
 			sendErrorResponse(w, "Ошибка удаления лайка: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -63,7 +63,7 @@ func toggleLike(w http.ResponseWriter, r *http.Request, postID int, userID int) 
 		CreateUserLog(database.DB, userID, "like_remove", "Удалён лайк с поста", ipAddress, userAgent)
 	} else {
 		// Добавляем лайк
-		_, err = database.DB.Exec("INSERT INTO likes (user_id, post_id) VALUES (?, ?)", userID, postID)
+		_, err = database.DB.Exec(ConvertPlaceholders("INSERT INTO likes (user_id, post_id) VALUES (?, ?)"), userID, postID)
 		if err != nil {
 			sendErrorResponse(w, "Ошибка добавления лайка: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -97,7 +97,7 @@ func toggleLike(w http.ResponseWriter, r *http.Request, postID int, userID int) 
 
 	// Получаем обновленное количество лайков
 	var likesCount int
-	err = database.DB.QueryRow("SELECT COUNT(*) FROM likes WHERE post_id = ?", postID).Scan(&likesCount)
+	err = database.DB.QueryRow(ConvertPlaceholders("SELECT COUNT(*) FROM likes WHERE post_id = ?"), postID).Scan(&likesCount)
 	if err != nil {
 		sendErrorResponse(w, "Ошибка подсчета лайков: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -115,7 +115,7 @@ func getLikeStatus(w http.ResponseWriter, _ *http.Request, postID int, userID in
 
 	// Если пользователь авторизован - проверяем его лайк
 	if userID > 0 {
-		err := database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = ?)", userID, postID).Scan(&liked)
+		err := database.DB.QueryRow(ConvertPlaceholders("SELECT EXISTS(SELECT 1 FROM likes WHERE user_id = ? AND post_id = ?)"), userID, postID).Scan(&liked)
 		if err != nil {
 			sendErrorResponse(w, "Ошибка проверки лайка: "+err.Error(), http.StatusInternalServerError)
 			return
@@ -124,7 +124,7 @@ func getLikeStatus(w http.ResponseWriter, _ *http.Request, postID int, userID in
 	// Если не авторизован - liked = false
 
 	var likesCount int
-	err := database.DB.QueryRow("SELECT COUNT(*) FROM likes WHERE post_id = ?", postID).Scan(&likesCount)
+	err := database.DB.QueryRow(ConvertPlaceholders("SELECT COUNT(*) FROM likes WHERE post_id = ?"), postID).Scan(&likesCount)
 	if err != nil {
 		sendErrorResponse(w, "Ошибка подсчета лайков: "+err.Error(), http.StatusInternalServerError)
 		return

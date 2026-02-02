@@ -117,7 +117,7 @@ func addFavorite(w http.ResponseWriter, r *http.Request, userID int) {
 
 	// Проверяем, что питомец существует
 	var petExists bool
-	err := database.DB.QueryRow("SELECT EXISTS(SELECT 1 FROM pets WHERE id = ?)", req.PetID).Scan(&petExists)
+	err := database.DB.QueryRow(ConvertPlaceholders("SELECT EXISTS(SELECT 1 FROM pets WHERE id = ?)"), req.PetID).Scan(&petExists)
 	if err != nil || !petExists {
 		http.Error(w, "Pet not found", http.StatusNotFound)
 		return

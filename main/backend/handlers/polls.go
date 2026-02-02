@@ -97,13 +97,13 @@ func loadPollForPost(postID int, userID int) (*models.Poll, error) {
 
 	// Подсчитываем общее количество проголосовавших
 	var totalVoters int
-	database.DB.QueryRow("SELECT COUNT(DISTINCT user_id) FROM poll_votes WHERE poll_id = ?", poll.ID).Scan(&totalVoters)
+	database.DB.QueryRow(ConvertPlaceholders("SELECT COUNT(DISTINCT user_id) FROM poll_votes WHERE poll_id = ?"), poll.ID).Scan(&totalVoters)
 	poll.TotalVoters = totalVoters
 
 	// Проверяем, голосовал ли пользователь
 	if userID > 0 {
 		var voted int
-		database.DB.QueryRow("SELECT COUNT(*) FROM poll_votes WHERE poll_id = ? AND user_id = ?", poll.ID, userID).Scan(&voted)
+		database.DB.QueryRow(ConvertPlaceholders("SELECT COUNT(*) FROM poll_votes WHERE poll_id = ? AND user_id = ?"), poll.ID, userID).Scan(&voted)
 		poll.UserVoted = voted > 0
 
 		// Если пользователь голосовал, загружаем его голоса
@@ -259,7 +259,7 @@ func VoteHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Проверяем, голосовал ли пользователь ранее
 	var previousVotes int
-	database.DB.QueryRow("SELECT COUNT(*) FROM poll_votes WHERE poll_id = ? AND user_id = ?", pollID, userID).Scan(&previousVotes)
+	database.DB.QueryRow(ConvertPlaceholders("SELECT COUNT(*) FROM poll_votes WHERE poll_id = ? AND user_id = ?"), pollID, userID).Scan(&previousVotes)
 
 	if previousVotes > 0 && !poll.AllowVoteChanges {
 		sendErrorResponse(w, "Вы уже проголосовали", http.StatusBadRequest)
@@ -281,27 +281,27 @@ func VoteHandler(w http.ResponseWriter, r *http.Request) {
 			pollID, userID)
 
 		// Удаляем старые голоса
-		database.DB.Exec("DELETE FROM poll_votes WHERE poll_id = ? AND user_id = ?", pollID, userID)
+		database.DB.Exec(ConvertPlaceholders("DELETE FROM poll_votes WHERE poll_id = ? AND user_id = ?"), pollID, userID)
 	}
 
 	// Добавляем новые голоса
 	for _, optionID := range req.OptionIDs {
 		// Проверяем, что вариант существует
 		var exists int
-		database.DB.QueryRow("SELECT COUNT(*) FROM poll_options WHERE id = ? AND poll_id = ?", optionID, pollID).Scan(&exists)
+		database.DB.QueryRow(ConvertPlaceholders("SELECT COUNT(*) FROM poll_options WHERE id = ? AND poll_id = ?"), optionID, pollID).Scan(&exists)
 		if exists == 0 {
 			continue
 		}
 
 		// Добавляем голос
-		_, err := database.DB.Exec("INSERT INTO poll_votes (poll_id, option_id, user_id) VALUES (?, ?, ?)",
+		_, err := database.DB.Exec(ConvertPlaceholders("INSERT INTO poll_votes (poll_id, option_id, user_id) VALUES (?, ?, ?)"),
 			pollID, optionID, userID)
 		if err != nil {
 			continue
 		}
 
 		// Увеличиваем счетчик голосов
-		database.DB.Exec("UPDATE poll_options SET votes_count = votes_count + 1 WHERE id = ?", optionID)
+		database.DB.Exec(ConvertPlaceholders("UPDATE poll_options SET votes_count = votes_count + 1 WHERE id = ?"), optionID)
 	}
 
 	// Загружаем обновленный опрос
@@ -337,7 +337,7 @@ func handleUnvote(w http.ResponseWriter, pollID int, userID int) {
 
 	// Проверяем, голосовал ли пользователь
 	var previousVotes int
-	database.DB.QueryRow("SELECT COUNT(*) FROM poll_votes WHERE poll_id = ? AND user_id = ?", pollID, userID).Scan(&previousVotes)
+	database.DB.QueryRow(ConvertPlaceholders("SELECT COUNT(*) FROM poll_votes WHERE poll_id = ? AND user_id = ?"), pollID, userID).Scan(&previousVotes)
 
 	if previousVotes == 0 {
 		sendErrorResponse(w, "Вы не голосовали в этом опросе", http.StatusBadRequest)
@@ -351,7 +351,7 @@ func handleUnvote(w http.ResponseWriter, pollID int, userID int) {
 		pollID, userID)
 
 	// Удаляем голоса
-	database.DB.Exec("DELETE FROM poll_votes WHERE poll_id = ? AND user_id = ?", pollID, userID)
+	database.DB.Exec(ConvertPlaceholders("DELETE FROM poll_votes WHERE poll_id = ? AND user_id = ?"), pollID, userID)
 
 	// Загружаем обновленный опрос
 	updatedPoll, err := loadPollForPost(poll.PostID, userID)

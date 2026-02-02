@@ -27,7 +27,7 @@ func getUserRoles(userID int) []string {
 
 	// Проверяем, есть ли у пользователя роль админа
 	var adminRole string
-	err := database.DB.QueryRow("SELECT role FROM admins WHERE user_id = ?", userID).Scan(&adminRole)
+	err := database.DB.QueryRow(ConvertPlaceholders("SELECT role FROM admins WHERE user_id = ?"), userID).Scan(&adminRole)
 	if err == nil {
 		roles = append(roles, adminRole)
 	}

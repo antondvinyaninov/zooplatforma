@@ -250,7 +250,7 @@ func DeleteCommentHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Проверяем, что комментарий принадлежит пользователю
 	var ownerID int
-	err = database.DB.QueryRow("SELECT user_id FROM comments WHERE id = ?", commentID).Scan(&ownerID)
+	err = database.DB.QueryRow(ConvertPlaceholders("SELECT user_id FROM comments WHERE id = ?"), commentID).Scan(&ownerID)
 	if err != nil {
 		sendErrorResponse(w, "Комментарий не найден", http.StatusNotFound)
 		return
@@ -261,7 +261,7 @@ func DeleteCommentHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	_, err = database.DB.Exec("DELETE FROM comments WHERE id = ?", commentID)
+	_, err = database.DB.Exec(ConvertPlaceholders("DELETE FROM comments WHERE id = ?"), commentID)
 	if err != nil {
 		sendErrorResponse(w, "Ошибка удаления комментария: "+err.Error(), http.StatusInternalServerError)
 		return

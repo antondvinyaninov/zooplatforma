@@ -38,7 +38,7 @@ ua.last_seen,
 				COALESCE((
 					SELECT COUNT(*) 
 					FROM messages 
-					WHERE chat_id = c.id AND receiver_id = ? AND is_read = 0
+					WHERE chat_id = c.id AND receiver_id = ? AND is_read = FALSE
 				), 0) as unread_count
 			FROM chats c
 			LEFT JOIN users u ON (
@@ -358,7 +358,7 @@ func GetUnreadCountHandler(db *sql.DB) http.HandlerFunc {
 		err := db.QueryRow(`
 			SELECT COUNT(*) 
 			FROM messages 
-			WHERE receiver_id = ? AND is_read = 0
+			WHERE receiver_id = ? AND is_read = FALSE
 		`, userID).Scan(&count)
 
 		if err != nil {
@@ -661,7 +661,7 @@ func getUnreadCount(db *sql.DB, chatID, userID int) (int, error) {
 	var count int
 	err := db.QueryRow(`
 		SELECT COUNT(*) FROM messages 
-		WHERE chat_id = ? AND receiver_id = ? AND is_read = 0
+		WHERE chat_id = ? AND receiver_id = ? AND is_read = FALSE
 	`, chatID, userID).Scan(&count)
 
 	return count, err
@@ -670,8 +670,8 @@ func getUnreadCount(db *sql.DB, chatID, userID int) (int, error) {
 func markMessagesAsRead(db *sql.DB, chatID, userID int) {
 	_, err := db.Exec(`
 		UPDATE messages 
-		SET is_read = 1, read_at = ?
-		WHERE chat_id = ? AND receiver_id = ? AND is_read = 0
+		SET is_read = TRUE, read_at = ?
+		WHERE chat_id = ? AND receiver_id = ? AND is_read = FALSE
 	`, time.Now(), chatID, userID)
 
 	if err != nil {

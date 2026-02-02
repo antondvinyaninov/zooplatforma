@@ -209,7 +209,7 @@ func getAllPosts(w http.ResponseWriter, r *http.Request) {
 	// Получаем город пользователя для фильтра "city"
 	var userCity string
 	if filter == "city" && userID > 0 {
-		database.DB.QueryRow("SELECT location FROM users WHERE id = ?", userID).Scan(&userCity)
+		database.DB.QueryRow(ConvertPlaceholders("SELECT location FROM users WHERE id = ?"), userID).Scan(&userCity)
 		log.Printf("🏙️ User city: %s", userCity)
 	}
 
@@ -232,7 +232,7 @@ func getAllPosts(w http.ResponseWriter, r *http.Request) {
 		FROM posts p
 		LEFT JOIN organizations o ON p.author_id = o.id AND p.author_type = 'organization'
 		LEFT JOIN users u ON p.author_id = u.id AND p.author_type = 'user'
-		WHERE p.is_deleted = 0 AND p.status = 'published'
+		WHERE p.is_deleted = FALSE AND p.status = 'published'
 	`
 
 	// Добавляем фильтры в зависимости от типа
@@ -379,7 +379,7 @@ func getDrafts(w http.ResponseWriter, r *http.Request) {
 		FROM posts p
 		LEFT JOIN users u ON p.author_id = u.id AND p.author_type = 'user'
 		LEFT JOIN organizations o ON p.author_id = o.id AND p.author_type = 'organization'
-		WHERE p.author_id = ? AND p.author_type = 'user' AND p.status = 'draft' AND p.is_deleted = 0
+		WHERE p.author_id = ? AND p.author_type = 'user' AND p.status = 'draft' AND p.is_deleted = FALSE
 		ORDER BY p.created_at DESC
 	`
 
@@ -455,7 +455,7 @@ func getUserPosts(w http.ResponseWriter, r *http.Request, userID int) {
 
 	log.Printf("🔍 getUserPosts: Pagination - limit=%d, offset=%d", limit, offset)
 
-	simpleQuery := `SELECT id FROM posts WHERE author_id = ? AND author_type = 'user' AND is_deleted = 0 ORDER BY created_at DESC LIMIT ? OFFSET ?`
+	simpleQuery := `SELECT id FROM posts WHERE author_id = ? AND author_type = 'user' AND is_deleted = FALSE ORDER BY created_at DESC LIMIT ? OFFSET ?`
 	rows, err := database.DB.Query(simpleQuery, userID, limit, offset)
 	if err != nil {
 		log.Printf("❌ getUserPosts: Query error: %v", err)
@@ -572,7 +572,7 @@ func getPetPosts(w http.ResponseWriter, r *http.Request, petID int) {
 		LEFT JOIN users u ON p.author_id = u.id AND p.author_type = 'user'
 		LEFT JOIN organizations o ON p.author_id = o.id AND p.author_type = 'organization'
 		INNER JOIN post_pets pp ON p.id = pp.post_id
-		WHERE pp.pet_id = ? AND p.is_deleted = 0 AND p.status = 'published'
+		WHERE pp.pet_id = ? AND p.is_deleted = FALSE AND p.status = 'published'
 		ORDER BY p.created_at DESC
 	`
 
@@ -622,7 +622,7 @@ func getOrganizationPosts(w http.ResponseWriter, r *http.Request, orgID int) {
 		FROM posts p
 		LEFT JOIN users u ON p.author_id = u.id AND p.author_type = 'user'
 		LEFT JOIN organizations o ON p.author_id = o.id AND p.author_type = 'organization'
-		WHERE p.author_id = ? AND p.author_type = 'organization' AND p.is_deleted = 0 AND p.status = 'published'
+		WHERE p.author_id = ? AND p.author_type = 'organization' AND p.is_deleted = FALSE AND p.status = 'published'
 		ORDER BY p.created_at DESC
 	`
 
@@ -726,7 +726,7 @@ func createPost(w http.ResponseWriter, r *http.Request) {
 
 	// Добавляем связи в post_pets для быстрых запросов
 	for _, petID := range req.AttachedPets {
-		_, err := database.DB.Exec("INSERT INTO post_pets (post_id, pet_id) VALUES (?, ?)", postID, petID)
+		_, err := database.DB.Exec(ConvertPlaceholders("INSERT INTO post_pets (post_id, pet_id) VALUES (?, ?)"), postID, petID)
 		if err != nil {
 			// Логируем ошибку, но не прерываем создание поста
 			continue
@@ -817,9 +817,9 @@ func updatePost(w http.ResponseWriter, r *http.Request, postID int) {
 	}
 
 	// Обновляем связи в post_pets
-	database.DB.Exec("DELETE FROM post_pets WHERE post_id = ?", postID)
+	database.DB.Exec(ConvertPlaceholders("DELETE FROM post_pets WHERE post_id = ?"), postID)
 	for _, petID := range req.AttachedPets {
-		database.DB.Exec("INSERT INTO post_pets (post_id, pet_id) VALUES (?, ?)", postID, petID)
+		database.DB.Exec(ConvertPlaceholders("INSERT INTO post_pets (post_id, pet_id) VALUES (?, ?)"), postID, petID)
 	}
 
 	// Получаем обновлённый пост
@@ -854,7 +854,7 @@ func deletePost(w http.ResponseWriter, r *http.Request, postID int) {
 	}
 
 	// Мягкое удаление
-	_, err = database.DB.Exec("UPDATE posts SET is_deleted = 1 WHERE id = ?", postID)
+	_, err = database.DB.Exec(ConvertPlaceholders("UPDATE posts SET is_deleted = TRUE WHERE id = ?"), postID)
 	if err != nil {
 		sendErrorResponse(w, "Ошибка удаления поста: "+err.Error(), http.StatusInternalServerError)
 		return
@@ -943,7 +943,7 @@ func getPostByID(postID int, userID int) (models.Post, error) {
 		       (SELECT COUNT(*) FROM comments WHERE post_id = p.id) as comments_count
 		FROM posts p
 		LEFT JOIN organizations o ON p.author_id = o.id AND p.author_type = 'organization'
-		WHERE p.id = ? AND p.is_deleted = 0
+		WHERE p.id = ? AND p.is_deleted = FALSE
 	`
 
 	var post models.Post

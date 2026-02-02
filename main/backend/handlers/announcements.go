@@ -161,7 +161,7 @@ func handleGetAnnouncement(w http.ResponseWriter, _ *http.Request, id int) {
 	}
 
 	// Увеличиваем счетчик просмотров
-	database.DB.Exec("UPDATE pet_announcements SET views_count = views_count + 1 WHERE id = ?", id)
+	database.DB.Exec(ConvertPlaceholders("UPDATE pet_announcements SET views_count = views_count + 1 WHERE id = ?"), id)
 
 	// Загружаем связанные данные
 	loadAnnouncementRelations(&a)
@@ -252,7 +252,7 @@ func handleUpdateAnnouncement(w http.ResponseWriter, r *http.Request, id int) {
 
 	// Проверяем права доступа
 	var authorID int
-	err := database.DB.QueryRow("SELECT author_id FROM pet_announcements WHERE id = ?", id).Scan(&authorID)
+	err := database.DB.QueryRow(ConvertPlaceholders("SELECT author_id FROM pet_announcements WHERE id = ?"), id).Scan(&authorID)
 	if err != nil {
 		sendError(w, "Announcement not found", http.StatusNotFound)
 		return
@@ -299,7 +299,7 @@ func handleDeleteAnnouncement(w http.ResponseWriter, r *http.Request, id int) {
 
 	// Проверяем права доступа
 	var authorID int
-	err := database.DB.QueryRow("SELECT author_id FROM pet_announcements WHERE id = ?", id).Scan(&authorID)
+	err := database.DB.QueryRow(ConvertPlaceholders("SELECT author_id FROM pet_announcements WHERE id = ?"), id).Scan(&authorID)
 	if err != nil {
 		sendError(w, "Announcement not found", http.StatusNotFound)
 		return
@@ -310,7 +310,7 @@ func handleDeleteAnnouncement(w http.ResponseWriter, r *http.Request, id int) {
 		return
 	}
 
-	_, err = database.DB.Exec("DELETE FROM pet_announcements WHERE id = ?", id)
+	_, err = database.DB.Exec(ConvertPlaceholders("DELETE FROM pet_announcements WHERE id = ?"), id)
 	if err != nil {
 		sendError(w, err.Error(), http.StatusInternalServerError)
 		return
@@ -323,7 +323,7 @@ func handleDeleteAnnouncement(w http.ResponseWriter, r *http.Request, id int) {
 func loadAnnouncementRelations(a *models.PetAnnouncement) {
 	// Загружаем автора
 	var author models.User
-	err := database.DB.QueryRow("SELECT id, name, last_name, email, avatar FROM users WHERE id = ?", a.AuthorID).
+	err := database.DB.QueryRow(ConvertPlaceholders("SELECT id, name, last_name, email, avatar FROM users WHERE id = ?"), a.AuthorID).
 		Scan(&author.ID, &author.Name, &author.LastName, &author.Email, &author.Avatar)
 	if err == nil {
 		a.Author = &author
@@ -332,7 +332,7 @@ func loadAnnouncementRelations(a *models.PetAnnouncement) {
 	// Загружаем контактное лицо
 	if a.ContactPersonID != nil {
 		var contact models.User
-		err := database.DB.QueryRow("SELECT id, name, last_name, email, avatar FROM users WHERE id = ?", *a.ContactPersonID).
+		err := database.DB.QueryRow(ConvertPlaceholders("SELECT id, name, last_name, email, avatar FROM users WHERE id = ?"), *a.ContactPersonID).
 			Scan(&contact.ID, &contact.Name, &contact.LastName, &contact.Email, &contact.Avatar)
 		if err == nil {
 			a.ContactPerson = &contact
@@ -484,7 +484,7 @@ func AnnouncementDonationsHandler(w http.ResponseWriter, r *http.Request) {
 func handleCreateDonation(w http.ResponseWriter, r *http.Request, announcementID int) {
 	// Проверяем, что это сбор средств
 	var announcementType string
-	err := database.DB.QueryRow("SELECT type FROM pet_announcements WHERE id = ?", announcementID).Scan(&announcementType)
+	err := database.DB.QueryRow(ConvertPlaceholders("SELECT type FROM pet_announcements WHERE id = ?"), announcementID).Scan(&announcementType)
 	if err != nil {
 		sendError(w, "Announcement not found", http.StatusNotFound)
 		return
@@ -521,7 +521,7 @@ func handleCreateDonation(w http.ResponseWriter, r *http.Request, announcementID
 	} else if donorID != nil {
 		// Загружаем имя из профиля
 		var name, lastName string
-		database.DB.QueryRow("SELECT name, last_name FROM users WHERE id = ?", *donorID).Scan(&name, &lastName)
+		database.DB.QueryRow(ConvertPlaceholders("SELECT name, last_name FROM users WHERE id = ?"), *donorID).Scan(&name, &lastName)
 		if lastName != "" {
 			donorName = name + " " + lastName
 		} else {
