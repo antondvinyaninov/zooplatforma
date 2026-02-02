@@ -64,7 +64,7 @@ func UploadAvatarHandler(w http.ResponseWriter, r *http.Request) {
 	fileName := fmt.Sprintf("%s%s", uuid.New().String(), ext)
 
 	// Создаем папку для аватаров пользователя
-	uploadDir := fmt.Sprintf("../../uploads/users/%d/avatars", userID)
+	uploadDir := fmt.Sprintf("/app/uploads/users/%d/avatars", userID)
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		logSystemEvent("error", "profile", "upload_avatar", fmt.Sprintf("Ошибка создания директории: %v", err), &userID, ipAddress)
 		sendErrorResponse(w, "Ошибка создания директории", http.StatusInternalServerError)
@@ -159,7 +159,7 @@ func UploadCoverPhotoHandler(w http.ResponseWriter, r *http.Request) {
 	fileName := fmt.Sprintf("%s%s", uuid.New().String(), ext)
 
 	// Создаем папку для обложек пользователя
-	uploadDir := fmt.Sprintf("../../uploads/users/%d/covers", userID)
+	uploadDir := fmt.Sprintf("/app/uploads/users/%d/covers", userID)
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		logSystemEvent("error", "profile", "upload_cover", fmt.Sprintf("Ошибка создания директории: %v", err), &userID, ipAddress)
 		sendErrorResponse(w, "Ошибка создания директории", http.StatusInternalServerError)
