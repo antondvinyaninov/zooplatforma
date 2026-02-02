@@ -72,18 +72,31 @@ func GetChatsHandler(db *sql.DB) http.HandlerFunc {
 			var msgIsRead sql.NullBool
 			var msgCreatedAt sql.NullString
 			var unreadCount int
+			var avatar sql.NullString
+			var lastSeen sql.NullString
 
 			err := rows.Scan(
 				&chat.ID, &chat.User1ID, &chat.User2ID,
 				&chat.LastMessageID, &chat.LastMessageAt, &chat.CreatedAt,
 				&otherUser.ID, &otherUser.Name, &otherUser.LastName,
-				&otherUser.Avatar, &otherUser.IsOnline, &otherUser.LastSeen,
+				&avatar, &otherUser.IsOnline, &lastSeen,
 				&msgID, &msgSenderID, &msgContent, &msgIsRead, &msgCreatedAt,
 				&unreadCount,
 			)
 			if err != nil {
 				log.Printf("Error scanning chat: %v", err)
 				continue
+			}
+
+			// Обрабатываем NULL значения
+			if avatar.Valid {
+				otherUser.Avatar = avatar.String
+			}
+			if lastSeen.Valid {
+				parsedTime, err := time.Parse(time.RFC3339, lastSeen.String)
+				if err == nil {
+					otherUser.LastSeen = &parsedTime
+				}
 			}
 
 			chat.OtherUser = &otherUser

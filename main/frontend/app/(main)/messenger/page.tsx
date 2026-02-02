@@ -255,6 +255,11 @@ export default function MessengerPage() {
           
           if (updatedChatsResponse.ok) {
             const updatedChats = await updatedChatsResponse.json();
+            
+            // Удаляем временный чат из списка
+            setChats(prev => prev.filter(chat => chat.id >= 0));
+            
+            // Добавляем обновленные чаты
             setChats(updatedChats);
             
             const realChat = updatedChats.find((chat: Chat) => chat.other_user?.id === selectedChat.other_user?.id);
@@ -262,6 +267,8 @@ export default function MessengerPage() {
             if (realChat) {
               setSelectedChatId(realChat.id);
               fetchMessages(realChat.id);
+            } else {
+              console.error('Real chat not found after sending message');
             }
           }
         } else {
