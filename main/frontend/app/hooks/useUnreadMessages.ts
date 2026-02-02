@@ -13,7 +13,7 @@ export function useUnreadMessages() {
 
     const fetchUnreadCount = async () => {
       try {
-        const response = await fetch('http://localhost:8000/api/messages/unread', {
+        const response = await fetch('/api/messages/unread', {
           credentials: 'include',
         });
 
