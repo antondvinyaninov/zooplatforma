@@ -8,6 +8,7 @@ import (
 
 	"github.com/gorilla/mux"
 	"github.com/joho/godotenv"
+	_ "github.com/lib/pq"
 	_ "github.com/mattn/go-sqlite3"
 )
 
@@ -25,19 +26,32 @@ func main() {
 	// Подключиться к БД Auth Service
 	var err error
 	dbPath := os.Getenv("DATABASE_PATH")
-	if dbPath == "" {
-		// Production: используем Volume
-		if os.Getenv("ENVIRONMENT") == "production" {
-			dbPath = "/app/auth-data/auth.db"
-		} else {
-			// Development: локальный файл
+
+	// Production: используем PostgreSQL
+	if os.Getenv("ENVIRONMENT") == "production" {
+		dbURL := os.Getenv("DATABASE_URL")
+		if dbURL == "" {
+			log.Fatal("❌ DATABASE_URL not set in production")
+		}
+
+		db, err = sql.Open("postgres", dbURL)
+		if err != nil {
+			log.Fatal("❌ Failed to connect to PostgreSQL:", err)
+		}
+
+		log.Println("✅ Auth Service using PostgreSQL")
+	} else {
+		// Development: используем SQLite
+		if dbPath == "" {
 			dbPath = "./auth.db"
 		}
-	}
 
-	db, err = sql.Open("sqlite3", dbPath)
-	if err != nil {
-		log.Fatal("❌ Failed to connect to database:", err)
+		db, err = sql.Open("sqlite3", dbPath)
+		if err != nil {
+			log.Fatal("❌ Failed to connect to database:", err)
+		}
+
+		log.Println("✅ Auth Service using SQLite:", dbPath)
 	}
 	defer db.Close()
 
@@ -88,125 +102,251 @@ func main() {
 }
 
 func initDatabase() error {
-	// Создать таблицу users
-	_, err := db.Exec(`
-		CREATE TABLE IF NOT EXISTS users (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			name TEXT NOT NULL,
-			last_name TEXT,
-			email TEXT UNIQUE NOT NULL,
-			password TEXT NOT NULL,
-			bio TEXT,
-			phone TEXT,
-			location TEXT,
-			avatar TEXT,
-			cover_photo TEXT,
-			profile_visibility TEXT DEFAULT 'public',
-			show_phone TEXT DEFAULT 'friends',
-			show_email TEXT DEFAULT 'friends',
-			allow_messages TEXT DEFAULT 'everyone',
-			show_online TEXT DEFAULT 'yes',
-			verified BOOLEAN DEFAULT 0,
-			verified_at DATETIME,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			last_seen DATETIME
-		)
-	`)
+	// Определяем тип БД
+	isPostgres := os.Getenv("ENVIRONMENT") == "production"
+
+	var createUsersSQL string
+	var createUserRolesSQL string
+	var createSessionsSQL string
+	var createRefreshTokensSQL string
+	var createPasswordResetsSQL string
+	var createEmailVerificationsSQL string
+
+	if isPostgres {
+		// PostgreSQL синтаксис
+		createUsersSQL = `
+			CREATE TABLE IF NOT EXISTS users (
+				id SERIAL PRIMARY KEY,
+				name TEXT NOT NULL,
+				last_name TEXT,
+				email TEXT UNIQUE NOT NULL,
+				password TEXT NOT NULL,
+				bio TEXT,
+				phone TEXT,
+				location TEXT,
+				avatar TEXT,
+				cover_photo TEXT,
+				profile_visibility TEXT DEFAULT 'public',
+				show_phone TEXT DEFAULT 'friends',
+				show_email TEXT DEFAULT 'friends',
+				allow_messages TEXT DEFAULT 'everyone',
+				show_online TEXT DEFAULT 'yes',
+				verified BOOLEAN DEFAULT false,
+				verified_at TIMESTAMP,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				last_seen TIMESTAMP
+			)
+		`
+
+		createUserRolesSQL = `
+			CREATE TABLE IF NOT EXISTS user_roles (
+				id SERIAL PRIMARY KEY,
+				user_id INTEGER NOT NULL,
+				role TEXT NOT NULL,
+				granted_by INTEGER,
+				granted_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				expires_at TIMESTAMP,
+				is_active BOOLEAN DEFAULT true,
+				notes TEXT,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+				UNIQUE(user_id, role)
+			)
+		`
+
+		createSessionsSQL = `
+			CREATE TABLE IF NOT EXISTS sessions (
+				id SERIAL PRIMARY KEY,
+				user_id INTEGER NOT NULL,
+				token TEXT UNIQUE NOT NULL,
+				expires_at TIMESTAMP NOT NULL,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id)
+			)
+		`
+
+		createRefreshTokensSQL = `
+			CREATE TABLE IF NOT EXISTS refresh_tokens (
+				id SERIAL PRIMARY KEY,
+				user_id INTEGER NOT NULL,
+				token TEXT UNIQUE NOT NULL,
+				expires_at TIMESTAMP NOT NULL,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id)
+			)
+		`
+
+		createPasswordResetsSQL = `
+			CREATE TABLE IF NOT EXISTS password_resets (
+				id SERIAL PRIMARY KEY,
+				user_id INTEGER NOT NULL,
+				token TEXT UNIQUE NOT NULL,
+				expires_at TIMESTAMP NOT NULL,
+				used BOOLEAN DEFAULT false,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id)
+			)
+		`
+
+		createEmailVerificationsSQL = `
+			CREATE TABLE IF NOT EXISTS email_verifications (
+				id SERIAL PRIMARY KEY,
+				user_id INTEGER NOT NULL,
+				token TEXT UNIQUE NOT NULL,
+				expires_at TIMESTAMP NOT NULL,
+				verified BOOLEAN DEFAULT false,
+				created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id)
+			)
+		`
+	} else {
+		// SQLite синтаксис
+		createUsersSQL = `
+			CREATE TABLE IF NOT EXISTS users (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				name TEXT NOT NULL,
+				last_name TEXT,
+				email TEXT UNIQUE NOT NULL,
+				password TEXT NOT NULL,
+				bio TEXT,
+				phone TEXT,
+				location TEXT,
+				avatar TEXT,
+				cover_photo TEXT,
+				profile_visibility TEXT DEFAULT 'public',
+				show_phone TEXT DEFAULT 'friends',
+				show_email TEXT DEFAULT 'friends',
+				allow_messages TEXT DEFAULT 'everyone',
+				show_online TEXT DEFAULT 'yes',
+				verified BOOLEAN DEFAULT 0,
+				verified_at DATETIME,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				last_seen DATETIME
+			)
+		`
+
+		createUserRolesSQL = `
+			CREATE TABLE IF NOT EXISTS user_roles (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL,
+				role TEXT NOT NULL,
+				granted_by INTEGER,
+				granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				expires_at DATETIME,
+				is_active BOOLEAN DEFAULT 1,
+				notes TEXT,
+				FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+				UNIQUE(user_id, role)
+			)
+		`
+
+		createSessionsSQL = `
+			CREATE TABLE IF NOT EXISTS sessions (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL,
+				token TEXT UNIQUE NOT NULL,
+				expires_at DATETIME NOT NULL,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id)
+			)
+		`
+
+		createRefreshTokensSQL = `
+			CREATE TABLE IF NOT EXISTS refresh_tokens (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL,
+				token TEXT UNIQUE NOT NULL,
+				expires_at DATETIME NOT NULL,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id)
+			)
+		`
+
+		createPasswordResetsSQL = `
+			CREATE TABLE IF NOT EXISTS password_resets (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL,
+				token TEXT UNIQUE NOT NULL,
+				expires_at DATETIME NOT NULL,
+				used BOOLEAN DEFAULT 0,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id)
+			)
+		`
+
+		createEmailVerificationsSQL = `
+			CREATE TABLE IF NOT EXISTS email_verifications (
+				id INTEGER PRIMARY KEY AUTOINCREMENT,
+				user_id INTEGER NOT NULL,
+				token TEXT UNIQUE NOT NULL,
+				expires_at DATETIME NOT NULL,
+				verified BOOLEAN DEFAULT 0,
+				created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+				FOREIGN KEY (user_id) REFERENCES users(id)
+			)
+		`
+	}
+
+	// Создать таблицы
+	_, err := db.Exec(createUsersSQL)
 	if err != nil {
 		return err
 	}
 
-	// Таблица user_roles для ролей пользователей
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS user_roles (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			user_id INTEGER NOT NULL,
-			role TEXT NOT NULL,
-			granted_by INTEGER,
-			granted_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			expires_at DATETIME,
-			is_active BOOLEAN DEFAULT 1,
-			notes TEXT,
-			FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-			UNIQUE(user_id, role)
-		)
-	`)
+	_, err = db.Exec(createUserRolesSQL)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(createSessionsSQL)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(createRefreshTokensSQL)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(createPasswordResetsSQL)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(createEmailVerificationsSQL)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.Exec(createEmailVerificationsSQL)
 	if err != nil {
 		return err
 	}
 
 	// Создать индексы
-	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles(user_id)`)
-	if err != nil {
-		return err
-	}
+	if isPostgres {
+		_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles(user_id)`)
+		if err != nil {
+			return err
+		}
 
-	_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role)`)
-	if err != nil {
-		return err
-	}
+		_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role)`)
+		if err != nil {
+			return err
+		}
+	} else {
+		_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_user_roles_user_id ON user_roles(user_id)`)
+		if err != nil {
+			return err
+		}
 
-	// Создать таблицу sessions
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS sessions (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			user_id INTEGER NOT NULL,
-			token TEXT UNIQUE NOT NULL,
-			expires_at DATETIME NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (user_id) REFERENCES users(id)
-		)
-	`)
-	if err != nil {
-		return err
+		_, err = db.Exec(`CREATE INDEX IF NOT EXISTS idx_user_roles_role ON user_roles(role)`)
+		if err != nil {
+			return err
+		}
 	}
-
-	// Создать таблицу refresh_tokens
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS refresh_tokens (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			user_id INTEGER NOT NULL,
-			token TEXT UNIQUE NOT NULL,
-			expires_at DATETIME NOT NULL,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (user_id) REFERENCES users(id)
-		)
-	`)
-	if err != nil {
-		return err
-	}
-
-	// Создать таблицу password_resets
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS password_resets (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			user_id INTEGER NOT NULL,
-			token TEXT UNIQUE NOT NULL,
-			expires_at DATETIME NOT NULL,
-			used BOOLEAN DEFAULT 0,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (user_id) REFERENCES users(id)
-		)
-	`)
-	if err != nil {
-		return err
-	}
-
-	// Создать таблицу email_verifications
-	_, err = db.Exec(`
-		CREATE TABLE IF NOT EXISTS email_verifications (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
-			user_id INTEGER NOT NULL,
-			token TEXT UNIQUE NOT NULL,
-			expires_at DATETIME NOT NULL,
-			verified BOOLEAN DEFAULT 0,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
-			FOREIGN KEY (user_id) REFERENCES users(id)
-		)
-	`)
 
 	log.Println("✅ Auth database initialized")
-	return err
+	return nil
 }
 
 func enableCORS(next http.Handler) http.Handler {
