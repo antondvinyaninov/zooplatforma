@@ -23,7 +23,7 @@ export default function CreateShelter() {
 
   const checkAuth = async () => {
     try {
-      const meResponse = await fetch('http://localhost:9000/api/admin/auth/me', {
+      const meResponse = await fetch('http://localhost:7100/api/auth/me', {
         method: 'GET',
         credentials: 'include',
       });
@@ -31,12 +31,6 @@ export default function CreateShelter() {
       const meResult = await meResponse.json();
 
       if (!meResult.success) {
-        router.push('/auth');
-        return;
-      }
-
-      const allowedRoles = ['shelter_admin', 'moderator', 'admin', 'superadmin'];
-      if (!allowedRoles.includes(meResult.data?.role)) {
         router.push('/auth');
         return;
       }

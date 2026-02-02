@@ -32,7 +32,7 @@ export default function SelectClinic() {
     
     try {
       // Проверяем авторизацию через Main API (SSO)
-      const meResponse = await fetch('http://localhost:8000/api/auth/me', {
+      const meResponse = await fetch('http://localhost:7100/api/auth/me', {
         method: 'GET',
         credentials: 'include',
       });
@@ -89,8 +89,8 @@ export default function SelectClinic() {
   const selectClinic = (clinicId: number) => {
     // Сохраняем выбранную клинику в localStorage
     localStorage.setItem('selectedClinicId', clinicId.toString());
-    // Переходим в дашборд
-    router.push('/dashboard');
+    // Переходим на страницу обзора
+    router.push('/overview');
   };
 
   if (loading) {

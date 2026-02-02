@@ -27,6 +27,7 @@ type Post struct {
 	Pets          []Pet         `json:"pets,omitempty"`         // Прикреплённые питомцы (полные данные)
 	Poll          *Poll         `json:"poll,omitempty"`         // Опрос (если есть)
 	CommentsCount int           `json:"comments_count,omitempty"`
+	CanEdit       bool          `json:"can_edit"` // Может ли текущий пользователь редактировать пост
 }
 
 // CreatePostRequest - запрос на создание поста

@@ -2,7 +2,6 @@ package main
 
 import (
 	"admin/handlers"
-	"admin/middleware"
 	"database"
 	"fmt"
 	"log"
@@ -10,6 +9,7 @@ import (
 	"os"
 
 	"github.com/joho/godotenv"
+	pkgmiddleware "github.com/zooplatforma/pkg/middleware"
 )
 
 func enableCORS(next http.HandlerFunc) http.HandlerFunc {
@@ -93,30 +93,50 @@ func main() {
 	http.HandleFunc("/api/admin/auth/me", enableCORS(handlers.AdminMeHandler))
 
 	// Protected admin routes
-	http.HandleFunc("/api/admin/users", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminUsersHandler)))
-	http.HandleFunc("/api/admin/users/", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminUserHandler)))
-	http.HandleFunc("/api/admin/posts", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminPostsHandler)))
-	http.HandleFunc("/api/admin/posts/", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminPostHandler)))
-	http.HandleFunc("/api/admin/stats/overview", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminStatsOverviewHandler)))
-	http.HandleFunc("/api/admin/logs", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminLogsHandler)))
+	http.HandleFunc("/api/admin/users", enableCORS(wrapSuperAdmin(handlers.AdminUsersHandler)))
+	http.HandleFunc("/api/admin/users/", enableCORS(wrapSuperAdmin(handlers.AdminUserHandler)))
+	http.HandleFunc("/api/admin/posts", enableCORS(wrapSuperAdmin(handlers.AdminPostsHandler)))
+	http.HandleFunc("/api/admin/posts/", enableCORS(wrapSuperAdmin(handlers.AdminPostHandler)))
+	http.HandleFunc("/api/admin/stats/overview", enableCORS(wrapSuperAdmin(handlers.AdminStatsOverviewHandler)))
+
+	// Monitoring routes
+	http.HandleFunc("/api/monitoring/errors", enableCORS(wrapSuperAdmin(handlers.GetRecentErrorsHandler(database.DB))))
+	http.HandleFunc("/api/monitoring/metrics", enableCORS(wrapSuperAdmin(handlers.GetSystemMetricsHandler(database.DB))))
+	http.HandleFunc("/api/monitoring/error-stats", enableCORS(wrapSuperAdmin(handlers.GetErrorStatsByServiceHandler(database.DB))))
+
+	// Health check (public)
+	http.HandleFunc("/api/health", enableCORS(handlers.HealthCheckHandler))
+	http.HandleFunc("/api/admin/logs", enableCORS(wrapSuperAdmin(handlers.AdminLogsHandler)))
 
 	// Organizations moderation
-	http.HandleFunc("/api/admin/organizations", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminOrganizationsHandler)))
-	http.HandleFunc("/api/admin/organizations/", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminVerifyOrganizationHandler)))
-	http.HandleFunc("/api/admin/organizations/stats", enableCORS(middleware.SuperAdminMiddleware(handlers.AdminOrganizationStatsHandler)))
+	http.HandleFunc("/api/admin/organizations", enableCORS(wrapSuperAdmin(handlers.AdminOrganizationsHandler)))
+	http.HandleFunc("/api/admin/organizations/", enableCORS(wrapSuperAdmin(handlers.AdminVerifyOrganizationHandler)))
+	http.HandleFunc("/api/admin/organizations/stats", enableCORS(wrapSuperAdmin(handlers.AdminOrganizationStatsHandler)))
 
 	// Health check for all services
-	http.HandleFunc("/api/admin/health/services", enableCORS(middleware.SuperAdminMiddleware(handlers.HealthCheckHandler)))
+	http.HandleFunc("/api/admin/health/services", enableCORS(wrapSuperAdmin(handlers.HealthCheckHandler)))
 
 	// Moderation
-	http.HandleFunc("/api/admin/moderation/reports", enableCORS(middleware.SuperAdminMiddleware(handlers.GetReportsHandler(database.DB))))
-	http.HandleFunc("/api/admin/moderation/reports/", enableCORS(middleware.SuperAdminMiddleware(handlers.ReviewReportHandler(database.DB))))
-	http.HandleFunc("/api/admin/moderation/stats", enableCORS(middleware.SuperAdminMiddleware(handlers.GetModerationStatsHandler(database.DB))))
+	http.HandleFunc("/api/admin/moderation/reports", enableCORS(wrapSuperAdmin(handlers.GetReportsHandler(database.DB))))
+	http.HandleFunc("/api/admin/moderation/reports/", enableCORS(wrapSuperAdmin(handlers.ReviewReportHandler(database.DB))))
+	http.HandleFunc("/api/admin/moderation/stats", enableCORS(wrapSuperAdmin(handlers.GetModerationStatsHandler(database.DB))))
 
 	port := ":9000"
 	fmt.Printf("🔐 Admin Panel API starting on port %s\n", port)
 	fmt.Println("📊 Dashboard: http://localhost:4000")
 	log.Fatal(http.ListenAndServe(port, nil))
+}
+
+// wrapSuperAdmin wraps a HandlerFunc with Auth + SuperAdmin middleware
+func wrapSuperAdmin(handler http.HandlerFunc) http.HandlerFunc {
+	return func(w http.ResponseWriter, r *http.Request) {
+		// Apply AuthMiddleware + RequireSuperAdmin
+		pkgmiddleware.AuthMiddleware(
+			pkgmiddleware.RequireSuperAdmin(
+				http.HandlerFunc(handler),
+			),
+		).ServeHTTP(w, r)
+	}
 }
 
 func handleRoot(w http.ResponseWriter, r *http.Request) {
@@ -133,11 +153,11 @@ func createAdminTables() error {
 	// Создаем таблицу администраторов
 	_, err := database.DB.Exec(`
 		CREATE TABLE IF NOT EXISTS admins (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id SERIAL PRIMARY KEY,
 			user_id INTEGER NOT NULL REFERENCES users(id),
 			role TEXT NOT NULL DEFAULT 'moderator',
 			permissions TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP,
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP,
 			created_by INTEGER REFERENCES admins(id)
 		)
 	`)
@@ -148,14 +168,14 @@ func createAdminTables() error {
 	// Создаем таблицу логов администраторов
 	_, err = database.DB.Exec(`
 		CREATE TABLE IF NOT EXISTS admin_logs (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id SERIAL PRIMARY KEY,
 			admin_id INTEGER NOT NULL REFERENCES admins(id),
 			action TEXT NOT NULL,
 			target_type TEXT,
 			target_id INTEGER,
 			details TEXT,
 			ip_address TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)
 	`)
 	if err != nil {
@@ -165,7 +185,7 @@ func createAdminTables() error {
 	// Создаем общую таблицу системных логов
 	_, err = database.DB.Exec(`
 		CREATE TABLE IF NOT EXISTS system_logs (
-			id INTEGER PRIMARY KEY AUTOINCREMENT,
+			id SERIAL PRIMARY KEY,
 			level TEXT NOT NULL DEFAULT 'info',
 			category TEXT NOT NULL,
 			action TEXT NOT NULL,
@@ -176,7 +196,7 @@ func createAdminTables() error {
 			details TEXT,
 			ip_address TEXT,
 			user_agent TEXT,
-			created_at DATETIME DEFAULT CURRENT_TIMESTAMP
+			created_at TIMESTAMP DEFAULT CURRENT_TIMESTAMP
 		)
 	`)
 	if err != nil {

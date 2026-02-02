@@ -32,6 +32,12 @@ export default function OrganizationPage() {
   const [membersLoading, setMembersLoading] = useState(true);
   const [postsLoading, setPostsLoading] = useState(true);
 
+  // Проверка является ли пользователь участником организации
+  const isMember = () => {
+    if (!user || membersLoading) return false;
+    return members.some(m => m.user_id === user.id);
+  };
+
   // Проверка является ли пользователь owner/admin
   const isOwnerOrAdmin = () => {
     if (!user || membersLoading) return false;
@@ -101,7 +107,7 @@ export default function OrganizationPage() {
 
     const managementUrls: Record<string, string> = {
       shelter: `http://localhost:5100/dashboard?orgId=${org.id}`,
-      clinic: `http://localhost:6300/dashboard?orgId=${org.id}`,
+      clinic: `http://localhost:6300/select`,
       store: `http://localhost:7100/dashboard?orgId=${org.id}`, // Пока не создан
       foundation: `http://localhost:7200/dashboard?orgId=${org.id}`, // Пока не создан
       kennel: `http://localhost:7300/dashboard?orgId=${org.id}`, // Пока не создан
@@ -358,8 +364,8 @@ export default function OrganizationPage() {
 
         {/* Right Column - Sidebar */}
         <div className="space-y-2.5">
-          {/* Управление организацией (только для owner/admin) */}
-          {isOwnerOrAdmin() && (
+          {/* Управление организацией (для всех участников) */}
+          {isMember() && (
             <div className="bg-white rounded-xl shadow-sm border border-gray-100 p-6">
               <h3 className="text-lg font-semibold text-gray-900 mb-4">Управление</h3>
               <div className="space-y-2">
@@ -371,12 +377,14 @@ export default function OrganizationPage() {
                   Система управления
                 </button>
                 
-                <button
-                  onClick={() => router.push(`/org/${org.id}/edit`)}
-                  className="w-full px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
-                >
-                  Редактировать профиль
-                </button>
+                {isOwnerOrAdmin() && (
+                  <button
+                    onClick={() => router.push(`/org/${org.id}/edit`)}
+                    className="w-full px-4 py-2.5 bg-gray-100 hover:bg-gray-200 text-gray-700 rounded-lg font-medium transition-colors"
+                  >
+                    Редактировать профиль
+                  </button>
+                )}
               </div>
             </div>
           )}

@@ -4,9 +4,11 @@ import (
 	"backend/models"
 	"database"
 	"encoding/json"
+	"log"
 	"net/http"
 	"strconv"
 	"strings"
+	"time"
 )
 
 func UsersHandler(w http.ResponseWriter, r *http.Request) {
@@ -23,9 +25,12 @@ func UsersHandler(w http.ResponseWriter, r *http.Request) {
 }
 
 func UserHandler(w http.ResponseWriter, r *http.Request) {
+	log.Printf("🔍 UserHandler: Received %s request to %s", r.Method, r.URL.Path)
 	w.Header().Set("Content-Type", "application/json")
 
 	id := extractID(r.URL.Path)
+	log.Printf("🔍 UserHandler: Extracted ID: %d", id)
+
 	if id == 0 {
 		sendError(w, "Invalid user ID", http.StatusBadRequest)
 		return
@@ -33,6 +38,7 @@ func UserHandler(w http.ResponseWriter, r *http.Request) {
 
 	switch r.Method {
 	case http.MethodGet:
+		log.Printf("🔍 UserHandler: Calling handleGetUser for id=%d", id)
 		// GET публичный - можно просматривать профили без авторизации
 		handleGetUser(w, r, id)
 	case http.MethodPut:
@@ -88,16 +94,49 @@ func handleGetUsers(w http.ResponseWriter, _ *http.Request) {
 }
 
 func handleGetUser(w http.ResponseWriter, _ *http.Request, id int) {
+	// Получаем данные пользователя из локальной БД Main Backend
 	var user models.User
-	err := database.DB.QueryRow("SELECT id, name, last_name, email, avatar, bio, location, phone, created_at, verified, verified_at FROM users WHERE id = ?", id).
-		Scan(&user.ID, &user.Name, &user.LastName, &user.Email, &user.Avatar, &user.Bio, &user.Location, &user.Phone, &user.CreatedAt, &user.Verified, &user.VerifiedAt)
+	query := `SELECT u.id, u.name, u.last_name, u.email, u.bio, u.phone, u.location, u.avatar, u.cover_photo,
+	          u.profile_visibility, u.show_phone, u.show_email, u.allow_messages, u.show_online, 
+	          u.verified, u.verified_at, u.created_at,
+	          ua.last_seen
+	          FROM users u
+	          LEFT JOIN user_activity ua ON u.id = ua.user_id
+	          WHERE u.id = ?`
+
+	var lastSeenTime *string
+	err := database.DB.QueryRow(query, id).Scan(
+		&user.ID, &user.Name, &user.LastName, &user.Email, &user.Bio, &user.Phone,
+		&user.Location, &user.Avatar, &user.CoverPhoto,
+		&user.ProfileVisibility, &user.ShowPhone, &user.ShowEmail, &user.AllowMessages, &user.ShowOnline,
+		&user.Verified, &user.VerifiedAt, &user.CreatedAt,
+		&lastSeenTime,
+	)
 
 	if err != nil {
-		sendError(w, "User not found", http.StatusNotFound)
+		if err.Error() == "sql: no rows in result set" {
+			sendError(w, "User not found", http.StatusNotFound)
+			return
+		}
+		log.Printf("❌ Database error: %v", err)
+		sendError(w, "Database error", http.StatusInternalServerError)
 		return
 	}
 
+	// Устанавливаем LastSeen если есть
+	if lastSeenTime != nil {
+		user.LastSeen = parseTime(*lastSeenTime)
+	}
+
+	// Проверяем онлайн статус (активен в последние 5 минут)
+	if user.LastSeen != nil {
+		fiveMinutesAgo := time.Now().Add(-5 * time.Minute)
+		user.IsOnline = user.LastSeen.After(fiveMinutesAgo)
+	}
+
+	// Возвращаем данные пользователя
 	sendSuccess(w, user)
+	log.Printf("✅ User profile loaded from Main Backend: id=%d, name=%s, last_name=%s, is_online=%v", id, user.Name, user.LastName, user.IsOnline)
 }
 
 func handleCreateUser(w http.ResponseWriter, r *http.Request) {

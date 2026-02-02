@@ -25,6 +25,13 @@ import {
   RectangleStackIcon,
 } from '@heroicons/react/24/outline';
 
+interface NavItem {
+  name: string;
+  href: string;
+  icon: React.ComponentType<React.SVGProps<SVGSVGElement>>;
+  badge?: string;
+}
+
 const additionalLinks = [
   { name: 'О платформе', href: '/about', icon: InformationCircleIcon },
   { name: 'Статистика', href: '/statistics', icon: ChartBarIcon },
@@ -33,10 +40,11 @@ const additionalLinks = [
 ];
 
 export default function Sidebar() {
-  const { user } = useAuth();
+  const { user, isAuthenticated, isLoading } = useAuth();
   const unreadCount = useUnreadMessages();
 
-  const mainNavigation = [
+  // Навигация для авторизованных пользователей
+  const authenticatedNavigation: NavItem[] = [
     { name: 'Метки', href: '/', icon: DocumentTextIcon },
     { name: 'Профиль', href: user ? `/id${user.id}` : '/profile', icon: UserIcon },
     { name: 'Мессенджер', href: '/messenger', icon: ChatBubbleLeftIcon, badge: unreadCount > 0 ? unreadCount.toString() : undefined },
@@ -45,6 +53,15 @@ export default function Sidebar() {
     { name: 'Избранное', href: '/favorites', icon: HeartIcon },
     { name: 'Сервисы', href: '/services', icon: Cog6ToothIcon },
   ];
+
+  // Навигация для неавторизованных пользователей (только публичные разделы)
+  const publicNavigation: NavItem[] = [
+    { name: 'Метки', href: '/', icon: DocumentTextIcon },
+    { name: 'Каталог', href: '/catalog', icon: RectangleStackIcon },
+  ];
+
+  const mainNavigation = isAuthenticated ? authenticatedNavigation : publicNavigation;
+
   return (
     <div className="sticky top-[48px]">
       <nav className="space-y-0">

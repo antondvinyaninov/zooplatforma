@@ -1,10 +1,10 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { useRouter, useParams } from 'next/navigation';
 import { useAuth } from '../../../contexts/AuthContext';
 import { postsApi, petsApi, usersApi, Post, Pet, User } from '../../../lib/api';
-import { getMediaUrl, getFullName } from '../../../lib/utils';
+import { getMediaUrl, getFullName, formatLastSeen } from '../../../lib/utils';
 import { 
   UserIcon, 
   MapPinIcon, 
@@ -23,7 +23,6 @@ import PostCard from '../../components/posts/PostCard';
 import CreatePost from '../../components/posts/CreatePost';
 import MediaGallery from '../../components/profile/MediaGallery';
 import MediaStats from '../../components/profile/MediaStats';
-import AddPetModal from '../../components/profile/AddPetModal';
 import FriendButton from '../../components/profile/FriendButton';
 import FriendsListWidget from '../../components/profile/FriendsListWidget';
 
@@ -32,13 +31,17 @@ type TabType = 'posts' | 'media';
 export default function UserProfilePage() {
   const [posts, setPosts] = useState<Post[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
+  const [curatedPets, setCuratedPets] = useState<Pet[]>([]);
   const [profileUser, setProfileUser] = useState<User | null>(null);
   const [loading, setLoading] = useState(true);
+  const [loadingMore, setLoadingMore] = useState(false);
+  const [hasMore, setHasMore] = useState(true);
+  const [offset, setOffset] = useState(0);
   const [activeTab, setActiveTab] = useState<TabType>('posts');
-  const [isAddPetModalOpen, setIsAddPetModalOpen] = useState(false);
   const { user: currentUser, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
   const params = useParams();
+  const observerTarget = useRef<HTMLDivElement>(null);
 
   // Извлекаем ID из параметра (id1 -> 1)
   const userIdParam = params.userId as string;
@@ -46,20 +49,6 @@ export default function UserProfilePage() {
 
   // Проверяем, это профиль текущего пользователя или чужой
   const isOwnProfile = currentUser && userId === currentUser.id;
-
-  useEffect(() => {
-    // Проверяем только на клиенте
-    if (typeof window === 'undefined') return;
-
-    if (!isLoading && !isAuthenticated) {
-      router.push('/auth');
-      return;
-    }
-
-    if (userId) {
-      loadUserProfile();
-    }
-  }, [userId, isLoading, isAuthenticated, currentUser]); // Добавили currentUser в зависимости
 
   const loadUserProfile = async () => {
     if (!userId) return;
@@ -75,18 +64,25 @@ export default function UserProfilePage() {
         return;
       }
 
-      // Загружаем посты и питомцев
-      const [postsResponse, petsResponse] = await Promise.all([
-        postsApi.getUserPosts(userId),
+      // Загружаем первые посты и питомцев
+      const [postsResponse, petsResponse, curatedPetsResponse] = await Promise.all([
+        postsApi.getUserPosts(userId, { limit: 20, offset: 0 }),
         petsApi.getUserPets(userId),
+        petsApi.getCuratedPets(userId),
       ]);
 
       if (postsResponse.success && postsResponse.data) {
         setPosts(postsResponse.data);
+        setHasMore(postsResponse.data.length === 20); // Если вернулось 20, значит есть еще
+        setOffset(20); // Следующая порция начнется с 20
       }
 
       if (petsResponse.success && petsResponse.data) {
         setPets(petsResponse.data);
+      }
+
+      if (curatedPetsResponse.success && curatedPetsResponse.data) {
+        setCuratedPets(curatedPetsResponse.data);
       }
     } catch (error) {
       console.error('Ошибка загрузки профиля:', error);
@@ -95,17 +91,64 @@ export default function UserProfilePage() {
     }
   };
 
+  const loadMorePosts = async () => {
+    if (!userId || loadingMore || !hasMore) return;
+
+    setLoadingMore(true);
+    try {
+      const postsResponse = await postsApi.getUserPosts(userId, { limit: 20, offset });
+      
+      if (postsResponse.success && postsResponse.data) {
+        setPosts(prev => [...prev, ...postsResponse.data]);
+        setHasMore(postsResponse.data.length === 20);
+        setOffset(prev => prev + postsResponse.data.length);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки постов:', error);
+    } finally {
+      setLoadingMore(false);
+    }
+  };
+
+  useEffect(() => {
+    // Проверяем только на клиенте
+    if (typeof window === 'undefined') return;
+
+    if (!isLoading && !isAuthenticated) {
+      router.push('/auth');
+      return;
+    }
+
+    if (userId && isAuthenticated) {
+      loadUserProfile();
+    }
+  }, [userId, isLoading, isAuthenticated]); // Убрали currentUser из зависимостей
+
+  // Infinite scroll observer
+  useEffect(() => {
+    const observer = new IntersectionObserver(
+      (entries) => {
+        if (entries[0].isIntersecting && hasMore && !loadingMore && activeTab === 'posts') {
+          loadMorePosts();
+        }
+      },
+      { threshold: 0.1 }
+    );
+
+    const currentTarget = observerTarget.current;
+    if (currentTarget) {
+      observer.observe(currentTarget);
+    }
+
+    return () => {
+      if (currentTarget) {
+        observer.unobserve(currentTarget);
+      }
+    };
+  }, [hasMore, loadingMore, activeTab, offset]);
+
   const handleEditClick = () => {
     router.push('/profile/edit');
-  };
-
-  const handleAddPet = () => {
-    setIsAddPetModalOpen(true);
-  };
-
-  const handlePetAdded = () => {
-    // Перезагрузить список питомцев
-    loadUserProfile();
   };
 
   const formatDate = (dateString: string) => {
@@ -122,6 +165,24 @@ export default function UserProfilePage() {
     if (diffDays < 7) return `${diffDays} дн назад`;
     
     return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'long' });
+  };
+
+  const formatLastSeen = (dateString: string) => {
+    const date = new Date(dateString);
+    const now = new Date();
+    const diffMs = now.getTime() - date.getTime();
+    const diffMins = Math.floor(diffMs / 60000);
+    const diffHours = Math.floor(diffMs / 3600000);
+    const diffDays = Math.floor(diffMs / 86400000);
+
+    if (diffMins < 1) return 'только что';
+    if (diffMins < 60) return `${diffMins} мин назад`;
+    if (diffHours < 24) return `${diffHours} ч назад`;
+    if (diffDays === 1) return 'вчера';
+    if (diffDays < 7) return `${diffDays} дн назад`;
+    if (diffDays < 30) return `${Math.floor(diffDays / 7)} нед назад`;
+    
+    return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
   };
 
   if (isLoading || loading) {
@@ -143,7 +204,8 @@ export default function UserProfilePage() {
   }
 
   const profile = {
-    name: getFullName(profileUser.name, profileUser.last_name),
+    name: profileUser.name,
+    lastName: profileUser.last_name,
     avatar: profileUser.avatar || null,
     coverPhoto: profileUser.cover_photo || null,
     location: profileUser.location || 'Не указано',
@@ -184,6 +246,10 @@ export default function UserProfilePage() {
                   <UserIcon className="w-12 h-12 sm:w-16 sm:h-16 text-gray-500" />
                 )}
               </div>
+              {/* Статус онлайн индикатор на аватаре */}
+              <div className={`absolute bottom-1 right-1 w-4 h-4 rounded-full border-2 border-white flex-shrink-0 ${
+                profileUser.is_online ? 'bg-green-500' : 'bg-gray-400'
+              }`}></div>
               {isOwnProfile && (
                 <button 
                   className="absolute bottom-0 right-0 p-2 bg-white rounded-full shadow-md hover:bg-gray-50 transition-colors border border-gray-200"
@@ -199,13 +265,32 @@ export default function UserProfilePage() {
               <div className="flex flex-col sm:flex-row items-start justify-between gap-3">
                 <div className="min-w-0 flex-1">
                   <div className="flex items-center gap-2">
-                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">{profile.name}</h1>
+                    <h1 className="text-xl sm:text-2xl font-bold text-gray-900 truncate">
+                      {getFullName(profile.name, profile.lastName)}
+                    </h1>
                     {profileUser.verified && (
                       <CheckBadgeIcon 
                         className="w-6 h-6 text-blue-500 flex-shrink-0" 
                         title="Проверенный пользователь"
                       />
                     )}
+                    {/* Статус онлайн */}
+                    <div className="flex items-center gap-1.5 ml-2">
+                      <div className={`w-2.5 h-2.5 rounded-full flex-shrink-0 ${
+                        profileUser.is_online ? 'bg-green-500' : 'bg-gray-400'
+                      }`}></div>
+                      <span className="text-xs font-medium text-gray-600">
+                        {profileUser.is_online ? (
+                          'Онлайн'
+                        ) : profileUser.last_seen ? (
+                          <>
+                            Был{profileUser.last_name ? 'а' : ''} {formatLastSeen(profileUser.last_seen)}
+                          </>
+                        ) : (
+                          'Статус неизвестен'
+                        )}
+                      </span>
+                    </div>
                   </div>
                   <div className="flex flex-col sm:flex-row sm:items-center gap-2 sm:gap-4 mt-1 text-xs sm:text-sm text-gray-600">
                     <div className="flex items-center gap-1">
@@ -229,7 +314,7 @@ export default function UserProfilePage() {
                     <span className="hidden sm:inline">Редактировать профиль</span>
                     <span className="sm:hidden">Редактировать</span>
                   </button>
-                ) : (
+                ) : userId ? (
                   <div className="flex items-center gap-2">
                     <FriendButton userId={userId} currentUserId={currentUser?.id || 0} />
                     <button 
@@ -241,7 +326,7 @@ export default function UserProfilePage() {
                       <span>Написать</span>
                     </button>
                   </div>
-                )}
+                ) : null}
               </div>
             </div>
           </div>
@@ -300,6 +385,16 @@ export default function UserProfilePage() {
                       {posts.map((post) => (
                         <PostCard key={post.id} post={post} />
                       ))}
+                      
+                      {/* Элемент для наблюдения (infinite scroll trigger) */}
+                      <div ref={observerTarget} className="h-10 flex items-center justify-center">
+                        {loadingMore && (
+                          <div className="animate-spin rounded-full h-6 w-6 border-b-2" style={{ borderColor: '#1B76FF' }}></div>
+                        )}
+                        {!hasMore && posts.length > 0 && (
+                          <p className="text-sm text-gray-500">Все посты загружены</p>
+                        )}
+                      </div>
                     </>
                   )}
                 </div>
@@ -324,6 +419,25 @@ export default function UserProfilePage() {
           <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
             <h2 className="text-lg font-semibold text-gray-900 mb-4">Контакты</h2>
             <div className="space-y-3">
+              {/* Статус онлайн */}
+              <div className="flex items-center gap-3 text-sm">
+                <div className={`w-3 h-3 rounded-full flex-shrink-0 ${
+                  profileUser.is_online ? 'bg-green-500' : 'bg-gray-400'
+                }`}></div>
+                <div>
+                  <span className="text-gray-700 font-medium">
+                    {profileUser.is_online ? (
+                      'Онлайн'
+                    ) : profileUser.last_seen ? (
+                      <>
+                        Был{profileUser.last_name ? 'а' : ''} {formatLastSeen(profileUser.last_seen)}
+                      </>
+                    ) : (
+                      'Статус неизвестен'
+                    )}
+                  </span>
+                </div>
+              </div>
               <div className="flex items-center gap-3 text-sm">
                 <PhoneIcon className="w-5 h-5 text-gray-400" />
                 <span className="text-gray-700">{profile.phone}</span>
@@ -350,9 +464,10 @@ export default function UserProfilePage() {
               <h2 className="text-lg font-semibold text-gray-900">Питомцы</h2>
               {isOwnProfile && (
                 <button 
-                  onClick={handleAddPet}
+                  onClick={() => window.location.href = 'http://localhost:6100'}
                   className="text-sm font-medium" 
                   style={{ color: '#1B76FF' }}
+                  title="Перейти в кабинет владельца для управления питомцами"
                 >
                   Добавить
                 </button>
@@ -368,48 +483,122 @@ export default function UserProfilePage() {
               </div>
             ) : (
               <div className="grid grid-cols-3 gap-3">
-                {pets.map((pet) => (
-                  <button
-                    key={pet.id}
-                    onClick={() => router.push(`/pets/${pet.id}`)}
-                    className="aspect-square rounded-lg bg-gray-200 flex flex-col items-center justify-center overflow-hidden p-2 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer relative group"
-                  >
-                    {pet.photo ? (
-                      <div className="relative w-full h-full">
+                {pets.map((pet) => {
+                  const photoUrl = getMediaUrl(pet.photo);
+                  const hasPhoto = pet.photo && pet.photo.trim() !== '';
+                  
+                  return (
+                    <div
+                      key={pet.id}
+                      onClick={() => router.push(`/pets/${pet.id}`)}
+                      className="relative w-full rounded-lg bg-gray-200 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer group overflow-hidden"
+                      style={{ aspectRatio: '1/1' }}
+                    >
+                      {hasPhoto ? (
                         <img 
-                          src={getMediaUrl(pet.photo) || pet.photo} 
-                          alt={pet.name} 
+                          src={photoUrl || ''} 
+                          alt={pet.name || 'Питомец'} 
                           className="w-full h-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                          width={76}
+                          height={76}
+                          onError={(e) => {
+                            console.error('❌ Failed to load pet image:', pet.name, photoUrl);
+                            // Показываем placeholder при ошибке
+                            e.currentTarget.style.display = 'none';
+                          }}
+                          onLoad={(e) => {
+                            // Логирование отключено для чистоты консоли
+                            // console.log('✅ Successfully loaded pet image:', pet.name || `Pet ${pet.id}`);
+                          }}
                         />
-                        <div className="absolute inset-0 bg-black bg-opacity-0 group-hover:bg-opacity-30 transition-all flex items-end justify-center pb-2">
-                          <span className="text-white text-xs font-medium opacity-0 group-hover:opacity-100 transition-opacity">
-                            {pet.name}
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center p-2">
+                          <span className="text-3xl mb-1">
+                            {pet.species === 'cat' ? '🐱' : pet.species === 'dog' ? '🐕' : '🐾'}
                           </span>
+                          <span className="text-xs text-gray-600 text-center font-medium">{pet.name || 'Питомец'}</span>
                         </div>
-                      </div>
-                    ) : (
-                      <>
-                        <span className="text-3xl mb-1">🐕</span>
-                        <span className="text-xs text-gray-600 text-center font-medium">{pet.name}</span>
-                      </>
-                    )}
-                  </button>
-                ))}
+                      )}
+                      {hasPhoto && pet.name && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="text-white text-xs font-medium">{pet.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
               </div>
             )}
           </div>
+
+          {/* Курирую */}
+          {curatedPets.length > 0 && (
+            <div className="bg-white rounded-xl shadow-sm p-6 border border-gray-100">
+              <div className="flex items-center justify-between mb-4">
+                <h2 className="text-lg font-semibold text-gray-900">Курирую</h2>
+                {isOwnProfile && (
+                  <button 
+                    onClick={() => window.location.href = 'http://localhost:6200'}
+                    className="text-sm font-medium" 
+                    style={{ color: '#1B76FF' }}
+                    title="Перейти в кабинет волонтёра"
+                  >
+                    Управление
+                  </button>
+                )}
+              </div>
+              <div className="grid grid-cols-3 gap-3">
+                {curatedPets.map((pet) => {
+                  const photoUrl = getMediaUrl(pet.photo);
+                  const hasPhoto = pet.photo && pet.photo.trim() !== '';
+                  
+                  return (
+                    <div
+                      key={pet.id}
+                      onClick={() => window.location.href = `http://localhost:4100/pets/${pet.id}`}
+                      className="relative w-full rounded-lg bg-gray-200 hover:ring-2 hover:ring-blue-500 transition-all cursor-pointer group overflow-hidden"
+                      style={{ aspectRatio: '1/1' }}
+                    >
+                      {hasPhoto ? (
+                        <img 
+                          src={photoUrl || ''} 
+                          alt={pet.name || 'Питомец'} 
+                          className="w-full h-full object-cover"
+                          loading="lazy"
+                          decoding="async"
+                          width={76}
+                          height={76}
+                          onError={(e) => {
+                            console.error('❌ Failed to load pet image:', pet.name, photoUrl);
+                            e.currentTarget.style.display = 'none';
+                          }}
+                        />
+                      ) : (
+                        <div className="w-full h-full flex flex-col items-center justify-center p-2">
+                          <span className="text-3xl mb-1">
+                            {pet.species === 'cat' ? '🐱' : pet.species === 'dog' ? '🐕' : '🐾'}
+                          </span>
+                          <span className="text-xs text-gray-600 text-center font-medium">{pet.name || 'Питомец'}</span>
+                        </div>
+                      )}
+                      {hasPhoto && pet.name && (
+                        <div className="absolute bottom-0 left-0 right-0 bg-gradient-to-t from-black/60 to-transparent p-2 opacity-0 group-hover:opacity-100 transition-opacity">
+                          <span className="text-white text-xs font-medium">{pet.name}</span>
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </div>
+          )}
 
           {/* Статистика медиа */}
           {isOwnProfile && <MediaStats />}
         </div>
       </div>
-
-      {/* Модальное окно добавления питомца */}
-      <AddPetModal
-        isOpen={isAddPetModalOpen}
-        onClose={() => setIsAddPetModalOpen(false)}
-        onSuccess={handlePetAdded}
-      />
     </div>
   );
 }

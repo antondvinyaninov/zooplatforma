@@ -14,7 +14,7 @@ export default function Home() {
   const checkAuth = async () => {
     try {
       // Проверяем авторизацию через Main API
-      const meResponse = await fetch('http://localhost:8000/api/auth/me', {
+      const meResponse = await fetch('http://localhost:7100/api/auth/me', {
         method: 'GET',
         credentials: 'include',
       });

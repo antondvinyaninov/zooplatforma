@@ -6,6 +6,8 @@ import (
 	"log"
 	"net/http"
 	"strconv"
+
+	pkgmiddleware "github.com/zooplatforma/pkg/middleware"
 )
 
 type tenantContextKey string
@@ -18,8 +20,8 @@ func TenantMiddleware(db *sql.DB) func(http.Handler) http.Handler {
 		return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 			log.Printf("🏥 Tenant check for: %s %s", r.Method, r.URL.Path)
 
-			// Получаем user_id из контекста (установлен AuthMiddleware)
-			userID, ok := r.Context().Value(UserIDKey).(int)
+			// Получаем user_id из контекста (установлен централизованным AuthMiddleware)
+			userID, ok := pkgmiddleware.GetUserID(r)
 			if !ok {
 				log.Printf("❌ User ID not found in context")
 				http.Error(w, "Unauthorized", http.StatusUnauthorized)

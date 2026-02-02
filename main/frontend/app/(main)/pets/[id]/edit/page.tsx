@@ -43,7 +43,8 @@ export default function EditPetPage() {
 
   const loadCurrentUser = async () => {
     try {
-      const response = await fetch('http://localhost:8000/api/auth/me', {
+      const authUrl = process.env.NEXT_PUBLIC_AUTH_URL || 'http://localhost:7100';
+      const response = await fetch(`${authUrl}/api/auth/me`, {
         credentials: 'include',
       });
       if (response.ok) {

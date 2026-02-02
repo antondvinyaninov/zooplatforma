@@ -21,20 +21,41 @@ import (
 // GetChatsHandler возвращает список диалогов пользователя
 func GetChatsHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := r.Context().Value("userID").(int)
+		userID, ok := r.Context().Value("userID").(int)
+		if !ok || userID == 0 {
+			http.Error(w, `{"success":false,"error":"Unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
 
-		// Получаем все чаты пользователя
+		// Оптимизированный запрос с JOIN вместо N+1 запросов
 		query := `
 			SELECT 
-				c.id, c.user1_id, c.user2_id, c.last_message_id, c.last_message_at, c.created_at
+				c.id, c.user1_id, c.user2_id, c.last_message_id, c.last_message_at, c.created_at,
+				u.id as other_user_id, u.name, u.last_name, u.avatar, 
+CASE WHEN ua.last_seen IS NOT NULL AND (julianday('now') - julianday(ua.last_seen)) * 24 * 60 < 5 THEN 1 ELSE 0 END as is_online,
+ua.last_seen,
+				m.id as msg_id, m.sender_id, m.content, m.is_read, m.created_at as msg_created_at,
+				COALESCE((
+					SELECT COUNT(*) 
+					FROM messages 
+					WHERE chat_id = c.id AND receiver_id = ? AND is_read = 0
+				), 0) as unread_count
 			FROM chats c
+			LEFT JOIN users u ON (
+				CASE 
+					WHEN c.user1_id = ? THEN c.user2_id 
+					ELSE c.user1_id 
+				END = u.id
+			)
+			LEFT JOIN user_activity ua ON u.id = ua.user_id
+LEFT JOIN messages m ON c.last_message_id = m.id
 			WHERE c.user1_id = ? OR c.user2_id = ?
 			ORDER BY c.last_message_at DESC NULLS LAST, c.created_at DESC
 		`
 
-		rows, err := db.Query(query, userID, userID)
+		rows, err := db.Query(query, userID, userID, userID, userID)
 		if err != nil {
-			log.Printf("❌ Error fetching chats: %v", err)
+			log.Printf("Error fetching chats: %v", err)
 			http.Error(w, "Failed to fetch chats", http.StatusInternalServerError)
 			return
 		}
@@ -43,41 +64,49 @@ func GetChatsHandler(db *sql.DB) http.HandlerFunc {
 		var chats []models.Chat
 		for rows.Next() {
 			var chat models.Chat
+			var otherUser models.User
+			var lastMessage models.Message
+			var msgID, msgSenderID sql.NullInt64
+			var msgContent sql.NullString
+			var msgIsRead sql.NullBool
+			var msgCreatedAt sql.NullString
+			var unreadCount int
+
 			err := rows.Scan(
 				&chat.ID, &chat.User1ID, &chat.User2ID,
 				&chat.LastMessageID, &chat.LastMessageAt, &chat.CreatedAt,
+				&otherUser.ID, &otherUser.Name, &otherUser.LastName,
+				&otherUser.Avatar, &otherUser.IsOnline, &otherUser.LastSeen,
+				&msgID, &msgSenderID, &msgContent, &msgIsRead, &msgCreatedAt,
+				&unreadCount,
 			)
 			if err != nil {
-				log.Printf("❌ Error scanning chat: %v", err)
+				log.Printf("Error scanning chat: %v", err)
 				continue
 			}
 
-			// Определяем ID собеседника
-			otherUserID := chat.User1ID
-			if chat.User1ID == userID {
-				otherUserID = chat.User2ID
-			}
+			chat.OtherUser = &otherUser
+			chat.UnreadCount = unreadCount
 
-			// Получаем информацию о собеседнике
-			otherUser, err := getUserByID(db, otherUserID)
-			if err != nil {
-				log.Printf("❌ Error fetching other user: %v", err)
-				continue
-			}
-			chat.OtherUser = otherUser
-
-			// Получаем последнее сообщение
-			if chat.LastMessageID != nil {
-				lastMessage, err := getMessageByID(db, *chat.LastMessageID)
-				if err == nil {
-					chat.LastMessage = lastMessage
+			// Если есть последнее сообщение
+			if msgID.Valid {
+				lastMessage.ID = int(msgID.Int64)
+				if msgSenderID.Valid {
+					lastMessage.SenderID = int(msgSenderID.Int64)
 				}
-			}
-
-			// Подсчитываем непрочитанные сообщения
-			unreadCount, err := getUnreadCount(db, chat.ID, userID)
-			if err == nil {
-				chat.UnreadCount = unreadCount
+				if msgContent.Valid {
+					lastMessage.Content = msgContent.String
+				}
+				if msgIsRead.Valid {
+					lastMessage.IsRead = msgIsRead.Bool
+				}
+				if msgCreatedAt.Valid {
+					// Парсим строку в time.Time
+					if t, err := time.Parse("2006-01-02 15:04:05", msgCreatedAt.String); err == nil {
+						lastMessage.CreatedAt = &t
+					}
+				}
+				chat.LastMessage = &lastMessage
 			}
 
 			chats = append(chats, chat)
@@ -95,7 +124,11 @@ func GetChatsHandler(db *sql.DB) http.HandlerFunc {
 // GetChatMessagesHandler возвращает сообщения конкретного чата
 func GetChatMessagesHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := r.Context().Value("userID").(int)
+		userID, ok := r.Context().Value("userID").(int)
+		if !ok || userID == 0 {
+			http.Error(w, `{"success":false,"error":"Unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
 
 		// Получаем ID чата из URL
 		pathParts := strings.Split(r.URL.Path, "/")
@@ -109,11 +142,16 @@ func GetChatMessagesHandler(db *sql.DB) http.HandlerFunc {
 			return
 		}
 
+		log.Printf("📨 GetChatMessagesHandler: chatID=%d, userID=%d", chatID, userID)
+
 		// Проверяем, что пользователь является участником чата
 		if !isUserInChat(db, chatID, userID) {
+			log.Printf("❌ User %d is not in chat %d", userID, chatID)
 			http.Error(w, "Access denied", http.StatusForbidden)
 			return
 		}
+
+		log.Printf("✅ User %d is in chat %d, fetching messages...", userID, chatID)
 
 		// Получаем сообщения
 		query := `
@@ -133,32 +171,82 @@ func GetChatMessagesHandler(db *sql.DB) http.HandlerFunc {
 		}
 		defer rows.Close()
 
+		log.Printf("📊 Query executed, scanning rows...")
 		var messages []models.Message
+		rowCount := 0
 		for rows.Next() {
+			rowCount++
 			var msg models.Message
+			var readAtStr, createdAtStr sql.NullString
+			
 			err := rows.Scan(
-				&msg.ID, &msg.ChatID, &msg.SenderID, &msg.ReceiverID,
-				&msg.Content, &msg.IsRead, &msg.ReadAt, &msg.CreatedAt,
+&msg.ID, &msg.ChatID, &msg.SenderID, &msg.ReceiverID,
+				&msg.Content, &msg.IsRead, &readAtStr, &createdAtStr,
 			)
 			if err != nil {
-				log.Printf("❌ Error scanning message: %v", err)
+				log.Printf("❌ Error scanning message row %d: %v", rowCount, err)
 				continue
 			}
-
-			// Получаем информацию об отправителе
-			sender, err := getUserByID(db, msg.SenderID)
-			if err == nil {
-				msg.Sender = sender
+			
+			// Парсим даты
+			if createdAtStr.Valid {
+				// Пробуем разные форматы
+				formats := []string{
+					time.RFC3339Nano,                      // 2006-01-02T15:04:05.999999999Z07:00
+					time.RFC3339,                          // 2006-01-02T15:04:05Z07:00
+					"2006-01-02 15:04:05.999999-07:00",   // SQLite с микросекундами
+					"2006-01-02 15:04:05",                 // SQLite без микросекунд
+				}
+				var t time.Time
+				var err error
+				for _, format := range formats {
+					t, err = time.Parse(format, createdAtStr.String)
+					if err == nil {
+						msg.CreatedAt = &t
+						break
+					}
+				}
+				if err != nil {
+					log.Printf("⚠️ Failed to parse created_at: %s, error: %v", createdAtStr.String, err)
+				}
 			}
-
-			// Получаем attachments
-			attachments, err := getMessageAttachments(db, msg.ID)
-			if err == nil {
-				msg.Attachments = attachments
+			
+			if readAtStr.Valid {
+				formats := []string{
+					time.RFC3339Nano,
+					time.RFC3339,
+					"2006-01-02 15:04:05.999999-07:00",
+					"2006-01-02 15:04:05",
+				}
+				var t time.Time
+				var err error
+				for _, format := range formats {
+					t, err = time.Parse(format, readAtStr.String)
+					if err == nil {
+						msg.ReadAt = &t
+						break
+					}
+				}
 			}
+			log.Printf("✅ Scanned message %d: ID=%d, Content=%s", rowCount, msg.ID, msg.Content)
 
+		// FIXME: Moved sender/attachments loading outside loop to avoid SQLite deadlock
 			messages = append(messages, msg)
+log.Printf("✅ Message %d added to list", msg.ID)
 		}
+
+	log.Printf("✅ Scanned %d messages, now loading senders and attachments...", len(messages))
+
+	// Загружаем отправителей и attachments после закрытия rows
+	for i := range messages {
+		log.Printf("🔍 Loading data for message %d", messages[i].ID)
+		sender, err := getUserByID(db, messages[i].SenderID)
+		if err == nil {
+			messages[i].Sender = sender
+		}
+		attachments, _ := getMessageAttachments(db, messages[i].ID)
+		messages[i].Attachments = attachments
+	}
 
 		// Отмечаем все сообщения как прочитанные
 		go markMessagesAsRead(db, chatID, userID)
@@ -166,6 +254,7 @@ func GetChatMessagesHandler(db *sql.DB) http.HandlerFunc {
 		if messages == nil {
 			messages = []models.Message{}
 		}
+		log.Printf("✅ Returning %d messages for chat %d", len(messages), chatID)
 
 		w.Header().Set("Content-Type", "application/json")
 		json.NewEncoder(w).Encode(messages)
@@ -175,7 +264,11 @@ func GetChatMessagesHandler(db *sql.DB) http.HandlerFunc {
 // SendMessageHandler отправляет текстовое сообщение
 func SendMessageHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := r.Context().Value("userID").(int)
+		userID, ok := r.Context().Value("userID").(int)
+		if !ok || userID == 0 {
+			http.Error(w, `{"success":false,"error":"Unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
 
 		var req struct {
 			ReceiverID int    `json:"receiver_id"`
@@ -255,7 +348,11 @@ func SendMessageHandler(db *sql.DB) http.HandlerFunc {
 // GetUnreadCountHandler возвращает количество непрочитанных сообщений
 func GetUnreadCountHandler(db *sql.DB) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
-		userID := r.Context().Value("userID").(int)
+		userID, ok := r.Context().Value("userID").(int)
+		if !ok || userID == 0 {
+			http.Error(w, `{"success":false,"error":"Unauthorized"}`, http.StatusUnauthorized)
+			return
+		}
 
 		var count int
 		err := db.QueryRow(`
@@ -355,11 +452,16 @@ func SendMediaMessageHandler(db *sql.DB) http.HandlerFunc {
 			defer file.Close()
 
 			// Определяем тип файла
-			fileType := "image"
+			fileType := "file" // По умолчанию - обычный файл
 			contentType := fileHeader.Header.Get("Content-Type")
-			if strings.HasPrefix(contentType, "video/") {
+
+			if strings.HasPrefix(contentType, "image/") {
+				fileType = "image"
+			} else if strings.HasPrefix(contentType, "video/") {
 				fileType = "video"
 			}
+
+			log.Printf("📎 File type detected: %s (Content-Type: %s)", fileType, contentType)
 
 			// Сохраняем файл
 			filePath, err := saveUploadedFile(file, fileHeader.Filename)
@@ -480,12 +582,19 @@ func getMessageByID(db *sql.DB, messageID int) (*models.Message, error) {
 	sender, err := getUserByID(db, msg.SenderID)
 	if err == nil {
 		msg.Sender = sender
+log.Printf("✅ Sender loaded: %s", sender.Name)
+} else {
+log.Printf("⚠️ Failed to get sender for message %d: %v", msg.ID, err)
 	}
 
+log.Printf("🔍 Getting attachments for message %d", msg.ID)
 	// Получаем attachments
 	attachments, err := getMessageAttachments(db, messageID)
 	if err == nil {
 		msg.Attachments = attachments
+log.Printf("✅ Attachments loaded: %d items", len(attachments))
+} else {
+log.Printf("⚠️ Failed to get attachments for message %d: %v", msg.ID, err)
 	}
 
 	return &msg, nil
@@ -578,18 +687,31 @@ func userExists(db *sql.DB, userID int) (bool, error) {
 
 func getUserByID(db *sql.DB, userID int) (*models.User, error) {
 	var user models.User
+	var lastSeen sql.NullTime
+
 	err := db.QueryRow(`
-		SELECT id, email, name, last_name, avatar, cover_photo, bio, 
-		       location, phone, created_at
-		FROM users WHERE id = ?
+		SELECT u.id, u.email, u.name, u.last_name, u.avatar, u.cover_photo, u.bio, 
+		       u.location, u.phone, u.created_at, ua.last_seen
+		FROM users u
+		LEFT JOIN user_activity ua ON u.id = ua.user_id
+		WHERE u.id = ?
 	`, userID).Scan(
 		&user.ID, &user.Email, &user.Name, &user.LastName, &user.Avatar,
 		&user.CoverPhoto, &user.Bio, &user.Location, &user.Phone,
-		&user.CreatedAt,
+		&user.CreatedAt, &lastSeen,
 	)
 
 	if err != nil {
 		return nil, err
+	}
+
+	// Устанавливаем last_seen если есть
+	if lastSeen.Valid {
+		user.LastSeen = &lastSeen.Time
+		// Проверяем онлайн статус (активен в последние 5 минут)
+		user.IsOnline = time.Since(lastSeen.Time) < 5*time.Minute
+	} else {
+		user.IsOnline = false
 	}
 
 	return &user, nil

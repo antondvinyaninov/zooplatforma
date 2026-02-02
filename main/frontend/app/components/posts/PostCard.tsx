@@ -1,6 +1,6 @@
 'use client';
 
-import { useState, useEffect } from 'react';
+import { useState, useEffect, useLayoutEffect } from 'react';
 import { useRouter, useSearchParams } from 'next/navigation';
 import { formatDistanceToNow } from 'date-fns';
 import { ru } from 'date-fns/locale';
@@ -8,6 +8,7 @@ import { UserIcon } from '@heroicons/react/24/outline';
 import { Pencil, Trash2 } from 'lucide-react';
 import { getMediaUrl, getFullName } from '@/lib/utils';
 import { useAuth } from '@/contexts/AuthContext';
+import { postsApi } from '@/lib/api';
 import PostComments from '../shared/PostComments';
 import PostModal from './PostModal';
 import PollDisplay from '../polls/PollDisplay';
@@ -15,6 +16,7 @@ import PhotoGrid from './PhotoGrid';
 import LikersModal from './LikersModal';
 import PetCard from './PetCard';
 import ReportButton from './ReportButton';
+import CreatePost from './CreatePost';
 
 interface User {
   id: number;
@@ -22,6 +24,14 @@ interface User {
   last_name?: string;
   email: string;
   avatar?: string;
+}
+
+interface Organization {
+  id: number;
+  name: string;
+  short_name?: string;
+  logo?: string;
+  type?: string;
 }
 
 interface Pet {
@@ -94,122 +104,110 @@ interface Post {
   organization?: Organization;
   pets?: Pet[];
   poll?: Poll;
-  comments_count?: number;
+  comments_count: number;
+  can_edit?: boolean; // ✅ Добавлено поле can_edit из Backend
 }
 
 interface PostCardProps {
   post: Post;
   onDelete?: (postId: number) => void;
+  onUpdate?: (postId: number) => void;
 }
 
-export default function PostCard({ post, onDelete }: PostCardProps) {
+export default function PostCard({ post, onDelete, onUpdate }: PostCardProps) {
+  const { user } = useAuth();
   const router = useRouter();
   const searchParams = useSearchParams();
-  const { user } = useAuth();
   const [showMenu, setShowMenu] = useState(false);
+  const [scrollPosition, setScrollPosition] = useState(0);
   const [isLiked, setIsLiked] = useState(false);
   const [likesCount, setLikesCount] = useState(0);
-  const [commentsCount, setCommentsCount] = useState(post.comments_count || 0);
+  const [commentsCount, setCommentsCount] = useState(post.comments_count);
   const [showModal, setShowModal] = useState(false);
   const [showLikersModal, setShowLikersModal] = useState(false);
   const [showShareMenu, setShowShareMenu] = useState(false);
   const [shareMessage, setShareMessage] = useState('');
   const [showLikeAnimation, setShowLikeAnimation] = useState(false);
   const [showReportModal, setShowReportModal] = useState(false);
-  const [canEditPost, setCanEditPost] = useState(false);
+  const [showEditMode, setShowEditMode] = useState(false);
 
-  // Проверка прав на редактирование поста
+  // ✅ Используем can_edit из Backend вместо локальной проверки
+  const canEditPost = post.can_edit || false;
+
+  // Открываем модал если в URL есть параметр metka с ID этого поста
   useEffect(() => {
-    const checkEditPermission = async () => {
-      if (!user) {
-        setCanEditPost(false);
-        return;
-      }
-
-      // Если пост от пользователя - проверяем ID
-      if (post.author_type === 'user' && user.id === post.author_id) {
-        setCanEditPost(true);
-        return;
-      }
-
-      // Если пост от организации - проверяем членство
-      if (post.author_type === 'organization' && post.organization) {
-        try {
-          const response = await fetch(
-            `http://localhost:8000/api/organizations/${post.organization.id}/members`,
-            { credentials: 'include' }
-          );
-          
-          if (response.ok) {
-            const data = await response.json();
-            // Проверяем, есть ли текущий пользователь в списке участников
-            const member = data.members?.find((m: any) => m.user_id === user.id);
-            // Разрешаем редактирование owner, admin, moderator
-            if (member && ['owner', 'admin', 'moderator'].includes(member.role)) {
-              setCanEditPost(true);
-              return;
-            }
-          }
-        } catch (error) {
-          console.error('Ошибка проверки прав:', error);
-        }
-      }
-
-      setCanEditPost(false);
-    };
-
-    checkEditPermission();
-  }, [user, post.author_id, post.author_type, post.organization]);
-
-  // Проверяем, открыт ли этот пост через URL
-  useEffect(() => {
-    const postId = searchParams.get('metka');
-    if (postId === String(post.id)) {
+    const metkaId = searchParams.get('metka');
+    if (metkaId && parseInt(metkaId) === post.id) {
       setShowModal(true);
     }
   }, [searchParams, post.id]);
 
   useEffect(() => {
-    loadLikeStatus();
-  }, [post.id]);
+    // Загружаем статус лайка только если пользователь авторизован
+    if (user) {
+      loadLikeStatus();
+    } else {
+      // Для неавторизованных показываем 0 лайков
+      setIsLiked(false);
+      setLikesCount(0);
+    }
+  }, [post.id, user]);
+
+  // Отслеживаем изменение showMenu - используем useLayoutEffect для синхронного выполнения
+  useLayoutEffect(() => {
+    if (showMenu && scrollPosition > 0 && window.scrollY !== scrollPosition) {
+      window.scrollTo(0, scrollPosition);
+    }
+  }, [showMenu, scrollPosition]);
+
+  // Дополнительная проверка после рендера (прокрутка может произойти после useLayoutEffect)
+  useEffect(() => {
+    if (showMenu && scrollPosition > 0 && window.scrollY !== scrollPosition) {
+      window.scrollTo(0, scrollPosition);
+    }
+  }, [showMenu, scrollPosition]);
 
   const loadLikeStatus = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/posts/${post.id}/like`, {
-        method: 'GET',
-        credentials: 'include',
-      });
+      const response = await postsApi.getLikeStatus(post.id);
       
-      const result = await response.json();
-      if (result.success && result.data) {
-        setIsLiked(result.data.liked);
-        setLikesCount(result.data.likes_count);
+      if (response.success && response.data) {
+        setIsLiked(response.data.liked);
+        setLikesCount(response.data.likes_count);
+      } else {
+        setIsLiked(false);
+        setLikesCount(0);
       }
     } catch (error) {
-      console.error('Ошибка загрузки статуса лайка:', error);
+      console.error(`❌ [PostCard ${post.id}] Error loading like status:`, error);
+      setIsLiked(false);
+      setLikesCount(0);
     }
   };
 
   const handleLike = async () => {
     try {
-      const response = await fetch(`http://localhost:8000/api/posts/${post.id}/like`, {
-        method: 'POST',
-        credentials: 'include',
-      });
+      const response = await postsApi.toggleLike(post.id);
       
-      const result = await response.json();
-      if (result.success && result.data) {
-        setIsLiked(result.data.liked);
-        setLikesCount(result.data.likes_count);
+      if (response.success && response.data) {
+        setIsLiked(response.data.liked);
+        setLikesCount(response.data.likes_count);
         
         // Показываем анимацию только при лайке (не при анлайке)
-        if (result.data.liked) {
+        if (response.data.liked) {
           setShowLikeAnimation(true);
           setTimeout(() => setShowLikeAnimation(false), 1000);
         }
+      } else {
+        console.error(`❌ [PostCard ${post.id}] Invalid response:`, response);
       }
     } catch (error) {
-      console.error('Ошибка лайка:', error);
+      console.error(`❌ [PostCard ${post.id}] Error toggling like:`, error);
+      console.error(`❌ [PostCard ${post.id}] Error details:`, {
+        name: error instanceof Error ? error.name : 'Unknown',
+        message: error instanceof Error ? error.message : String(error),
+        stack: error instanceof Error ? error.stack : undefined,
+      });
     }
   };
 
@@ -249,7 +247,7 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
   const handleOpenModal = () => {
     setShowModal(true);
     // Добавляем параметр metka в URL
-    router.push(`/?metka=${post.id}`, { scroll: false });
+    router.push(`?metka=${post.id}`, { scroll: false });
   };
 
   const handleCloseModal = () => {
@@ -263,6 +261,9 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
       return;
     }
 
+    // Сохраняем текущую позицию скролла перед удалением
+    const currentScroll = window.scrollY;
+
     try {
       const response = await fetch(`http://localhost:8000/api/posts/${post.id}`, {
         method: 'DELETE',
@@ -272,8 +273,14 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
       if (response.ok) {
         if (onDelete) {
           onDelete(post.id);
+          
+          // Восстанавливаем позицию скролла через 10ms (прокрутка происходит между 0-10ms)
+          setTimeout(() => {
+            if (window.scrollY !== currentScroll) {
+              window.scrollTo(0, currentScroll);
+            }
+          }, 10);
         }
-        // Можно добавить уведомление об успешном удалении
       } else {
         alert('Ошибка при удалении поста');
       }
@@ -285,9 +292,20 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
   };
 
   const handleEditPost = () => {
-    // TODO: Открыть модальное окно редактирования или перейти на страницу редактирования
-    alert('Функция редактирования в разработке');
+    setShowEditMode(true);
     setShowMenu(false);
+  };
+
+  const handlePostUpdated = () => {
+    setShowEditMode(false);
+    
+    // Обновляем пост локально без перезагрузки страницы
+    if (onUpdate) {
+      onUpdate(post.id);
+    } else {
+      // Fallback: перезагружаем страницу если onUpdate не передан
+      window.location.reload();
+    }
   };
 
   const getTimeAgo = (dateString: string) => {
@@ -348,7 +366,16 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
         {/* Menu Button */}
         <div className="relative">
           <button
-            onClick={() => setShowMenu(!showMenu)}
+            type="button"
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              
+              // Сохраняем текущую позицию скролла
+              const currentScroll = window.scrollY;
+              setScrollPosition(currentScroll);
+              setShowMenu(!showMenu);
+            }}
             className="p-2 hover:bg-gray-100 rounded-full transition-colors"
           >
             <svg className="w-5 h-5 text-gray-600" fill="currentColor" viewBox="0 0 24 24">
@@ -363,14 +390,22 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
               {canEditPost && (
                 <>
                   <button
-                    onClick={handleEditPost}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleEditPost();
+                    }}
                     className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-gray-700 transition-colors"
                   >
                     <Pencil className="w-5 h-5 text-blue-500" />
                     <span>Редактировать</span>
                   </button>
                   <button
-                    onClick={handleDeletePost}
+                    type="button"
+                    onClick={(e) => {
+                      e.preventDefault();
+                      handleDeletePost();
+                    }}
                     className="w-full px-4 py-2 text-left hover:bg-gray-50 flex items-center gap-3 text-red-600 transition-colors"
                   >
                     <Trash2 className="w-5 h-5" />
@@ -382,7 +417,9 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
               
               {/* Пожаловаться */}
               <button
-                onClick={() => {
+                type="button"
+                onClick={(e) => {
+                  e.preventDefault();
                   setShowReportModal(true);
                   setShowMenu(false);
                 }}
@@ -568,6 +605,22 @@ export default function PostCard({ post, onDelete }: PostCardProps) {
           targetName={`Пост от ${post.author_type === 'organization' ? (post.organization?.short_name || post.organization?.name) : getFullName(post.user?.name || '', post.user?.last_name)}`}
           isOpen={showReportModal}
           onClose={() => setShowReportModal(false)}
+        />
+      )}
+
+      {/* Edit Mode - используем CreatePost компонент */}
+      {showEditMode && (
+        <CreatePost
+          editMode={true}
+          editPost={{
+            id: post.id,
+            content: post.content,
+            attached_pets: post.attached_pets,
+            attachments: post.attachments,
+            tags: post.tags,
+            poll: post.poll,
+          }}
+          onPostUpdated={handlePostUpdated}
         />
       )}
     </div>

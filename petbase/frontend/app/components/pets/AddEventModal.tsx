@@ -8,7 +8,7 @@ import {
   eventTypeIcons,
   deathReasonLabels,
   petEventsApi 
-} from '../../../lib/petid-api';
+} from '../../../lib/api';
 
 interface AddEventModalProps {
   petId: number;

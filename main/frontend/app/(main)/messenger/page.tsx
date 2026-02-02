@@ -1,167 +1,66 @@
 'use client';
 
-import { useState, useEffect, useRef } from 'react';
-import { useAuth } from '@/contexts/AuthContext';
+import { useEffect, useState, useRef } from 'react';
 import { useRouter } from 'next/navigation';
-
-interface User {
-  id: number;
-  name: string;
-  last_name: string;
-  avatar?: string;
-  email?: string;
-}
-
-interface Message {
-  id: number;
-  chat_id: number;
-  sender_id: number;
-  receiver_id: number;
-  content: string;
-  is_read: boolean;
-  read_at?: string;
-  created_at: string;
-  sender?: User;
-  attachments?: MessageAttachment[];
-}
-
-interface MessageAttachment {
-  id: number;
-  message_id: number;
-  file_path: string;
-  file_type: string;
-  file_size: number;
-  created_at: string;
-}
-
-interface Chat {
-  id: number;
-  user1_id: number;
-  user2_id: number;
-  last_message_id?: number;
-  last_message_at?: string;
-  created_at: string;
-  other_user?: User;
-  last_message?: Message;
-  unread_count: number;
-}
+import { useAuth } from '@/contexts/AuthContext';
+import ChatList from './components/ChatList';
+import ChatHeader from './components/ChatHeader';
+import MessageList from './components/MessageList';
+import MessageInput from './components/MessageInput';
+import { Chat, Message } from './types';
 
 export default function MessengerPage() {
-  const { user, isAuthenticated, isLoading } = useAuth();
   const router = useRouter();
-  const searchParams = new URLSearchParams(typeof window !== 'undefined' ? window.location.search : '');
-  const userIdParam = searchParams.get('user');
-  
+  const { user, isLoading: authLoading } = useAuth();
   const [chats, setChats] = useState<Chat[]>([]);
-  const [selectedChat, setSelectedChat] = useState<Chat | null>(null);
-  const [messages, setMessages] = useState<Message[]>([]);
-  const [newMessage, setNewMessage] = useState('');
   const [loading, setLoading] = useState(true);
+  const [isCollapsed, setIsCollapsed] = useState(false);
+  const [messageText, setMessageText] = useState('');
+  const [messages, setMessages] = useState<Message[]>([]);
+  const [selectedChatId, setSelectedChatId] = useState<number | null>(null);
   const [sending, setSending] = useState(false);
-  const [selectedFiles, setSelectedFiles] = useState<File[]>([]);
-  const [previewUrls, setPreviewUrls] = useState<string[]>([]);
-  const messagesEndRef = useRef<HTMLDivElement>(null);
-  const fileInputRef = useRef<HTMLInputElement>(null);
+  const [isFetchingChats, setIsFetchingChats] = useState(false);
+  const chatsLoaded = useRef(false);
 
+  // Проверка авторизации
   useEffect(() => {
-    // Проверяем только на клиенте
-    if (typeof window === 'undefined') return;
-    
-    if (!isLoading && !isAuthenticated) {
-      router.push('/auth');
-      return;
+    if (!authLoading && !user) {
+      router.push('/login');
     }
-    
-    if (user) {
+  }, [user, authLoading, router]);
+
+  // Блокируем скролл страницы
+  useEffect(() => {
+    document.body.style.overflow = 'hidden';
+    return () => {
+      document.body.style.overflow = 'unset';
+    };
+  }, []);
+
+  // Загружаем чаты только один раз при монтировании
+  useEffect(() => {
+    if (user && !chatsLoaded.current) {
+      chatsLoaded.current = true;
       fetchChats();
     }
-  }, [user, isLoading, isAuthenticated, router]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [user?.id]);
 
+  // Загружаем сообщения при выборе чата
   useEffect(() => {
-    // Если есть параметр user в URL, пытаемся открыть диалог с этим пользователем
-    if (userIdParam && chats.length > 0 && !selectedChat && user) {
-      const targetUserId = parseInt(userIdParam);
-      const existingChat = chats.find(chat => 
-        chat.other_user?.id === targetUserId
-      );
-      
-      if (existingChat) {
-        setSelectedChat(existingChat);
-      } else {
-        // Создаем временный "чат" для нового диалога
-        const newChat: Chat = {
-          id: 0, // Временный ID
-          user1_id: user.id,
-          user2_id: targetUserId,
-          created_at: new Date().toISOString(),
-          unread_count: 0,
-          other_user: {
-            id: targetUserId,
-            name: 'Загрузка...',
-            last_name: '',
-            email: '',
-          }
-        };
-        setSelectedChat(newChat);
-        
-        // Загружаем информацию о пользователе
-        fetch(`http://localhost:8000/api/users/${targetUserId}`, {
-          credentials: 'include',
-        })
-          .then(res => res.json())
-          .then(data => {
-            // API возвращает { success: true, data: {...} }
-            const userData = data.data || data;
-            setSelectedChat(prev => prev ? {
-              ...prev,
-              other_user: userData
-            } : null);
-          })
-          .catch(err => console.error('Error loading user:', err));
-      }
+    if (selectedChatId) {
+      fetchMessages(selectedChatId);
     }
-  }, [userIdParam, chats, selectedChat, user]);
-
-  useEffect(() => {
-    // Загружаем сообщения только для реальных чатов (не временных)
-    if (selectedChat && selectedChat.id > 0) {
-      fetchMessages(selectedChat.id);
-    } else if (selectedChat && selectedChat.id === 0) {
-      // Для нового диалога просто очищаем сообщения
-      setMessages([]);
-    }
-  }, [selectedChat]);
-
-  useEffect(() => {
-    scrollToBottom();
-  }, [messages]);
-
-  const scrollToBottom = () => {
-    messagesEndRef.current?.scrollIntoView({ behavior: 'smooth' });
-  };
-
-  const fetchChats = async () => {
-    try {
-      const response = await fetch('http://localhost:8000/api/chats', {
-        credentials: 'include',
-      });
-
-      if (response.ok) {
-        const data = await response.json();
-        setChats(data);
-      } else if (response.status === 401) {
-        // Пользователь не авторизован - редирект на /auth
-        router.push('/auth');
-      }
-    } catch (error) {
-      // Тихо игнорируем ошибки сети при загрузке
-      console.debug('Could not fetch chats:', error);
-    } finally {
-      setLoading(false);
-    }
-  };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [selectedChatId]);
 
   const fetchMessages = async (chatId: number) => {
+    // Если это временный чат (ID < 0), не загружаем сообщения
+    if (chatId < 0) {
+      setMessages([]);
+      return;
+    }
+
     try {
       const response = await fetch(`http://localhost:8000/api/chats/${chatId}/messages`, {
         credentials: 'include',
@@ -170,394 +69,220 @@ export default function MessengerPage() {
       if (response.ok) {
         const data = await response.json();
         setMessages(data);
-        
-        // Обновляем счетчик непрочитанных в списке чатов
-        setChats(prevChats =>
-          prevChats.map(chat =>
-            chat.id === chatId ? { ...chat, unread_count: 0 } : chat
-          )
-        );
+      } else {
+        console.error('Failed to fetch messages:', response.status);
+        setMessages([]);
       }
     } catch (error) {
       console.error('Error fetching messages:', error);
+      setMessages([]);
     }
   };
 
-  const sendMessage = async (e: React.FormEvent) => {
+  const fetchChats = async () => {
+    if (isFetchingChats) return;
+    
+    setIsFetchingChats(true);
+    try {
+      const response = await fetch('http://localhost:8000/api/chats', {
+        credentials: 'include',
+      });
+
+      if (response.ok) {
+        const data = await response.json();
+        setChats(data);
+      } else {
+        console.error('Failed to fetch chats:', response.status);
+      }
+    } catch (error) {
+      console.error('Ошибка загрузки чатов:', error);
+    } finally {
+      setLoading(false);
+      setIsFetchingChats(false);
+    }
+  };
+
+  const handleSendMessage = async (e: React.FormEvent) => {
     e.preventDefault();
     
-    if ((!newMessage.trim() && selectedFiles.length === 0) || !selectedChat || sending) return;
+    if (!messageText.trim() || !selectedChatId || sending) return;
 
-    const isNewChat = selectedChat.id === 0;
-    const receiverId = selectedChat.other_user?.id;
-
-    if (!receiverId) {
-      console.error('Receiver ID is missing');
+    const selectedChat = chats.find(c => c.id === selectedChatId);
+    
+    if (!selectedChat?.other_user?.id) {
+      console.error('Не найден получатель сообщения');
       return;
     }
 
     setSending(true);
+    
     try {
-      let response;
-      
-      // Если есть файлы, отправляем через /api/messages/send-media
-      if (selectedFiles.length > 0) {
-        const formData = new FormData();
-        formData.append('receiver_id', receiverId.toString());
-        formData.append('content', newMessage.trim());
-        
-        selectedFiles.forEach(file => {
-          formData.append('media', file);
-        });
-
-        response = await fetch('http://localhost:8000/api/messages/send-media', {
-          method: 'POST',
-          credentials: 'include',
-          body: formData,
-        });
-      } else {
-        // Обычное текстовое сообщение
-        response = await fetch('http://localhost:8000/api/messages/send', {
-          method: 'POST',
-          headers: {
-            'Content-Type': 'application/json',
-          },
-          credentials: 'include',
-          body: JSON.stringify({
-            receiver_id: receiverId,
-            content: newMessage.trim(),
-          }),
-        });
-      }
+      const response = await fetch(`http://localhost:8000/api/messages/send`, {
+        method: 'POST',
+        headers: {
+          'Content-Type': 'application/json',
+        },
+        credentials: 'include',
+        body: JSON.stringify({
+          receiver_id: selectedChat.other_user.id,
+          content: messageText.trim(),
+        }),
+      });
 
       if (response.ok) {
-        const message = await response.json();
-        setMessages(prev => [...prev, message]);
-        setNewMessage('');
-        setSelectedFiles([]);
-        setPreviewUrls([]);
+        setMessageText('');
         
-        // Если это был новый чат, обновляем список чатов и выбираем созданный
-        if (isNewChat) {
-          const chatsResponse = await fetch('http://localhost:8000/api/chats', {
+        // Если это был временный чат (ID < 0), нужно обновить список чатов
+        if (selectedChatId < 0) {
+          const updatedChatsResponse = await fetch('http://localhost:8000/api/chats', {
             credentials: 'include',
           });
           
-          if (chatsResponse.ok) {
-            const updatedChats = await chatsResponse.json();
+          if (updatedChatsResponse.ok) {
+            const updatedChats = await updatedChatsResponse.json();
             setChats(updatedChats);
             
-            // Находим и выбираем только что созданный чат
-            const newChat = updatedChats.find((chat: Chat) => 
-              chat.other_user?.id === receiverId
-            );
+            const realChat = updatedChats.find((chat: Chat) => chat.other_user?.id === selectedChat.other_user?.id);
             
-            if (newChat) {
-              setSelectedChat(newChat);
+            if (realChat) {
+              setSelectedChatId(realChat.id);
+              fetchMessages(realChat.id);
             }
           }
         } else {
-          // Просто обновляем список чатов для обновления last_message
-          fetchChats();
+          // Обычный чат - просто перезагружаем сообщения
+          fetchMessages(selectedChatId);
         }
-      } else {
-        const errorData = await response.json();
-        console.error('Error sending message:', errorData);
       }
     } catch (error) {
-      console.error('Error sending message:', error);
+      console.error('Ошибка отправки сообщения:', error);
     } finally {
       setSending(false);
     }
   };
 
-  const handleFileSelect = (e: React.ChangeEvent<HTMLInputElement>) => {
-    const files = Array.from(e.target.files || []);
-    
-    // Фильтруем только изображения и видео
-    const validFiles = files.filter(file => 
-      file.type.startsWith('image/') || file.type.startsWith('video/')
-    );
+  const handleFileSelect = async (e: React.ChangeEvent<HTMLInputElement>) => {
+    const files = e.target.files;
+    if (!files || files.length === 0 || !selectedChatId) return;
 
-    if (validFiles.length === 0) {
-      alert('Пожалуйста, выберите изображения или видео');
+    const selectedChat = chats.find(c => c.id === selectedChatId);
+    if (!selectedChat?.other_user?.id) {
+      console.error('Не найден получатель сообщения');
       return;
     }
 
-    // Ограничение: максимум 5 файлов
-    if (selectedFiles.length + validFiles.length > 5) {
-      alert('Максимум 5 файлов за раз');
-      return;
+    setSending(true);
+
+    try {
+      const formData = new FormData();
+      formData.append('receiver_id', selectedChat.other_user.id.toString());
+      
+      if (messageText.trim()) {
+        formData.append('content', messageText.trim());
+      }
+
+      Array.from(files).forEach(file => {
+        formData.append('media', file);
+      });
+
+      const response = await fetch('http://localhost:8000/api/messages/send-media', {
+        method: 'POST',
+        credentials: 'include',
+        body: formData,
+      });
+
+      if (response.ok) {
+        setMessageText('');
+        
+        if (selectedChatId < 0) {
+          await fetchChats();
+          const updatedChatsResponse = await fetch('http://localhost:8000/api/chats', {
+            credentials: 'include',
+          });
+          
+          if (updatedChatsResponse.ok) {
+            const updatedChats = await updatedChatsResponse.json();
+            const realChat = updatedChats.find((chat: Chat) => chat.other_user?.id === selectedChat.other_user?.id);
+            
+            if (realChat) {
+              setSelectedChatId(realChat.id);
+              fetchMessages(realChat.id);
+            }
+          }
+        } else {
+          fetchMessages(selectedChatId);
+          fetchChats();
+        }
+      } else {
+        const errorText = await response.text();
+        console.error('Ошибка отправки медиа:', errorText);
+        alert('Ошибка отправки файла');
+      }
+    } catch (error) {
+      console.error('Ошибка отправки медиа:', error);
+      alert('Ошибка отправки файла');
+    } finally {
+      setSending(false);
     }
-
-    setSelectedFiles(prev => [...prev, ...validFiles]);
-
-    // Создаем preview URLs
-    validFiles.forEach(file => {
-      const reader = new FileReader();
-      reader.onloadend = () => {
-        setPreviewUrls(prev => [...prev, reader.result as string]);
-      };
-      reader.readAsDataURL(file);
-    });
   };
 
-  const removeFile = (index: number) => {
-    setSelectedFiles(prev => prev.filter((_, i) => i !== index));
-    setPreviewUrls(prev => prev.filter((_, i) => i !== index));
+  const handleCloseChat = () => {
+    setSelectedChatId(null);
+    setMessages([]);
   };
 
-  const formatTime = (dateString: string) => {
-    const date = new Date(dateString);
-    const now = new Date();
-    const diff = now.getTime() - date.getTime();
-    const days = Math.floor(diff / (1000 * 60 * 60 * 24));
-
-    if (days === 0) {
-      return date.toLocaleTimeString('ru-RU', { hour: '2-digit', minute: '2-digit' });
-    } else if (days === 1) {
-      return 'Вчера';
-    } else if (days < 7) {
-      return date.toLocaleDateString('ru-RU', { weekday: 'short' });
-    } else {
-      return date.toLocaleDateString('ru-RU', { day: 'numeric', month: 'short' });
-    }
-  };
-
-  if (isLoading || loading) {
-    return (
-      <div className="flex items-center justify-center min-h-screen">
-        <div className="text-gray-500">Загрузка...</div>
-      </div>
-    );
-  }
+  const selectedChat = chats.find(c => c.id === selectedChatId);
 
   return (
-    <div className="flex h-[calc(100vh-64px)] bg-gray-50">
-      {/* Список диалогов */}
-      <div className="w-80 bg-white border-r border-gray-200 flex flex-col">
-        <div className="p-4 border-b border-gray-200">
-          <h1 className="text-xl font-semibold">Мессенджер</h1>
-        </div>
+    <div className="h-[calc(100vh-74px)] bg-white rounded-lg shadow-sm border border-gray-200 flex overflow-hidden">
+      {/* Левая панель - список чатов */}
+      <ChatList
+        chats={chats}
+        loading={loading}
+        isCollapsed={isCollapsed}
+        selectedChatId={selectedChatId}
+        currentUserId={user?.id}
+        onToggleCollapse={() => setIsCollapsed(!isCollapsed)}
+        onSelectChat={setSelectedChatId}
+      />
 
-        <div className="flex-1 overflow-y-auto">
-          {chats.length === 0 ? (
-            <div className="p-4 text-center text-gray-500">
-              Нет диалогов
-            </div>
-          ) : (
-            chats.map(chat => (
-              <button
-                key={chat.id}
-                onClick={() => setSelectedChat(chat)}
-                className={`w-full p-4 flex items-start gap-3 hover:bg-gray-50 transition-colors border-b border-gray-100 ${
-                  selectedChat?.id === chat.id ? 'bg-blue-50' : ''
-                }`}
-              >
-                {/* Аватар */}
-                <div className="w-12 h-12 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold flex-shrink-0">
-                  {chat.other_user?.name?.[0]?.toUpperCase() || '?'}
-                </div>
-
-                {/* Информация */}
-                <div className="flex-1 min-w-0 text-left">
-                  <div className="flex items-center justify-between mb-1">
-                    <span className="font-medium text-gray-900 truncate">
-                      {chat.other_user?.name} {chat.other_user?.last_name}
-                    </span>
-                    {chat.last_message_at && (
-                      <span className="text-xs text-gray-500 ml-2 flex-shrink-0">
-                        {formatTime(chat.last_message_at)}
-                      </span>
-                    )}
-                  </div>
-                  
-                  {chat.last_message && (
-                    <div className="flex items-center justify-between">
-                      <p className="text-sm text-gray-600 truncate">
-                        {chat.last_message.sender_id === user?.id && 'Вы: '}
-                        {chat.last_message.content}
-                      </p>
-                      {chat.unread_count > 0 && (
-                        <span className="ml-2 bg-blue-500 text-white text-xs rounded-full w-5 h-5 flex items-center justify-center flex-shrink-0">
-                          {chat.unread_count}
-                        </span>
-                      )}
-                    </div>
-                  )}
-                </div>
-              </button>
-            ))
-          )}
-        </div>
-      </div>
-
-      {/* Окно чата */}
-      <div className="flex-1 flex flex-col bg-white">
-        {selectedChat ? (
+      {/* Правая часть - окно чата */}
+      <div className="flex-1 flex flex-col bg-gray-50">
+        {selectedChatId ? (
           <>
             {/* Шапка чата */}
-            <div className="p-4 border-b border-gray-200 flex items-center gap-3">
-              <div className="w-10 h-10 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white font-semibold">
-                {selectedChat.other_user?.name?.[0]?.toUpperCase() || '?'}
-              </div>
-              <div>
-                <h2 className="font-semibold text-gray-900">
-                  {selectedChat.other_user?.name} {selectedChat.other_user?.last_name}
-                </h2>
-                {selectedChat.id === 0 && (
-                  <p className="text-xs text-gray-500">Новый диалог</p>
-                )}
-              </div>
-            </div>
+            <ChatHeader 
+              user={selectedChat?.other_user || null}
+              onClose={handleCloseChat}
+            />
 
-            {/* Сообщения */}
-            <div className="flex-1 overflow-y-auto p-4 space-y-4">
-              {messages.length === 0 && selectedChat.id === 0 ? (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  <div className="text-center">
-                    <div className="w-16 h-16 mx-auto mb-4 rounded-full bg-gradient-to-br from-blue-400 to-purple-500 flex items-center justify-center text-white text-2xl font-semibold">
-                      {selectedChat.other_user?.name?.[0]?.toUpperCase() || '?'}
-                    </div>
-                    <p className="text-lg font-medium text-gray-900 mb-1">
-                      {selectedChat.other_user?.name} {selectedChat.other_user?.last_name}
-                    </p>
-                    <p className="text-sm text-gray-500">
-                      Начните диалог, отправив первое сообщение
-                    </p>
-                  </div>
-                </div>
-              ) : messages.length === 0 ? (
-                <div className="flex items-center justify-center h-full text-gray-500">
-                  Нет сообщений
-                </div>
-              ) : (
-                messages.map(message => {
-                  const isMyMessage = message.sender_id === user?.id;
-                  
-                  return (
-                    <div
-                      key={message.id}
-                      className={`flex ${isMyMessage ? 'justify-end' : 'justify-start'}`}
-                    >
-                      <div
-                        className={`max-w-[70%] rounded-2xl px-4 py-2 ${
-                          isMyMessage
-                            ? 'bg-blue-500 text-white'
-                            : 'bg-gray-100 text-gray-900'
-                        }`}
-                      >
-                        {/* Attachments */}
-                        {message.attachments && message.attachments.length > 0 && (
-                          <div className="mb-2 space-y-2">
-                            {message.attachments.map((attachment, idx) => (
-                              <div key={idx}>
-                                {attachment.file_type === 'image' ? (
-                                  <img
-                                    src={`http://localhost:8000${attachment.file_path}`}
-                                    alt="Изображение"
-                                    className="rounded-lg max-w-full h-auto cursor-pointer"
-                                    onClick={() => window.open(`http://localhost:8000${attachment.file_path}`, '_blank')}
-                                  />
-                                ) : attachment.file_type === 'video' ? (
-                                  <video
-                                    src={`http://localhost:8000${attachment.file_path}`}
-                                    controls
-                                    className="rounded-lg max-w-full h-auto"
-                                  />
-                                ) : null}
-                              </div>
-                            ))}
-                          </div>
-                        )}
-                        
-                        {/* Text content */}
-                        {message.content && (
-                          <p className="whitespace-pre-wrap break-words">{message.content}</p>
-                        )}
-                        
-                        <div
-                          className={`text-xs mt-1 ${
-                            isMyMessage ? 'text-blue-100' : 'text-gray-500'
-                          }`}
-                        >
-                          {formatTime(message.created_at)}
-                        </div>
-                      </div>
-                    </div>
-                  );
-                })
-              )}
-              <div ref={messagesEndRef} />
-            </div>
+            {/* Область сообщений */}
+            <MessageList 
+              messages={messages}
+              currentUserId={user?.id}
+            />
 
-            {/* Форма отправки */}
-            <form onSubmit={sendMessage} className="p-4 border-t border-gray-200">
-              {/* Preview выбранных файлов */}
-              {previewUrls.length > 0 && (
-                <div className="mb-3 flex gap-2 flex-wrap">
-                  {previewUrls.map((url, index) => (
-                    <div key={index} className="relative">
-                      <img
-                        src={url}
-                        alt={`Preview ${index + 1}`}
-                        className="w-20 h-20 object-cover rounded-lg"
-                      />
-                      <button
-                        type="button"
-                        onClick={() => removeFile(index)}
-                        className="absolute -top-2 -right-2 w-6 h-6 bg-red-500 text-white rounded-full flex items-center justify-center hover:bg-red-600 transition-colors"
-                      >
-                        ×
-                      </button>
-                    </div>
-                  ))}
-                </div>
-              )}
-
-              <div className="flex gap-2">
-                {/* Кнопка загрузки файлов */}
-                <input
-                  ref={fileInputRef}
-                  type="file"
-                  accept="image/*,video/*"
-                  multiple
-                  onChange={handleFileSelect}
-                  className="hidden"
-                />
-                <button
-                  type="button"
-                  onClick={() => fileInputRef.current?.click()}
-                  className="px-4 py-2 text-gray-600 hover:text-gray-800 hover:bg-gray-100 rounded-full transition-colors"
-                  disabled={sending}
-                  title="Прикрепить фото или видео"
-                >
-                  <svg className="w-6 h-6" fill="none" stroke="currentColor" viewBox="0 0 24 24">
-                    <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M15.172 7l-6.586 6.586a2 2 0 102.828 2.828l6.414-6.586a4 4 0 00-5.656-5.656l-6.415 6.585a6 6 0 108.486 8.486L20.5 13" />
-                  </svg>
-                </button>
-
-                <input
-                  type="text"
-                  value={newMessage}
-                  onChange={(e) => setNewMessage(e.target.value)}
-                  placeholder="Написать сообщение..."
-                  className="flex-1 px-4 py-2 border border-gray-300 rounded-full focus:outline-none focus:ring-2 focus:ring-blue-500"
-                  disabled={sending}
-                />
-                <button
-                  type="submit"
-                  disabled={(!newMessage.trim() && selectedFiles.length === 0) || sending}
-                  className="px-6 py-2 bg-blue-500 text-white rounded-full hover:bg-blue-600 disabled:opacity-50 disabled:cursor-not-allowed transition-colors"
-                >
-                  {sending ? 'Отправка...' : 'Отправить'}
-                </button>
-              </div>
-            </form>
+            {/* Поле ввода */}
+            <MessageInput
+              messageText={messageText}
+              sending={sending}
+              onMessageChange={setMessageText}
+              onSendMessage={handleSendMessage}
+              onFileSelect={handleFileSelect}
+            />
           </>
         ) : (
-          <div className="flex-1 flex items-center justify-center text-gray-500">
-            Выберите диалог
+          <div className="flex-1 flex items-center justify-center" style={{
+            backgroundImage: `url("data:image/svg+xml,%3Csvg width='60' height='60' viewBox='0 0 60 60' xmlns='http://www.w3.org/2000/svg'%3E%3Cg fill='none' fill-rule='evenodd'%3E%3Cg fill='%23e3f2fd' fill-opacity='0.4'%3E%3Cpath d='M36 34v-4h-2v4h-4v2h4v4h2v-4h4v-2h-4zm0-30V0h-2v4h-4v2h4v4h2V6h4V4h-4zM6 34v-4H4v4H0v2h4v4h2v-4h4v-2H6zM6 4V0H4v4H0v2h4v4h2V6h4V4H6z'/%3E%3C/g%3E%3C/g%3E%3C/svg%3E")`,
+            backgroundColor: '#e3f2fd'
+          }}>
+            <div className="text-center text-gray-400">
+              <svg className="w-24 h-24 mx-auto mb-4 text-gray-300" fill="none" stroke="currentColor" viewBox="0 0 24 24">
+                <path strokeLinecap="round" strokeLinejoin="round" strokeWidth={2} d="M8 12h.01M12 12h.01M16 12h.01M21 12c0 4.418-4.03 8-9 8a9.863 9.863 0 01-4.255-.949L3 20l1.395-3.72C3.512 15.042 3 13.574 3 12c0-4.418 4.03-8 9-8s9 3.582 9 8z" />
+              </svg>
+              <p className="text-lg font-medium">Выберите чат</p>
+              <p className="text-sm mt-1">Чтобы начать общение</p>
+            </div>
           </div>
         )}
       </div>

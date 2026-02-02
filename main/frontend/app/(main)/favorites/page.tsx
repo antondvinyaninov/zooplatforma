@@ -3,7 +3,7 @@
 import { useState, useEffect } from 'react';
 import { useRouter } from 'next/navigation';
 import { HeartIcon } from '@heroicons/react/24/solid';
-import { getFavorites, removeFavorite } from '@/lib/favorites-api';
+import { getFavorites, removeFavorite, type Favorite } from '@/lib/favorites-api';
 
 interface Pet {
   id: number;
@@ -25,11 +25,7 @@ interface Pet {
   organization_type?: string;
 }
 
-interface FavoriteWithPet {
-  id: number;
-  user_id: number;
-  pet_id: number;
-  created_at: string;
+interface FavoriteWithPet extends Favorite {
   pet?: Pet;
 }
 
@@ -68,7 +64,7 @@ export default function FavoritesPage() {
         })
       );
 
-      setFavorites(favoritesWithPets.filter(f => f.pet));
+      setFavorites(favoritesWithPets as FavoriteWithPet[]);
     } catch (error) {
       console.error('Error loading favorites:', error);
     } finally {
@@ -180,7 +176,8 @@ export default function FavoritesPage() {
       ) : (
         <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-6">
           {favorites.map((favorite) => {
-            const pet = favorite.pet!;
+            if (!favorite.pet) return null;
+            const pet = favorite.pet;
             return (
               <div
                 key={favorite.id}

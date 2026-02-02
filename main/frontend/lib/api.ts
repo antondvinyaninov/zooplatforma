@@ -1,4 +1,5 @@
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 'http://localhost:8000';
+const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL || 'http://localhost:7100';
 
 interface ApiResponse<T> {
   success: boolean;
@@ -13,10 +14,15 @@ export class ApiClient {
     this.baseUrl = baseUrl;
   }
 
-  private getHeaders(): HeadersInit {
-    return {
+  private async getHeaders(): Promise<HeadersInit> {
+    const headers: HeadersInit = {
       'Content-Type': 'application/json',
     };
+
+    // ✅ ВАЖНО: Cookie auth_token автоматически отправляется браузером через credentials: 'include'
+    // Не нужно добавлять Authorization header - используем HttpOnly cookie
+
+    return headers;
   }
 
   private async handleResponse<T>(response: Response): Promise<ApiResponse<T>> {
@@ -44,16 +50,14 @@ export class ApiClient {
   }
 
   async get<T>(endpoint: string): Promise<ApiResponse<T>> {
-    try {
+    try {      const headers = await this.getHeaders();      
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'GET',
-        headers: this.getHeaders(),
+        headers,
         credentials: 'include', // Include cookies
       });
-
       return this.handleResponse<T>(response);
-    } catch (error) {
-      return {
+    } catch (error) {      return {
         success: false,
         error: error instanceof Error ? error.message : 'Unknown error',
       };
@@ -62,9 +66,10 @@ export class ApiClient {
 
   async post<T>(endpoint: string, body: unknown): Promise<ApiResponse<T>> {
     try {
+      const headers = await this.getHeaders();
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'POST',
-        headers: this.getHeaders(),
+        headers,
         credentials: 'include', // Include cookies
         body: JSON.stringify(body),
       });
@@ -80,9 +85,10 @@ export class ApiClient {
 
   async put<T>(endpoint: string, body: unknown): Promise<ApiResponse<T>> {
     try {
+      const headers = await this.getHeaders();
       const response = await fetch(`${this.baseUrl}${endpoint}`, {
         method: 'PUT',
-        headers: this.getHeaders(),
+        headers,
         credentials: 'include', // Include cookies
         body: JSON.stringify(body),
       });
@@ -98,9 +104,10 @@ export class ApiClient {
 
   async delete<T>(endpoint: string, body?: unknown): Promise<ApiResponse<T>> {
     try {
+      const headers = await this.getHeaders();
       const options: RequestInit = {
         method: 'DELETE',
-        headers: this.getHeaders(),
+        headers,
         credentials: 'include', // Include cookies
       };
       
@@ -121,8 +128,9 @@ export class ApiClient {
 }
 
 export const apiClient = new ApiClient(API_URL);
+export const authClient = new ApiClient(AUTH_URL);
 
-// API методы
+// API методы для авторизации (используют Main Backend который проксирует к Auth Service)
 export const authApi = {
   register: (name: string, email: string, password: string) =>
     apiClient.post<{ user: User }>('/api/auth/register', { name, email, password }),
@@ -165,10 +173,16 @@ export const usersApi = {
   
   // Загрузка аватара
   uploadAvatar: async (file: File): Promise<ApiResponse<{ avatar_url: string; message: string }>> => {
-    const formData = new FormData();
-    formData.append('avatar', file);
-    
     try {
+      // Импортируем функцию сжатия
+      const { compressAvatarImage } = await import('./image-compression');
+      
+      // Сжимаем изображение
+      const compressedFile = await compressAvatarImage(file);
+      
+      const formData = new FormData();
+      formData.append('avatar', compressedFile);
+      
       const response = await fetch(`${API_URL}/api/profile/avatar`, {
         method: 'POST',
         credentials: 'include',
@@ -198,10 +212,16 @@ export const usersApi = {
   
   // Загрузка обложки
   uploadCover: async (file: File): Promise<ApiResponse<{ cover_url: string; message: string }>> => {
-    const formData = new FormData();
-    formData.append('cover', file);
-    
     try {
+      // Импортируем функцию сжатия
+      const { compressCoverImage } = await import('./image-compression');
+      
+      // Сжимаем изображение
+      const compressedFile = await compressCoverImage(file);
+      
+      const formData = new FormData();
+      formData.append('cover', compressedFile);
+      
       const response = await fetch(`${API_URL}/api/profile/cover`, {
         method: 'POST',
         credentials: 'include',
@@ -303,7 +323,13 @@ export const profileApi = {
 export const postsApi = {
   getAll: () => apiClient.get<Post[]>('/api/posts'),
   
-  getUserPosts: (userId: number) => apiClient.get<Post[]>(`/api/posts/user/${userId}`),
+  getUserPosts: (userId: number, params?: { limit?: number; offset?: number }) => {
+    const queryParams = new URLSearchParams();
+    if (params?.limit) queryParams.append('limit', params.limit.toString());
+    if (params?.offset) queryParams.append('offset', params.offset.toString());
+    const queryString = queryParams.toString();
+    return apiClient.get<Post[]>(`/api/posts/user/${userId}${queryString ? `?${queryString}` : ''}`);
+  },
   
   getPetPosts: (petId: number) => apiClient.get<Post[]>(`/api/posts/pet/${petId}`),
   
@@ -341,6 +367,7 @@ export const commentsApi = {
 // API методы для питомцев
 export const petsApi = {
   getUserPets: (userId: number) => apiClient.get<Pet[]>(`/api/pets/user/${userId}`),
+  getCuratedPets: (userId: number) => apiClient.get<Pet[]>(`/api/pets/curated/${userId}`),
   
   create: (data: { name: string; species?: string; photo?: string }) =>
     apiClient.post<Pet>('/api/pets', data),
@@ -461,7 +488,11 @@ export interface User {
   show_email?: string;
   allow_messages?: string;
   show_online?: string;
+  verified?: boolean;
+  verified_at?: string;
   created_at?: string;
+  last_seen?: string; // Время последней активности
+  is_online?: boolean; // Онлайн статус (активен в последние 5 минут)
 }
 
 export interface Post {
@@ -482,7 +513,7 @@ export interface Post {
   organization?: Organization;
   pets?: Pet[];
   poll?: Poll;
-  comments_count?: number;
+  comments_count: number;
   // Лайки
   liked?: boolean;
   likes_count?: number;

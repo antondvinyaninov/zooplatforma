@@ -1,0 +1,140 @@
+# Оптимизированный multi-stage Dockerfile
+# Использует кэширование слоев для быстрой пересборки
+
+# ============================================
+# Stage 1: Go Dependencies (кэшируется)
+# ============================================
+FROM golang:1.25.5-alpine AS go-deps
+
+RUN apk add --no-cache git make build-base
+
+WORKDIR /app
+
+# Копируем только go.mod/go.sum для кэширования зависимостей
+COPY database/go.mod database/go.sum ./database/
+COPY auth/backend/go.mod auth/backend/go.sum ./auth/backend/
+COPY main/backend/go.mod main/backend/go.sum ./main/backend/
+COPY admin/backend/go.mod admin/backend/go.sum ./admin/backend/
+COPY clinic/backend/go.mod clinic/backend/go.sum ./clinic/backend/
+COPY owner/backend/go.mod owner/backend/go.sum ./owner/backend/
+COPY petbase/backend/go.mod petbase/backend/go.sum ./petbase/backend/
+COPY shelter/backend/go.mod shelter/backend/go.sum ./shelter/backend/
+COPY volunteer/backend/go.mod volunteer/backend/go.sum ./volunteer/backend/
+COPY pkg ./pkg
+
+# Скачиваем зависимости (этот слой кэшируется)
+RUN go mod download -C database && \
+    go mod download -C auth/backend && \
+    go mod download -C main/backend && \
+    go mod download -C admin/backend && \
+    go mod download -C clinic/backend && \
+    go mod download -C owner/backend && \
+    go mod download -C petbase/backend && \
+    go mod download -C shelter/backend && \
+    go mod download -C volunteer/backend
+
+# ============================================
+# Stage 2: Go Builder (пересобирается при изменении кода)
+# ============================================
+FROM go-deps AS go-builder
+
+# Копируем весь код
+COPY . .
+
+# Собираем только нужный сервис (через ARG)
+ARG SERVICE=main
+RUN case $SERVICE in \
+    auth) cd auth/backend && CGO_ENABLED=1 go build -o /app/bin/backend . ;; \
+    main) cd main/backend && go build -o /app/bin/backend . ;; \
+    admin) cd admin/backend && go build -o /app/bin/backend . ;; \
+    clinic) cd clinic/backend && go build -o /app/bin/backend . ;; \
+    owner) cd owner/backend && go build -o /app/bin/backend . ;; \
+    petbase) cd petbase/backend && go build -o /app/bin/backend . ;; \
+    shelter) cd shelter/backend && go build -o /app/bin/backend . ;; \
+    volunteer) cd volunteer/backend && go build -o /app/bin/backend . ;; \
+    *) echo "Unknown service: $SERVICE" && exit 1 ;; \
+    esac
+
+# ============================================
+# Stage 3: Node Dependencies (кэшируется)
+# ============================================
+FROM node:20-alpine AS node-deps
+
+WORKDIR /app
+
+# Копируем только package.json для кэширования
+COPY main/frontend/package*.json ./main/frontend/
+COPY shared/package*.json ./shared/
+
+# Устанавливаем зависимости (этот слой кэшируется)
+RUN cd main/frontend && npm ci && \
+    cd ../.. && cd shared && npm ci
+
+# ============================================
+# Stage 4: Next.js Builder (пересобирается при изменении кода)
+# ============================================
+FROM node-deps AS next-builder
+
+# Копируем весь код
+COPY main/frontend ./main/frontend
+COPY shared ./shared
+
+# Собираем Next.js
+RUN cd main/frontend && npm run build
+
+# ============================================
+# Stage 5: Runtime (минимальный образ)
+# ============================================
+FROM alpine:3.19 AS runtime
+
+RUN apk add --no-cache ca-certificates nodejs npm
+
+WORKDIR /app
+
+# Копируем только нужные файлы
+ARG SERVICE=main
+
+# Для всех сервисов копируем Go бинарник
+COPY --from=go-builder /app/bin/backend /app/backend
+
+# Для main сервиса копируем Next.js
+RUN if [ "$SERVICE" = "main" ]; then \
+    mkdir -p /app/frontend; \
+    fi
+
+COPY --from=next-builder /app/main/frontend/.next /app/frontend/.next
+COPY --from=next-builder /app/main/frontend/node_modules /app/frontend/node_modules
+COPY --from=next-builder /app/main/frontend/package.json /app/frontend/package.json
+COPY --from=next-builder /app/main/frontend/public /app/frontend/public
+COPY --from=next-builder /app/main/frontend/next.config.ts /app/frontend/next.config.ts
+
+# Копируем миграции
+COPY database/migrations /app/migrations
+
+# Скрипт запуска
+RUN cat > /app/start.sh << 'EOF'
+#!/bin/sh
+set -e
+
+SERVICE=${SERVICE:-main}
+
+if [ "$SERVICE" = "main" ]; then
+    echo "🚀 Starting Main Backend..."
+    /app/backend &
+    BACKEND_PID=$!
+    
+    echo "🚀 Starting Main Frontend..."
+    cd /app/frontend && npm start &
+    FRONTEND_PID=$!
+    
+    wait -n
+else
+    echo "🚀 Starting $SERVICE Backend..."
+    exec /app/backend
+fi
+EOF
+RUN chmod +x /app/start.sh
+
+EXPOSE 7100 8000 8100 8200 8400 8500 8600 9000 3000
+
+CMD ["/app/start.sh"]

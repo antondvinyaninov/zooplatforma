@@ -2,11 +2,13 @@
 
 import { useState, useEffect, useRef } from 'react';
 import { useRouter } from 'next/navigation';
+import { useAuth } from '@/contexts/AuthContext';
 import { BellIcon, HeartIcon, ChatBubbleLeftIcon, UserPlusIcon, CheckIcon } from '@heroicons/react/24/outline';
 import { notificationsApi, Notification } from '@/lib/api';
 import { getMediaUrl, getFullName } from '@/lib/utils';
 
 export default function NotificationsDropdown() {
+  const { isAuthenticated } = useAuth();
   const [notifications, setNotifications] = useState<Notification[]>([]);
   const [unreadCount, setUnreadCount] = useState(0);
   const [isOpen, setIsOpen] = useState(false);
@@ -15,12 +17,17 @@ export default function NotificationsDropdown() {
   const router = useRouter();
 
   useEffect(() => {
-    loadUnreadCount();
-    
-    // Обновляем каждые 30 секунд
-    const interval = setInterval(loadUnreadCount, 30000);
-    return () => clearInterval(interval);
-  }, []);
+    // Загружаем только если авторизован
+    if (isAuthenticated) {
+      loadUnreadCount();
+      
+      // Обновляем каждые 2 минуты
+      const interval = setInterval(loadUnreadCount, 120000);
+      return () => clearInterval(interval);
+    } else {
+      setUnreadCount(0);
+    }
+  }, [isAuthenticated]);
 
   useEffect(() => {
     const handleClickOutside = (event: MouseEvent) => {
@@ -40,13 +47,19 @@ export default function NotificationsDropdown() {
   }, [isOpen]);
 
   const loadUnreadCount = async () => {
+    // Не загружаем если не авторизован
+    if (!isAuthenticated) {
+      setUnreadCount(0);
+      return;
+    }
+
     try {
       const response = await notificationsApi.getUnreadCount();
       if (response.success && response.data) {
         setUnreadCount(response.data.count);
       }
     } catch (error) {
-      // Тихо игнорируем ошибки сети - backend может быть временно недоступен
+      // Тихо игнорируем ошибки сети - уведомления опциональны
       console.debug('Could not load unread count:', error);
     }
   };

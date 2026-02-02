@@ -466,7 +466,7 @@ export default function PetDetailPage() {
                   
                   {/* Есть владелец */}
                   {pet.user_id && pet.user_id > 0 && (
-                    <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4">
+                    <div className="bg-green-50 border-2 border-green-200 rounded-lg p-4 mb-4">
                       <div className="flex items-center gap-2 mb-3">
                         <span className="text-2xl">👤</span>
                         <span className="font-semibold text-green-900 text-lg">Есть владелец</span>
@@ -556,8 +556,8 @@ export default function PetDetailPage() {
                     </div>
                   )}
 
-                  {/* Есть куратор (но нет владельца) */}
-                  {(!pet.user_id || pet.user_id === 0) && (pet.curator_id || pet.curator_name || pet.curator_phone) && (
+                  {/* Есть куратор */}
+                  {(pet.curator_id || pet.curator_name || pet.curator_phone) && (
                     <div className="bg-blue-50 border-2 border-blue-200 rounded-lg p-4">
                       <div className="flex items-center gap-2 mb-3">
                         <span className="text-2xl">🤝</span>

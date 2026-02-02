@@ -1,0 +1,37 @@
+{
+	"folders": [
+		{
+			"name": "main",
+			"path": "."
+		},
+		{
+			"name": "auth",
+			"path": "../auth"
+		},
+		{
+			"name": "pkg",
+			"path": "../pkg"
+		},
+		{
+			"name": "uploads",
+			"path": "../uploads"
+		},
+		{
+			"name": "database",
+			"path": "../database"
+		},
+		{
+			"name": "petbase",
+			"path": "../petbase"
+		},
+		{
+			"name": "shared",
+			"path": "../shared"
+		},
+		{
+			"path": "../docs"
+		}
+	],
+	"settings": {
+	}
+}

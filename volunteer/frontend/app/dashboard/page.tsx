@@ -33,7 +33,7 @@ export default function VolunteerDashboard() {
   const [isClient, setIsClient] = useState(false);
   const [pets, setPets] = useState<Pet[]>([]);
   const [loading, setLoading] = useState(true);
-  const [user, setUser] = useState<{ email: string; name?: string; role: string } | null>(null);
+  const [user, setUser] = useState<{ email: string; name?: string; avatar?: string; role: string } | null>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -53,8 +53,8 @@ export default function VolunteerDashboard() {
     setLoading(true);
 
     try {
-      // Проверяем авторизацию через Main API (SSO)
-      const meResponse = await fetch('http://localhost:8000/api/auth/me', {
+      // Проверяем авторизацию через Auth Service
+      const meResponse = await fetch('http://localhost:7100/api/auth/me', {
         method: 'GET',
         credentials: 'include',
       });
@@ -73,8 +73,9 @@ export default function VolunteerDashboard() {
       }
 
       setUser({
-        email: meResult.data.email,
-        name: meResult.data.name,
+        email: meResult.data.user.email,
+        name: meResult.data.user.name,
+        avatar: meResult.data.user.avatar,
         role: 'volunteer',
       });
 
@@ -237,11 +238,11 @@ export default function VolunteerDashboard() {
             title={`Подопечных (${pets.length})`}
             actions={
               <button
-                onClick={() => window.location.href = 'http://localhost:3000/catalog'}
+                onClick={() => router.push('/dashboard/pets/create')}
                 className="px-4 py-2 bg-blue-600 text-white text-sm rounded-lg hover:bg-blue-700 transition-colors flex items-center gap-2"
               >
                 <PlusIcon className="w-4 h-4" />
-                Взять под опеку
+                Добавить животное
               </button>
             }
           >

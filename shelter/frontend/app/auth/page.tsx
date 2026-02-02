@@ -3,15 +3,13 @@
 import { useRouter } from 'next/navigation';
 import AuthForm from '../components/AuthForm';
 
-const ADMIN_API_URL = 'http://localhost:9000';
-
 export default function ShelterAuth() {
   const router = useRouter();
 
   const handleSubmit = async (data: { email: string; password: string }) => {
     try {
       // Логинимся через главный backend (SSO)
-      const loginResponse = await fetch('http://localhost:8000/api/auth/login', {
+      const loginResponse = await fetch('http://localhost:7100/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',
@@ -24,8 +22,8 @@ export default function ShelterAuth() {
         return { success: false, error: loginResult.error || 'Неверный email или пароль' };
       }
 
-      // Проверяем права через Admin API
-      const meResponse = await fetch(`${ADMIN_API_URL}/api/admin/auth/me`, {
+      // Проверяем авторизацию через Main API (SSO)
+      const meResponse = await fetch('http://localhost:7100/api/auth/me', {
         method: 'GET',
         credentials: 'include',
       });
@@ -33,16 +31,11 @@ export default function ShelterAuth() {
       const meResult = await meResponse.json();
 
       if (!meResult.success) {
-        return { success: false, error: 'У вас нет прав доступа к кабинету приюта' };
+        return { success: false, error: 'Ошибка авторизации' };
       }
 
-      // Проверяем роль (shelter_admin или выше)
-      const allowedRoles = ['shelter_admin', 'moderator', 'admin', 'superadmin'];
-      if (!allowedRoles.includes(meResult.data?.role)) {
-        return { success: false, error: 'Доступ только для администраторов приюта' };
-      }
-
-      // Успешный вход
+      // Успешный вход - переходим на главную страницу
+      // Там будет проверка наличия приютов
       router.push('/');
       return { success: true };
     } catch (err) {

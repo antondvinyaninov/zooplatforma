@@ -1,15 +1,15 @@
 package handlers
 
 import (
-	"backend/middleware"
 	"backend/models"
+	"bytes"
 	"database"
-	"database/sql"
 	"encoding/json"
+	"io"
+	"log"
 	"net/http"
+	"os"
 	"time"
-
-	"golang.org/x/crypto/bcrypt"
 )
 
 // logSystemEvent - логирует событие в системе
@@ -54,59 +54,85 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Hash password
-	hashedPassword, err := bcrypt.GenerateFromPassword([]byte(req.Password), bcrypt.DefaultCost)
+	// 🔥 НОВОЕ: Используем Auth Service
+	authServiceURL := os.Getenv("AUTH_SERVICE_URL")
+	if authServiceURL == "" {
+		authServiceURL = "http://localhost:7100"
+	}
+
+	// Отправляем запрос к Auth Service
+	jsonData, _ := json.Marshal(req)
+	resp, err := http.Post(authServiceURL+"/api/auth/register", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		sendError(w, "Failed to hash password", http.StatusInternalServerError)
+		log.Printf("❌ Auth Service error: %v", err)
+		sendError(w, "Auth service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Читаем ответ от Auth Service
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		// Передаем ошибку от Auth Service
+		w.WriteHeader(resp.StatusCode)
+		w.Write(body)
 		return
 	}
 
-	// Insert user
-	result, err := database.DB.Exec("INSERT INTO users (name, email, password) VALUES (?, ?, ?)",
-		req.Name, req.Email, string(hashedPassword))
-	if err != nil {
-		// Log the actual error for debugging
-		println("Database error:", err.Error())
-		sendError(w, "Ошибка создания пользователя: "+err.Error(), http.StatusInternalServerError)
+	// Парсим ответ
+	var authResp struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Token string `json:"token"`
+			User  struct {
+				ID    int    `json:"id"`
+				Email string `json:"email"`
+				Name  string `json:"name"`
+			} `json:"user"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(body, &authResp); err != nil {
+		sendError(w, "Invalid auth response", http.StatusInternalServerError)
 		return
 	}
 
-	id, _ := result.LastInsertId()
+	// ✅ Синхронизируем пользователя с основной БД
+	_, err = database.DB.Exec(`
+		INSERT OR IGNORE INTO users (id, name, email, created_at)
+		VALUES (?, ?, ?, datetime('now'))
+	`, authResp.Data.User.ID, authResp.Data.User.Name, authResp.Data.User.Email)
+
+	if err != nil {
+		log.Printf("⚠️ Failed to sync user to main DB: %v", err)
+		// Не критично - продолжаем
+	} else {
+		log.Printf("✅ User synced to main DB: id=%d, email=%s", authResp.Data.User.ID, authResp.Data.User.Email)
+	}
+
+	// Устанавливаем cookie с токеном от Auth Service
+	http.SetCookie(w, &http.Cookie{
+		Name:     "auth_token",
+		Value:    authResp.Data.Token,
+		Path:     "/",
+		Domain:   "localhost", // ✅ Cookie работает для всех портов localhost
+		HttpOnly: true,
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode, // Lax для localhost
+		MaxAge:   86400 * 7,            // 7 days
+	})
 
 	// Логируем регистрацию
 	ipAddress := r.RemoteAddr
 	userAgent := r.Header.Get("User-Agent")
-	CreateUserLog(database.DB, int(id), "register", "Пользователь зарегистрировался", ipAddress, userAgent)
+	userID := authResp.Data.User.ID
+	CreateUserLog(database.DB, userID, "register", "Пользователь зарегистрировался через Auth Service", ipAddress, userAgent)
 
-	// Получаем роли пользователя (по умолчанию только "user")
-	roles := getUserRoles(int(id))
+	// Возвращаем ответ клиенту
+	w.Write(body)
 
-	// Generate token
-	token, err := middleware.GenerateToken(int(id), req.Email, roles)
-	if err != nil {
-		sendError(w, "Failed to generate token", http.StatusInternalServerError)
-		return
-	}
-
-	// Set httpOnly cookie (доступен всем поддоменам для SSO)
-	http.SetCookie(w, &http.Cookie{
-		Name:     "auth_token",
-		Value:    token,
-		Path:     "/",
-		Domain:   "", // Пустой для localhost, ".zooplatforma.ru" для production
-		HttpOnly: true,
-		Secure:   false, // Set to true in production with HTTPS
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   86400 * 7, // 7 days
-	})
-
-	sendSuccess(w, models.AuthResponse{
-		User: models.UserResponse{
-			ID:    int(id),
-			Name:  req.Name,
-			Email: req.Email,
-		},
-	})
+	log.Printf("✅ User registered via Auth Service: %s", authResp.Data.User.Email)
 }
 
 func MeHandler(w http.ResponseWriter, r *http.Request) {
@@ -117,84 +143,124 @@ func MeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get token from cookie
-	cookie, err := r.Cookie("auth_token")
-	if err != nil {
+	// Get token from Authorization header (priority) or cookie
+	var token string
+
+	// 1. Try Authorization header first
+	authHeader := r.Header.Get("Authorization")
+	if authHeader != "" {
+		// Remove "Bearer " prefix if present
+		if len(authHeader) > 7 && authHeader[:7] == "Bearer " {
+			token = authHeader[7:]
+		} else {
+			token = authHeader
+		}
+	}
+
+	// 2. If no header, try cookie
+	if token == "" {
+		cookie, err := r.Cookie("auth_token")
+		if err != nil {
+			sendError(w, "Не авторизован", http.StatusUnauthorized)
+			return
+		}
+		token = cookie.Value
+	}
+
+	// 3. If still no token, return 401
+	if token == "" {
 		sendError(w, "Не авторизован", http.StatusUnauthorized)
 		return
 	}
 
-	// Parse token
-	token, err := middleware.ParseToken(cookie.Value)
+	// 🔥 НОВОЕ: Используем Auth Service для получения данных пользователя
+	authServiceURL := os.Getenv("AUTH_SERVICE_URL")
+	if authServiceURL == "" {
+		authServiceURL = "http://localhost:7100"
+	}
+
+	// Создаем запрос к Auth Service
+	req, err := http.NewRequest("GET", authServiceURL+"/api/auth/me", nil)
 	if err != nil {
-		sendError(w, "Неверный токен", http.StatusUnauthorized)
+		log.Printf("❌ Failed to create request: %v", err)
+		sendError(w, "Internal server error", http.StatusInternalServerError)
 		return
 	}
 
-	// Get user from database - используем sql.NullString для nullable полей
-	var user models.User
-	var lastName, bio, phone, location, avatar, coverPhoto sql.NullString
-	var profileVisibility, showPhone, showEmail, allowMessages, showOnline sql.NullString
+	// Добавляем токен в заголовок
+	req.Header.Set("Authorization", "Bearer "+token)
 
-	err = database.DB.QueryRow(`
-		SELECT id, name, last_name, email, bio, phone, location, avatar, cover_photo, 
-		       profile_visibility, show_phone, show_email, allow_messages, show_online, created_at 
-		FROM users WHERE id = ?`, token.UserID).
-		Scan(&user.ID, &user.Name, &lastName, &user.Email, &bio, &phone, &location, &avatar, &coverPhoto,
-			&profileVisibility, &showPhone, &showEmail, &allowMessages, &showOnline, &user.CreatedAt)
-
+	// Отправляем запрос
+	client := &http.Client{}
+	resp, err := client.Do(req)
 	if err != nil {
-		sendError(w, "Пользователь не найден", http.StatusNotFound)
+		log.Printf("❌ Auth Service error: %v", err)
+		sendError(w, "Auth service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Читаем ответ
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		// Передаем ошибку от Auth Service
+		w.WriteHeader(resp.StatusCode)
+		w.Write(body)
 		return
 	}
 
-	// Преобразуем NullString в обычные строки
-	user.LastName = lastName.String
-	user.Bio = bio.String
-	user.Phone = phone.String
-	user.Location = location.String
-	user.Avatar = avatar.String
-	user.CoverPhoto = coverPhoto.String
-	user.ProfileVisibility = profileVisibility.String
-	user.ShowPhone = showPhone.String
-	user.ShowEmail = showEmail.String
-	user.AllowMessages = allowMessages.String
-	user.ShowOnline = showOnline.String
-
-	// Устанавливаем значения по умолчанию, если пусто
-	if user.ProfileVisibility == "" {
-		user.ProfileVisibility = "public"
-	}
-	if user.ShowPhone == "" {
-		user.ShowPhone = "nobody"
-	}
-	if user.ShowEmail == "" {
-		user.ShowEmail = "nobody"
-	}
-	if user.AllowMessages == "" {
-		user.AllowMessages = "everyone"
-	}
-	if user.ShowOnline == "" {
-		user.ShowOnline = "yes"
+	// Парсим ответ от Auth Service
+	var authResp struct {
+		Success bool `json:"success"`
+		Data    struct {
+			User struct {
+				ID        int       `json:"id"`
+				Email     string    `json:"email"`
+				Name      string    `json:"name"`
+				Bio       string    `json:"bio"`
+				Phone     string    `json:"phone"`
+				Avatar    string    `json:"avatar"`
+				CreatedAt time.Time `json:"created_at"`
+			} `json:"user"`
+		} `json:"data"`
 	}
 
-	sendSuccess(w, models.UserResponse{
-		ID:                user.ID,
-		Name:              user.Name,
-		LastName:          user.LastName,
-		Email:             user.Email,
-		Bio:               user.Bio,
-		Phone:             user.Phone,
-		Location:          user.Location,
-		Avatar:            user.Avatar,
-		CoverPhoto:        user.CoverPhoto,
-		ProfileVisibility: user.ProfileVisibility,
-		ShowPhone:         user.ShowPhone,
-		ShowEmail:         user.ShowEmail,
-		AllowMessages:     user.AllowMessages,
-		ShowOnline:        user.ShowOnline,
-		CreatedAt:         user.CreatedAt,
-	})
+	if err := json.Unmarshal(body, &authResp); err != nil {
+		log.Printf("❌ Failed to parse auth response: %v", err)
+		sendError(w, "Invalid auth response", http.StatusInternalServerError)
+		return
+	}
+
+	// Формируем ответ в формате Main Backend (для обратной совместимости)
+	response := map[string]interface{}{
+		"success": true,
+		"data": map[string]interface{}{
+			"user": map[string]interface{}{
+				"id":         authResp.Data.User.ID,
+				"name":       authResp.Data.User.Name,
+				"email":      authResp.Data.User.Email,
+				"bio":        authResp.Data.User.Bio,
+				"phone":      authResp.Data.User.Phone,
+				"avatar":     authResp.Data.User.Avatar,
+				"created_at": authResp.Data.User.CreatedAt,
+				// Поля для обратной совместимости (пока не в Auth Service)
+				"last_name":          "",
+				"location":           "",
+				"cover_photo":        "",
+				"profile_visibility": "public",
+				"show_phone":         "nobody",
+				"show_email":         "nobody",
+				"allow_messages":     "everyone",
+				"show_online":        "yes",
+			},
+			"token": token,
+		},
+		"token": token,
+	}
+
+	json.NewEncoder(w).Encode(response)
+	log.Printf("✅ User profile loaded via Auth Service: %s", authResp.Data.User.Email)
 }
 
 func LogoutHandler(w http.ResponseWriter, r *http.Request) {
@@ -205,16 +271,14 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Получаем user_id из токена перед удалением cookie
-	cookie, err := r.Cookie("auth_token")
-	if err == nil {
-		token, err := middleware.ParseToken(cookie.Value)
-		if err == nil {
-			// Логируем выход
-			ipAddress := r.RemoteAddr
-			userAgent := r.Header.Get("User-Agent")
-			CreateUserLog(database.DB, token.UserID, "logout", "Выход из системы", ipAddress, userAgent)
-		}
+	// Получаем user_id из контекста (если есть) для логирования
+	// Но не требуем авторизации для logout
+	cookie, _ := r.Cookie("auth_token")
+	if cookie != nil {
+		// Можно попробовать получить user_id через Auth Service, но это не критично
+		// Просто логируем что кто-то вышел
+		ipAddress := r.RemoteAddr
+		log.Printf("🔓 User logged out from IP: %s", ipAddress)
 	}
 
 	// Clear cookie (для всех поддоменов)
@@ -222,11 +286,11 @@ func LogoutHandler(w http.ResponseWriter, r *http.Request) {
 		Name:     "auth_token",
 		Value:    "",
 		Path:     "/",
-		Domain:   "", // Пустой для localhost, ".zooplatforma.ru" для production
+		Domain:   "localhost", // ✅ Cookie работает для всех портов localhost
 		HttpOnly: true,
 		Secure:   false,
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   -1, // Delete cookie
+		SameSite: http.SameSiteLaxMode, // Lax для localhost
+		MaxAge:   -1,                   // Delete cookie
 	})
 
 	sendSuccess(w, map[string]string{"message": "Logged out successfully"})
@@ -247,25 +311,53 @@ func VerifyTokenHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Parse token
-	token, err := middleware.ParseToken(cookie.Value)
+	// Verify token via Auth Service
+	authServiceURL := os.Getenv("AUTH_SERVICE_URL")
+	if authServiceURL == "" {
+		authServiceURL = "http://localhost:7100"
+	}
+
+	req, err := http.NewRequest("GET", authServiceURL+"/api/auth/me", nil)
 	if err != nil {
+		sendError(w, "Internal server error", http.StatusInternalServerError)
+		return
+	}
+
+	req.Header.Set("Authorization", "Bearer "+cookie.Value)
+
+	client := &http.Client{}
+	resp, err := client.Do(req)
+	if err != nil {
+		sendError(w, "Auth service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	defer resp.Body.Close()
+
+	if resp.StatusCode != http.StatusOK {
 		sendError(w, "Неверный токен", http.StatusUnauthorized)
 		return
 	}
 
-	// Verify user exists
-	var exists int
-	err = database.DB.QueryRow("SELECT 1 FROM users WHERE id = ?", token.UserID).Scan(&exists)
-	if err != nil {
-		sendError(w, "Пользователь не найден", http.StatusUnauthorized)
+	body, _ := io.ReadAll(resp.Body)
+
+	var authResp struct {
+		Success bool `json:"success"`
+		Data    struct {
+			User struct {
+				ID    int    `json:"id"`
+				Email string `json:"email"`
+			} `json:"user"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(body, &authResp); err != nil {
+		sendError(w, "Invalid auth response", http.StatusInternalServerError)
 		return
 	}
 
 	sendSuccess(w, map[string]interface{}{
-		"user_id": token.UserID,
-		"email":   token.Email,
-		"roles":   token.Roles,
+		"user_id": authResp.Data.User.ID,
+		"email":   authResp.Data.User.Email,
 		"valid":   true,
 	})
 }
@@ -289,56 +381,78 @@ func LoginHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Get user
-	var user models.User
-	var hashedPassword string
-	err := database.DB.QueryRow("SELECT id, name, email, password FROM users WHERE email = ?", req.Email).
-		Scan(&user.ID, &user.Name, &user.Email, &hashedPassword)
+	// 🔥 НОВОЕ: Используем Auth Service
+	authServiceURL := os.Getenv("AUTH_SERVICE_URL")
+	if authServiceURL == "" {
+		authServiceURL = "http://localhost:7100"
+	}
 
+	// Отправляем запрос к Auth Service
+	jsonData, _ := json.Marshal(req)
+	resp, err := http.Post(authServiceURL+"/api/auth/login", "application/json", bytes.NewBuffer(jsonData))
 	if err != nil {
-		sendError(w, "Неверный email или пароль", http.StatusUnauthorized)
+		log.Printf("❌ Auth Service error: %v", err)
+		sendError(w, "Auth service unavailable", http.StatusServiceUnavailable)
+		return
+	}
+	defer resp.Body.Close()
+
+	// Читаем ответ от Auth Service
+	body, _ := io.ReadAll(resp.Body)
+
+	if resp.StatusCode != http.StatusOK {
+		// Передаем ошибку от Auth Service
+		w.WriteHeader(resp.StatusCode)
+		w.Write(body)
 		return
 	}
 
-	// Check password
-	if err := bcrypt.CompareHashAndPassword([]byte(hashedPassword), []byte(req.Password)); err != nil {
-		sendError(w, "Неверный email или пароль", http.StatusUnauthorized)
+	// Парсим ответ
+	var authResp struct {
+		Success bool `json:"success"`
+		Data    struct {
+			Token string `json:"token"`
+			User  struct {
+				ID    int    `json:"id"`
+				Email string `json:"email"`
+				Name  string `json:"name"`
+			} `json:"user"`
+		} `json:"data"`
+	}
+
+	if err := json.Unmarshal(body, &authResp); err != nil {
+		sendError(w, "Invalid auth response", http.StatusInternalServerError)
 		return
 	}
 
-	// Получаем роли пользователя
-	roles := getUserRoles(user.ID)
-
-	// Generate token
-	token, err := middleware.GenerateToken(user.ID, user.Email, roles)
-	if err != nil {
-		sendError(w, "Failed to generate token", http.StatusInternalServerError)
-		return
-	}
-
-	// Set httpOnly cookie (доступен всем поддоменам для SSO)
+	// Устанавливаем cookie с токеном от Auth Service
 	http.SetCookie(w, &http.Cookie{
 		Name:     "auth_token",
-		Value:    token,
+		Value:    authResp.Data.Token,
 		Path:     "/",
-		Domain:   "", // Пустой для localhost, ".zooplatforma.ru" для production
+		Domain:   "localhost", // ✅ Cookie работает для всех портов localhost
 		HttpOnly: true,
-		Secure:   false, // Set to true in production with HTTPS
-		SameSite: http.SameSiteLaxMode,
-		MaxAge:   86400 * 7, // 7 days
+		Secure:   false,
+		SameSite: http.SameSiteLaxMode, // Lax для localhost
+		MaxAge:   86400 * 7,            // 7 days
 	})
+
+	log.Printf("🔍 LoginHandler: Cookie set for user %s", authResp.Data.User.Email)
 
 	// Логируем успешный вход
 	ipAddress := r.RemoteAddr
 	userAgent := r.Header.Get("User-Agent")
-	logSystemEvent("info", "auth", "login", "Пользователь вошел в систему", &user.ID, ipAddress)
-	CreateUserLog(database.DB, user.ID, "login", "Вход в систему", ipAddress, userAgent)
+	userID := authResp.Data.User.ID
 
-	sendSuccess(w, models.AuthResponse{
-		User: models.UserResponse{
-			ID:    user.ID,
-			Name:  user.Name,
-			Email: user.Email,
-		},
-	})
+	log.Printf("🔍 LoginHandler: Logging system event...")
+	logSystemEvent("info", "auth", "login", "Пользователь вошел в систему (Auth Service)", &userID, ipAddress)
+
+	log.Printf("🔍 LoginHandler: Creating user log...")
+	CreateUserLog(database.DB, userID, "login", "Вход в систему через Auth Service", ipAddress, userAgent)
+
+	log.Printf("🔍 LoginHandler: Sending response...")
+	// Возвращаем ответ клиенту
+	w.Write(body)
+
+	log.Printf("✅ User logged in via Auth Service: %s", authResp.Data.User.Email)
 }

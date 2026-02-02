@@ -13,8 +13,8 @@ export default function Home() {
 
   const checkShelters = async () => {
     try {
-      // Проверяем авторизацию
-      const meResponse = await fetch('http://localhost:9000/api/admin/auth/me', {
+      // Проверяем авторизацию через Main API (SSO)
+      const meResponse = await fetch('http://localhost:7100/api/auth/me', {
         method: 'GET',
         credentials: 'include',
       });
@@ -22,13 +22,6 @@ export default function Home() {
       const meResult = await meResponse.json();
 
       if (!meResult.success) {
-        router.push('/auth');
-        return;
-      }
-
-      // Проверяем роль
-      const allowedRoles = ['shelter_admin', 'moderator', 'admin', 'superadmin'];
-      if (!allowedRoles.includes(meResult.data?.role)) {
         router.push('/auth');
         return;
       }

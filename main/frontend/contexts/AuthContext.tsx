@@ -28,18 +28,34 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       return;
     }
 
+    let mounted = true;
+
     const checkAuth = async () => {
-      const response = await authApi.me();
-      
-      if (response.success && response.data) {
-        setUser(response.data);
-        setToken('authenticated');
+      try {
+        // Простой запрос к Auth Service
+        const response = await authApi.me();
+        
+        if (mounted && response.success && response.data) {
+          const userData = response.data as any;
+          const user = userData.user || userData;
+          
+          setUser(user);
+          setToken('authenticated');
+        }
+      } catch (error) {
+        console.error('Auth check failed:', error);
+      } finally {
+        if (mounted) {
+          setIsLoading(false);
+        }
       }
-      
-      setIsLoading(false);
     };
 
     checkAuth();
+
+    return () => {
+      mounted = false;
+    };
   }, []);
 
   const login = async (email: string, password: string) => {
@@ -75,10 +91,16 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const refreshUser = async () => {
-    const response = await authApi.me();
-    
-    if (response.success && response.data) {
-      setUser(response.data);
+    try {
+      const authResponse = await authApi.me();
+      
+      if (authResponse.success && authResponse.data) {
+        const userData = authResponse.data as any;
+        const user = userData.user || userData;
+        setUser(user);
+      }
+    } catch (error) {
+      console.error('User refresh failed:', error);
     }
   };
 

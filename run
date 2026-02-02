@@ -69,6 +69,7 @@ kill_port 5100
 kill_port 6100
 kill_port 6200
 kill_port 6300
+kill_port 7100  # Auth Service
 kill_port 8000
 kill_port 8081
 kill_port 8100
@@ -85,12 +86,20 @@ sleep 1
 
 # Verify ports are free
 echo "🔍 Verifying ports are free..."
-for port in 3000 4000 4100 5100 6100 6200 6300 8000 8081 8100 8200 8400 8500 8600 9000; do
+for port in 3000 4000 4100 5100 6100 6200 6300 7100 8000 8081 8100 8200 8400 8500 8600 9000; do
   if lsof -i :$port -sTCP:LISTEN >/dev/null 2>&1; then
     echo "   ⚠️  WARNING: Port $port is still occupied!"
     lsof -i :$port
   fi
 done
+
+# Start Auth Service with Air (FIRST!)
+echo "🔐 Starting Auth Service on port 7100 (with hot reload)..."
+(cd auth/backend && /Users/dvinyaninov/go/bin/air) &
+AUTH_PID=$!
+
+# Wait for Auth Service to start
+sleep 2
 
 # Start main backend with Air
 echo "🔧 Starting Main Backend on port 8000 (with hot reload)..."
@@ -218,6 +227,7 @@ check_port 6100 "Owner Frontend     "
 check_port 6200 "Volunteer Frontend "
 check_port 6300 "Clinic Frontend    "
 check_port 8081 "Mobile             "
+check_port 7100 "Auth Backend       "
 check_port 8000 "Main Backend       "
 check_port 8100 "PetBase Backend    "
 check_port 8200 "Shelter Backend    "
@@ -237,6 +247,7 @@ echo "   👤 Owner Frontend:      http://localhost:6100"
 echo "   🤝 Volunteer Frontend:  http://localhost:6200"
 echo "   🏥 Clinic Frontend:     http://localhost:6300"
 echo "   📱 Mobile:              http://localhost:8081"
+echo "   🔑 Auth Backend:        http://localhost:7100"
 echo "   🔧 Main Backend:        http://localhost:8000"
 echo "   🐾 PetBase Backend:     http://localhost:8100"
 echo "   🏠 Shelter Backend:     http://localhost:8200"
@@ -260,5 +271,5 @@ echo ""
 echo "Press Ctrl+C to stop all services"
 
 # Wait for Ctrl+C
-trap "echo ''; echo '🛑 Stopping all services...'; kill $BACKEND_PID $ADMIN_BACKEND_PID $PETBASE_BACKEND_PID $SHELTER_BACKEND_PID $OWNER_BACKEND_PID $VOLUNTEER_BACKEND_PID $CLINIC_BACKEND_PID $FRONTEND_PID $ADMIN_FRONTEND_PID $PETBASE_FRONTEND_PID $SHELTER_FRONTEND_PID $OWNER_FRONTEND_PID $VOLUNTEER_FRONTEND_PID $CLINIC_FRONTEND_PID $MOBILE_PID 2>/dev/null; exit" INT
+trap "echo ''; echo '🛑 Stopping all services...'; kill $AUTH_PID $BACKEND_PID $ADMIN_BACKEND_PID $PETBASE_BACKEND_PID $SHELTER_BACKEND_PID $OWNER_BACKEND_PID $VOLUNTEER_BACKEND_PID $CLINIC_BACKEND_PID $FRONTEND_PID $ADMIN_FRONTEND_PID $PETBASE_FRONTEND_PID $SHELTER_FRONTEND_PID $OWNER_FRONTEND_PID $VOLUNTEER_FRONTEND_PID $CLINIC_FRONTEND_PID $MOBILE_PID 2>/dev/null; exit" INT
 wait

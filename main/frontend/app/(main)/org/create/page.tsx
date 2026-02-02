@@ -139,7 +139,8 @@ export default function CreateOrganizationPage() {
     const getEmail = () => {
       // Пробуем разные варианты
       if (data.emails && Array.isArray(data.emails) && data.emails.length > 0) {
-        return data.emails[0].value || data.emails[0] || '';
+        const email = data.emails[0];
+        return (typeof email === 'object' && email.value) ? email.value : (typeof email === 'string' ? email : '');
       }
       // Иногда email может быть строкой
       if (typeof data.emails === 'string') {
@@ -151,7 +152,8 @@ export default function CreateOrganizationPage() {
     const getPhone = () => {
       // Пробуем разные варианты
       if (data.phones && Array.isArray(data.phones) && data.phones.length > 0) {
-        return data.phones[0].value || data.phones[0] || '';
+        const phone = data.phones[0];
+        return (typeof phone === 'object' && phone.value) ? phone.value : (typeof phone === 'string' ? phone : '');
       }
       // Иногда phone может быть строкой
       if (typeof data.phones === 'string') {

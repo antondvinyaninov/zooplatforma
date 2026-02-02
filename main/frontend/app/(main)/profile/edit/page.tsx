@@ -7,6 +7,7 @@ import { useToast } from '../../../../contexts/ToastContext';
 import { usersApi } from '../../../../lib/api';
 import { UserIcon, CameraIcon, XMarkIcon } from '@heroicons/react/24/outline';
 import Image from 'next/image';
+import CityAutocomplete from '../../../components/shared/CityAutocomplete';
 
 export default function EditProfilePage() {
   const [isSaving, setIsSaving] = useState(false);
@@ -466,12 +467,9 @@ export default function EditProfilePage() {
                   <label className="block text-sm font-medium text-gray-700 mb-2">
                     Город
                   </label>
-                  <input
-                    type="text"
+                  <CityAutocomplete
                     value={editForm.location}
-                    onChange={(e) => setEditForm({ ...editForm, location: e.target.value })}
-                    className="w-full px-4 py-2.5 border border-gray-300 rounded-lg focus:ring-2 focus:border-transparent text-sm"
-                    style={{ '--tw-ring-color': '#1B76FF' } as React.CSSProperties}
+                    onChange={(value) => setEditForm({ ...editForm, location: value })}
                     placeholder="Москва"
                   />
                   <p className="text-xs text-gray-500 mt-1">

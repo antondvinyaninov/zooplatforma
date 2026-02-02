@@ -25,8 +25,8 @@ export default function SelectShelter() {
 
   const checkAuthAndLoadShelters = async () => {
     try {
-      // Проверяем авторизацию через Admin API (SSO)
-      const meResponse = await fetch('http://localhost:9000/api/admin/auth/me', {
+      // Проверяем авторизацию через Main API (SSO)
+      const meResponse = await fetch('http://localhost:7100/api/auth/me', {
         method: 'GET',
         credentials: 'include',
       });
@@ -38,14 +38,7 @@ export default function SelectShelter() {
         return;
       }
 
-      // Проверяем роль (shelter_admin или выше)
-      const allowedRoles = ['shelter_admin', 'moderator', 'admin', 'superadmin'];
-      if (!allowedRoles.includes(meResult.data?.role)) {
-        router.push('/auth');
-        return;
-      }
-
-      setAdminUser(meResult.data);
+      setAdminUser(meResult.data.user);
 
       // Загружаем список приютов пользователя
       const sheltersResponse = await fetch('http://localhost:8200/api/my-shelters', {

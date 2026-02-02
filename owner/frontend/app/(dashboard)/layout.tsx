@@ -19,7 +19,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   const router = useRouter();
   const pathname = usePathname();
   const [activeTab, setActiveTab] = useState('overview');
-  const [user, setUser] = useState<{ email: string; name?: string; role: string } | null>(null);
+  const [user, setUser] = useState<{ email: string; name?: string; avatar?: string; role: string } | null>(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
@@ -39,7 +39,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
 
   const checkAuth = async () => {
     try {
-      const meResponse = await fetch('http://localhost:8000/api/auth/me', {
+      const meResponse = await fetch('http://localhost:7100/api/auth/me', {
         credentials: 'include',
       });
 
@@ -61,8 +61,9 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
       }
 
       setUser({
-        email: meResult.data.email,
-        name: meResult.data.name,
+        email: meResult.data.user.email,
+        name: meResult.data.user.name,
+        avatar: meResult.data.user.avatar,
         role: 'owner',
       });
     } catch (error) {
@@ -89,7 +90,7 @@ export default function DashboardLayout({ children }: { children: ReactNode }) {
   };
 
   const handleLogout = async () => {
-    await fetch('http://localhost:8000/api/auth/logout', {
+    await fetch('http://localhost:7100/api/auth/logout', {
       method: 'POST',
       credentials: 'include',
     });

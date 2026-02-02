@@ -6,18 +6,16 @@ import (
 	"net/http"
 	"os"
 	"owner/handlers"
-	"owner/middleware"
 	"strings"
 
 	"database"
 
 	"github.com/joho/godotenv"
+	"github.com/zooplatforma/pkg/middleware"
 )
 
 func enableCORSHandler(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		log.Printf("🌐 CORS: %s %s from origin: %s", r.Method, r.URL.Path, r.Header.Get("Origin"))
-
 		origin := r.Header.Get("Origin")
 		allowedOriginsEnv := os.Getenv("ALLOWED_ORIGINS")
 		allowedOrigins := map[string]bool{
@@ -36,7 +34,6 @@ func enableCORSHandler(next http.Handler) http.Handler {
 			log.Printf("✅ Origin allowed: %s", origin)
 		} else if origin == "" {
 			w.Header().Set("Access-Control-Allow-Origin", "http://localhost:6100")
-			log.Printf("⚠️ No origin, using default: http://localhost:6100")
 		}
 
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
@@ -49,7 +46,6 @@ func enableCORSHandler(next http.Handler) http.Handler {
 			return
 		}
 
-		log.Printf("➡️ Passing to handler: %s %s", r.Method, r.URL.Path)
 		next.ServeHTTP(w, r)
 	})
 }
@@ -87,9 +83,6 @@ func main() {
 		log.Println("Warning: .env file not found")
 	}
 
-	// Initialize JWT secret
-	middleware.InitJWTSecret()
-
 	// Initialize database
 	if err := database.InitDB(); err != nil {
 		log.Fatal("Failed to initialize database:", err)
@@ -101,37 +94,54 @@ func main() {
 		log.Fatal("Failed to create tables:", err)
 	}
 
+	// ✅ Auth Service URL (middleware читает из AUTH_SERVICE_URL в .env)
+	authServiceURL := os.Getenv("AUTH_SERVICE_URL")
+	if authServiceURL == "" {
+		authServiceURL = "http://localhost:7100"
+	}
+	log.Printf("🔐 Auth Service URL: %s", authServiceURL)
+
 	// Routes
 	// Публичные endpoints
 	http.HandleFunc("/api/health", enableCORS(handleHealth))
 
 	// Защищённые endpoints (требуют аутентификации)
 	db := database.DB
-	authMiddleware := middleware.AuthMiddleware(db)
 
 	// Owner endpoints - прямые запросы к базе данных
-	http.Handle("/api/pets", enableCORSHandler(authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		if r.Method == "GET" {
+	http.Handle("/api/pets", enableCORSHandler(middleware.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		switch r.Method {
+		case "GET":
 			handlers.GetMyPets(db)(w, r)
-		} else if r.Method == "POST" {
+		case "POST":
 			handlers.CreatePet(db)(w, r)
-		} else {
+		default:
 			http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		}
 	}))))
-	http.Handle("/api/pets/", enableCORSHandler(authMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+	http.Handle("/api/pets/", enableCORSHandler(middleware.AuthMiddleware(http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		log.Printf("🔀 Route /api/pets/ - Method: %s, Path: %s", r.Method, r.URL.Path)
 		// Проверяем, это запрос на загрузку фото или получение питомца
-		if strings.HasSuffix(r.URL.Path, "/photo") && r.Method == "POST" {
-			log.Printf("📸 Routing to UploadPetPhoto handler")
-			handlers.UploadPetPhoto(db)(w, r)
+		if strings.HasSuffix(r.URL.Path, "/photo") {
+			switch r.Method {
+			case "POST":
+				log.Printf("📸 Routing to UploadPetPhoto handler")
+				handlers.UploadPetPhoto(db)(w, r)
+			default:
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			}
 		} else {
-			log.Printf("🐾 Routing to GetPet handler")
-			handlers.GetPet(db)(w, r)
+			switch r.Method {
+			case "GET":
+				log.Printf("🐾 Routing to GetPet handler")
+				handlers.GetPet(db)(w, r)
+			default:
+				http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
+			}
 		}
 	}))))
-	http.Handle("/api/profile", enableCORSHandler(authMiddleware(http.HandlerFunc(handlers.GetProfile(db)))))
-	http.Handle("/api/breeds", enableCORSHandler(authMiddleware(http.HandlerFunc(handlers.GetBreeds(db)))))
+	http.Handle("/api/profile", enableCORSHandler(middleware.AuthMiddleware(http.HandlerFunc(handlers.GetProfile(db)))))
+	http.Handle("/api/breeds", enableCORSHandler(middleware.AuthMiddleware(http.HandlerFunc(handlers.GetBreeds(db)))))
 
 	// Static files - раздача загруженных файлов из общей папки
 	http.Handle("/uploads/", enableCORSHandler(http.StripPrefix("/uploads/", http.FileServer(http.Dir("../../uploads")))))
@@ -180,7 +190,7 @@ func handleHealth(w http.ResponseWriter, r *http.Request) {
 func createTables() error {
 	db := database.DB
 
-	// Create treatments table
+	// Create treatments table (SQLite syntax)
 	query := `
 	CREATE TABLE IF NOT EXISTS treatments (
 		id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -205,13 +215,13 @@ func createTables() error {
 		return fmt.Errorf("failed to create treatments table: %w", err)
 	}
 
-	// Create trigger for updated_at
+	// Create trigger for updated_at (SQLite syntax)
 	triggerQuery := `
-	CREATE TRIGGER IF NOT EXISTS update_treatments_timestamp 
+	CREATE TRIGGER IF NOT EXISTS update_treatments_timestamp
 	AFTER UPDATE ON treatments
 	FOR EACH ROW
 	BEGIN
-		UPDATE treatments SET updated_at = CURRENT_TIMESTAMP WHERE id = OLD.id;
+		UPDATE treatments SET updated_at = CURRENT_TIMESTAMP WHERE id = NEW.id;
 	END;
 	`
 

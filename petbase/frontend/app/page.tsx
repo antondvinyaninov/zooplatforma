@@ -100,7 +100,7 @@ export default function PetBaseDashboard() {
   const [cards, setCards] = useState<PetCard[]>([]);
   const [pets, setPets] = useState<Pet[]>([]);
   const [loading, setLoading] = useState(true);
-  const [adminUser, setAdminUser] = useState<{ email: string; role: string } | null>(null);
+  const [adminUser, setAdminUser] = useState<{ email: string; role: string; avatar?: string } | null>(null);
 
   useEffect(() => {
     setIsClient(true);
@@ -121,7 +121,7 @@ export default function PetBaseDashboard() {
 
     // Проверяем авторизацию
     const authResult = await petbaseApi.checkAuth();
-    if (!authResult.success) {
+    if (!authResult.success || !authResult.data) {
       router.push('/auth');
       return;
     }
@@ -140,33 +140,44 @@ export default function PetBaseDashboard() {
         setBreeds(result.data || []);
       }
     } else if (activeTab === 'pets') {
-      // Загружаем питомцев
-      // Получаем текущего пользователя из Main API
+      // Загружаем ВСЕ питомцы из базы (для админа)
       try {
-        const meResponse = await fetch('http://localhost:8000/api/auth/me', {
+        // Получаем токен из Main API
+        const meResponse = await fetch('http://localhost:7100/api/auth/me', {
           credentials: 'include',
         });
         
         if (meResponse.ok) {
           const meResult = await meResponse.json();
           if (meResult.success && meResult.data) {
-            const userId = meResult.data.id;
+            const token = meResult.data.token;
             
-            // Загружаем питомцев пользователя
+            // Загружаем ВСЕ питомцы через /api/pets с Bearer token
             const response = await fetch('http://localhost:8100/api/pets', {
               headers: {
-                'X-User-ID': userId.toString(),
+                'Authorization': `Bearer ${token}`,
               },
-              credentials: 'include',
             });
-            const result = await response.json();
-            if (result.success) {
-              setPets(result.data || []);
+            
+            console.log('📋 Pets response status:', response.status);
+            
+            if (response.ok) {
+              const result = await response.json();
+              console.log('📋 Pets result:', result);
+              if (result.success) {
+                setPets(result.data || []);
+              } else {
+                console.error('❌ Pets API returned success=false:', result.error);
+                setPets([]);
+              }
+            } else {
+              console.error('❌ Pets API error:', response.status, response.statusText);
+              setPets([]);
             }
           }
         }
       } catch (error) {
-        console.error('Error loading pets:', error);
+        console.error('❌ Error loading pets:', error);
         setPets([]);
       }
     } else if (activeTab === 'stats') {
@@ -534,7 +545,7 @@ export default function PetBaseDashboard() {
                           <td className="py-3 px-4">
                             {pet.photo ? (
                               <img
-                                src={pet.photo}
+                                src={`http://localhost:8100${pet.photo}`}
                                 alt={pet.name}
                                 className="w-12 h-12 rounded-full object-cover"
                               />

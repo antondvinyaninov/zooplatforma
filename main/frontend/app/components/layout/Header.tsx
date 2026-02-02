@@ -2,12 +2,15 @@
 
 import Image from 'next/image';
 import { MagnifyingGlassIcon } from '@heroicons/react/24/outline';
+import { useAuth } from '@/contexts/AuthContext';
 import CityDetector from './CityDetector';
 import UserMenu from './UserMenu';
 import NotificationsDropdown from './NotificationsDropdown';
 import FriendsDropdown from './FriendsDropdown';
 
 export default function Header() {
+  const { isAuthenticated, isLoading } = useAuth();
+
   return (
     <header className="bg-white shadow-sm border-b border-gray-200 sticky top-0 z-50">
       <div className="max-w-[1150px] mx-auto px-4 py-1">
@@ -47,13 +50,13 @@ export default function Header() {
               <CityDetector />
             </div>
             
-            {/* Friends */}
-            <FriendsDropdown />
+            {/* Friends - только для авторизованных */}
+            {isAuthenticated && <FriendsDropdown />}
             
-            {/* Notifications */}
-            <NotificationsDropdown />
+            {/* Notifications - только для авторизованных */}
+            {isAuthenticated && <NotificationsDropdown />}
 
-            {/* User Menu */}
+            {/* User Menu - всегда показываем (там кнопка "Войти" для неавторизованных) */}
             <UserMenu />
           </div>
         </div>

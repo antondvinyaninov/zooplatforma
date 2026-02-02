@@ -10,8 +10,8 @@ export default function AdminAuth() {
 
   const handleSubmit = async (data: { email: string; password: string }) => {
     try {
-      // Сначала логинимся через главный backend
-      const loginResponse = await fetch('http://localhost:8000/api/auth/login', {
+      // Сначала логинимся через Auth Service
+      const loginResponse = await fetch('http://localhost:7100/api/auth/login', {
         method: 'POST',
         headers: { 'Content-Type': 'application/json' },
         credentials: 'include',

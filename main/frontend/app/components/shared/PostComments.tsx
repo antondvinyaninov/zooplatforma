@@ -142,7 +142,7 @@ export default function PostComments({
             // Иначе добавляем как новый корневой комментарий
             newComments = [...comments, response.data];
           }
-          setComments(newComments);
+          setInternalComments(newComments);
           
           // Обновляем счетчик в родительском компоненте
           const count = newComments.reduce((sum, c) => sum + 1 + (c.replies?.length || 0), 0);

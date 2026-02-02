@@ -3,6 +3,7 @@ package handlers
 import (
 	"encoding/json"
 	"net/http"
+	"sync"
 	"time"
 )
 
@@ -19,44 +20,71 @@ type HealthResponse struct {
 	Overall  string          `json:"overall"` // "healthy", "degraded", "down"
 }
 
-// HealthCheckHandler проверяет работоспособность всех сервисов
+// HealthCheckHandler проверяет работоспособность всех backend и frontend сервисов
+// Backend проверяются через GET /api/health
+// Frontend проверяются через GET /favicon.ico (легковесный запрос, не вызывает рендеринг)
+// Примечание: Admin Backend не проверяет сам себя, чтобы избежать циклической зависимости
 func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	if r.Method != http.MethodGet {
 		http.Error(w, "Method not allowed", http.StatusMethodNotAllowed)
 		return
 	}
 
+	// Проверяем backend и frontend сервисы
+	// Backend проверяем через /api/health
+	// Frontend проверяем через /favicon.ico (легковесный запрос)
+	// Примечание: Admin Backend не проверяет сам себя, чтобы избежать циклической зависимости
 	services := []struct {
-		Name string
-		URL  string
+		Name      string
+		URL       string
+		IsBackend bool
 	}{
-		{"Main Backend", "http://localhost:8000/api/health"},
-		{"Main Frontend", "http://localhost:3000"},
-		{"Admin Backend", "http://localhost:9000/api/health"},
-		{"Admin Frontend", "http://localhost:4000"},
-		{"PetBase Backend", "http://localhost:8100/api/health"},
-		{"PetBase Frontend", "http://localhost:4100"},
-		{"Shelter Backend", "http://localhost:8200/api/health"},
-		{"Shelter Frontend", "http://localhost:5100"},
-		{"Owner Backend", "http://localhost:8400/api/health"},
-		{"Owner Frontend", "http://localhost:6100"},
-		{"Volunteer Backend", "http://localhost:8500/api/health"},
-		{"Volunteer Frontend", "http://localhost:6200"},
-		{"Clinic Backend", "http://localhost:8600/api/health"},
-		{"Clinic Frontend", "http://localhost:6300"},
+		{"Auth Service", "http://localhost:7100/api/health", true},
+		{"Main Backend", "http://localhost:8000/api/health", true},
+		{"Main Frontend", "http://localhost:3000", false},
+		{"Admin Frontend", "http://localhost:4000", false},
+		{"PetBase Backend", "http://localhost:8100/api/health", true},
+		{"PetBase Frontend", "http://localhost:4100", false},
+		{"Shelter Backend", "http://localhost:8200/api/health", true},
+		{"Shelter Frontend", "http://localhost:5100", false},
+		{"Owner Backend", "http://localhost:8400/api/health", true},
+		{"Owner Frontend", "http://localhost:6100", false},
+		{"Volunteer Backend", "http://localhost:8500/api/health", true},
+		{"Volunteer Frontend", "http://localhost:6200", false},
+		{"Clinic Backend", "http://localhost:8600/api/health", true},
+		{"Clinic Frontend", "http://localhost:6300", false},
 	}
 
+	// Параллельная проверка всех сервисов
+	var wg sync.WaitGroup
+	statusChan := make(chan ServiceStatus, len(services))
+
+	for _, service := range services {
+		wg.Add(1)
+		go func(name, url string, isBackend bool) {
+			defer wg.Done()
+			statusChan <- checkService(name, url, isBackend)
+		}(service.Name, service.URL, service.IsBackend)
+	}
+
+	// Ждем завершения всех проверок
+	go func() {
+		wg.Wait()
+		close(statusChan)
+	}()
+
+	// Собираем результаты
 	var statuses []ServiceStatus
 	onlineCount := 0
 	slowCount := 0
 
-	for _, service := range services {
-		status := checkService(service.Name, service.URL)
+	for status := range statusChan {
 		statuses = append(statuses, status)
 
-		if status.Status == "online" {
+		switch status.Status {
+		case "online":
 			onlineCount++
-		} else if status.Status == "slow" {
+		case "slow":
 			slowCount++
 		}
 	}
@@ -78,14 +106,30 @@ func HealthCheckHandler(w http.ResponseWriter, r *http.Request) {
 	json.NewEncoder(w).Encode(response)
 }
 
-func checkService(name, url string) ServiceStatus {
+func checkService(name, url string, isBackend bool) ServiceStatus {
 	start := time.Now()
 
+	// Уменьшаем таймаут до 1 секунды для быстрой проверки
 	client := &http.Client{
-		Timeout: 5 * time.Second,
+		Timeout: 1 * time.Second,
+		// Не следуем редиректам для быстрой проверки
+		CheckRedirect: func(req *http.Request, via []*http.Request) error {
+			return http.ErrUseLastResponse
+		},
 	}
 
-	resp, err := client.Get(url)
+	var resp *http.Response
+	var err error
+
+	// Для frontend используем GET к favicon.ico (легковесный запрос)
+	// Для backend используем GET к /api/health
+	if isBackend {
+		resp, err = client.Get(url)
+	} else {
+		// Для frontend просто проверяем, что сервер отвечает
+		resp, err = client.Get(url + "/favicon.ico")
+	}
+
 	latency := time.Since(start).Milliseconds()
 
 	status := ServiceStatus{
@@ -101,15 +145,29 @@ func checkService(name, url string) ServiceStatus {
 	}
 	defer resp.Body.Close()
 
-	// Проверяем статус код и задержку
-	if resp.StatusCode >= 200 && resp.StatusCode < 300 {
-		if latency > 1000 {
-			status.Status = "slow"
+	// Для frontend принимаем 200 и 404 (favicon может не существовать, но сервер работает)
+	// Для backend только 200
+	if isBackend {
+		if resp.StatusCode >= 200 && resp.StatusCode < 300 {
+			if latency > 1000 {
+				status.Status = "slow"
+			} else {
+				status.Status = "online"
+			}
 		} else {
-			status.Status = "online"
+			status.Status = "offline"
 		}
 	} else {
-		status.Status = "offline"
+		// Frontend: если сервер ответил (даже 404), значит он работает
+		if resp.StatusCode >= 200 && resp.StatusCode < 500 {
+			if latency > 500 {
+				status.Status = "slow"
+			} else {
+				status.Status = "online"
+			}
+		} else {
+			status.Status = "offline"
+		}
 	}
 
 	return status
