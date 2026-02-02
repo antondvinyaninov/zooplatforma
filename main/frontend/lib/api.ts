@@ -1,11 +1,13 @@
+// В production используем относительные пути (Next.js проксирует через rewrites)
+// В development используем прямые URL к backend
 const API_URL = process.env.NEXT_PUBLIC_API_URL || 
-  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
-    ? window.location.origin 
+  (typeof window !== 'undefined' && process.env.NODE_ENV === 'production'
+    ? '' // Пустая строка = относительные пути (/api/...)
     : 'http://localhost:8000');
 
 const AUTH_URL = process.env.NEXT_PUBLIC_AUTH_URL || 
-  (typeof window !== 'undefined' && window.location.hostname !== 'localhost' 
-    ? window.location.origin 
+  (typeof window !== 'undefined' && process.env.NODE_ENV === 'production'
+    ? '' // В production Auth тоже через Next.js rewrites
     : 'http://localhost:7100');
 
 interface ApiResponse<T> {

@@ -152,7 +152,7 @@ case $SERVICE in
     
     # Запускаем frontend (production режим)
     echo "🚀 Starting Main Frontend..."
-    cd /app/frontend && npm start &
+    cd /app/frontend && NEXT_PUBLIC_API_URL=http://localhost:8000 NEXT_PUBLIC_AUTH_URL=http://localhost:7100 npm start &
     FRONTEND_PID=$!
     
     # Ждем любого процесса
