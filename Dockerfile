@@ -141,6 +141,10 @@ COPY infrastructure /app/infrastructure
 # Копируем nginx конфиг в правильное место
 COPY nginx.conf /etc/nginx/nginx.conf
 
+# Создаем папку для загруженных файлов
+RUN mkdir -p /app/uploads/users /app/uploads/messages /app/uploads/posts /app/uploads/pets /app/uploads/temp && \
+    chmod -R 777 /app/uploads
+
 # Создаем скрипт для запуска сервисов
 RUN cat > /app/start.sh << 'EOF'
 #!/bin/sh

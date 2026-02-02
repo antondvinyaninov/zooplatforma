@@ -197,9 +197,17 @@ export const usersApi = {
       const formData = new FormData();
       formData.append('avatar', compressedFile);
       
+      // Получаем токен из localStorage
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch(`${API_URL}/api/profile/avatar`, {
         method: 'POST',
         credentials: 'include',
+        headers,
         body: formData,
       });
       
@@ -236,9 +244,17 @@ export const usersApi = {
       const formData = new FormData();
       formData.append('cover', compressedFile);
       
+      // Получаем токен из localStorage
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch(`${API_URL}/api/profile/cover`, {
         method: 'POST',
         credentials: 'include',
+        headers,
         body: formData,
       });
       
@@ -266,9 +282,17 @@ export const usersApi = {
   // Удаление аватара
   deleteAvatar: async (): Promise<ApiResponse<{ message: string }>> => {
     try {
+      // Получаем токен из localStorage
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch(`${API_URL}/api/profile/avatar/delete`, {
         method: 'DELETE',
         credentials: 'include',
+        headers,
       });
       
       const result = await response.json();
@@ -295,9 +319,17 @@ export const usersApi = {
   // Удаление обложки
   deleteCover: async (): Promise<ApiResponse<{ message: string }>> => {
     try {
+      // Получаем токен из localStorage
+      const token = localStorage.getItem('token');
+      const headers: HeadersInit = {};
+      if (token) {
+        headers['Authorization'] = `Bearer ${token}`;
+      }
+      
       const response = await fetch(`${API_URL}/api/profile/cover/delete`, {
         method: 'DELETE',
         credentials: 'include',
+        headers,
       });
       
       const result = await response.json();
