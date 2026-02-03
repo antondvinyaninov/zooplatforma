@@ -76,8 +76,10 @@ type User struct {
 	Name          string  `json:"name"`
 	LastName      string  `json:"last_name"`
 	Avatar        string  `json:"avatar"`
+	CoverPhoto    string  `json:"cover_photo"`
 	Bio           string  `json:"bio"`
 	Phone         string  `json:"phone"`
+	Location      string  `json:"location"`
 	DateOfBirth   *string `json:"date_of_birth,omitempty"`
 	Gender        string  `json:"gender"`
 	City          string  `json:"city"`
@@ -349,16 +351,31 @@ func getMeHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Получить пользователя из БД
 	var user User
-	var avatar sql.NullString
+	var avatar, lastName, bio, phone, location, coverPhoto sql.NullString
 	var createdAt sql.NullString
 
 	err = db.QueryRow(sqlQuery(`
-		SELECT id, email, name, last_name, avatar, created_at
+		SELECT id, email, name, last_name, avatar, bio, phone, location, cover_photo, created_at
 		FROM users WHERE id = ?
-	`), claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &user.LastName, &avatar, &createdAt)
+	`), claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &lastName, &avatar, &bio, &phone, &location, &coverPhoto, &createdAt)
 
+	if lastName.Valid {
+		user.LastName = lastName.String
+	}
 	if avatar.Valid {
 		user.Avatar = avatar.String
+	}
+	if bio.Valid {
+		user.Bio = bio.String
+	}
+	if phone.Valid {
+		user.Phone = phone.String
+	}
+	if location.Valid {
+		user.Location = location.String
+	}
+	if coverPhoto.Valid {
+		user.CoverPhoto = coverPhoto.String
 	}
 	if createdAt.Valid {
 		user.CreatedAt = createdAt.String
