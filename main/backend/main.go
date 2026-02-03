@@ -10,11 +10,7 @@ import (
 	"strings"
 
 	"github.com/joho/godotenv"
-	"github.com/zooplatforma/pkg/clients"
 )
-
-// Global AuthClient
-var authClient *clients.AuthClient
 
 func enableCORS(next http.HandlerFunc) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
@@ -111,8 +107,6 @@ func main() {
 		log.Println("Warning: .env file not found, using default values")
 	}
 
-	// ✅ Auth Service URL будет автоматически прочитан из AUTH_SERVICE_URL в .env
-	// pkg/middleware использует os.Getenv("AUTH_SERVICE_URL") внутри
 	authServiceURL := os.Getenv("AUTH_SERVICE_URL")
 	if authServiceURL == "" {
 		authServiceURL = "http://localhost:7100"
@@ -120,10 +114,6 @@ func main() {
 	} else {
 		log.Printf("🔐 Auth Service URL: %s\n", authServiceURL)
 	}
-
-	// Initialize AuthClient
-	authClient = clients.NewAuthClient(authServiceURL)
-	log.Printf("✅ AuthClient initialized: %s\n", authServiceURL)
 
 	// ✅ Gateway теперь обрабатывает авторизацию
 	log.Printf("🚀 Running behind API Gateway - auth handled by Gateway")
