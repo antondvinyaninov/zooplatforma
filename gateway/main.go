@@ -1,6 +1,7 @@
 package main
 
 import (
+	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -95,13 +96,21 @@ func main() {
 	}
 	r.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadsDir))))
 
-	// Frontend (все остальные запросы проксируем на Next.js)
-	// Next.js сам обработает роутинг страниц
-	r.PathPrefix("/").HandlerFunc(ProxyHandler(&Service{
-		Name:    "Main Frontend",
-		URL:     "http://localhost:3000",
-		Timeout: 30,
-	}))
+	// Корневой путь - информация о Gateway
+	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
+		w.Header().Set("Content-Type", "application/json")
+		json.NewEncoder(w).Encode(map[string]interface{}{
+			"success": true,
+			"service": "API Gateway",
+			"version": "1.0.0",
+			"endpoints": map[string]string{
+				"health":  "/health",
+				"auth":    "/api/auth/*",
+				"api":     "/api/*",
+				"uploads": "/uploads/*",
+			},
+		})
+	}).Methods("GET")
 
 	// Запустить сервер
 	port := os.Getenv("GATEWAY_PORT")
