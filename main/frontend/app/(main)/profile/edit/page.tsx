@@ -214,7 +214,7 @@ export default function EditProfilePage() {
         // Обновляем данные пользователя в контексте
         await refreshUser();
         toast.success('Профиль успешно обновлен!');
-        router.push(`/id${user.id}`);
+        // Остаемся на странице редактирования
       } else {
         toast.error(response.error || 'Ошибка обновления профиля');
       }
