@@ -27,6 +27,10 @@ func main() {
 	var err error
 	dbPath := os.Getenv("DATABASE_PATH")
 
+	// Логируем переменные окружения для отладки
+	log.Printf("🔍 ENVIRONMENT: %s", os.Getenv("ENVIRONMENT"))
+	log.Printf("🔍 DATABASE_URL: %s", os.Getenv("DATABASE_URL"))
+
 	// Production: используем PostgreSQL
 	if os.Getenv("ENVIRONMENT") == "production" {
 		dbURL := os.Getenv("DATABASE_URL")
@@ -39,7 +43,13 @@ func main() {
 			log.Fatal("❌ Failed to connect to PostgreSQL:", err)
 		}
 
+		// Проверяем подключение
+		if err = db.Ping(); err != nil {
+			log.Fatal("❌ Failed to ping PostgreSQL:", err)
+		}
+
 		log.Println("✅ Auth Service using PostgreSQL")
+		log.Printf("✅ Connected to PostgreSQL successfully")
 	} else {
 		// Development: используем SQLite
 		if dbPath == "" {
