@@ -56,6 +56,7 @@ func CORSMiddleware(next http.Handler) http.Handler {
 		"http://localhost:6100":                                  true, // Owner Frontend (dev)
 		"http://localhost:6200":                                  true, // Volunteer Frontend (dev)
 		"http://localhost:6300":                                  true, // Clinic Frontend (dev)
+		"http://localhost:8000":                                  true, // Main Backend (dev) - если нужен
 		"https://my-projects-zooplatforma.crv1ic.easypanel.host": true, // Main Frontend (prod)
 		"https://my-projects-admin.crv1ic.easypanel.host":        true, // Admin Frontend (prod)
 		"https://my-projects-petbase.crv1ic.easypanel.host":      true, // PetBase Frontend (prod)
@@ -68,15 +69,22 @@ func CORSMiddleware(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		origin := r.Header.Get("Origin")
 
+		// Логируем для отладки
+		log.Printf("🌐 CORS: Origin=%s, Method=%s, Path=%s", origin, r.Method, r.URL.Path)
+
 		// Проверяем что origin разрешен
 		if allowedOrigins[origin] {
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
-		}
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-ID, X-User-Email, X-User-Role")
+			w.Header().Set("Access-Control-Max-Age", "3600") // Кеш preflight на 1 час
 
-		// Устанавливаем остальные CORS заголовки
-		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
-		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-ID, X-User-Email, X-User-Role")
+			log.Printf("✅ CORS: Allowed origin %s", origin)
+		} else if origin != "" {
+			// Origin не разрешен
+			log.Printf("⚠️ CORS: Blocked origin %s", origin)
+		}
 
 		// Обработать preflight запрос
 		if r.Method == "OPTIONS" {
