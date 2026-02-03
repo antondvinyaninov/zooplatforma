@@ -194,7 +194,7 @@ case $SERVICE in
     
     # Запускаем Main frontend (production режим, порт 3000)
     echo "🚀 Starting Main Frontend..."
-    cd /app/frontend && PORT=3000 NEXT_PUBLIC_API_URL=http://localhost:8000 NEXT_PUBLIC_AUTH_URL=http://localhost:7100 npm start &
+    cd /app/frontend && PORT=3000 NEXT_PUBLIC_API_URL=http://localhost:8000 NEXT_PUBLIC_AUTH_URL=http://localhost:7100 NEXT_PUBLIC_DADATA_API_KEY=300ba9e25ef32f0d6ea7c41826b2255b138e19e2 npm start &
     FRONTEND_PID=$!
     
     # Запускаем PetBase frontend (production режим, порт 4100)
