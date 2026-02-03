@@ -34,6 +34,8 @@ export default function EditProfilePage() {
   const toast = useToast();
   const router = useRouter();
 
+  const [isInitialLoad, setIsInitialLoad] = useState(true);
+
   useEffect(() => {
     // Проверяем только на клиенте
     if (typeof window === 'undefined') return;
@@ -43,7 +45,8 @@ export default function EditProfilePage() {
       return;
     }
 
-    if (user) {
+    // Загружаем данные только при первой загрузке страницы
+    if (user && isInitialLoad) {
       console.log('Loading user data:', user); // Для отладки
       setEditForm({
         name: user.name || '',
@@ -59,8 +62,9 @@ export default function EditProfilePage() {
       });
       setAvatarPreview(user.avatar || null);
       setCoverPreview(user.cover_photo || null);
+      setIsInitialLoad(false);
     }
-  }, [user, isLoading, isAuthenticated, router]);
+  }, [user, isLoading, isAuthenticated, router, isInitialLoad]);
 
   const handleAvatarChange = async (e: React.ChangeEvent<HTMLInputElement>) => {
     const file = e.target.files?.[0];
