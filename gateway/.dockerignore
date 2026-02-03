@@ -1,0 +1,10 @@
+# Игнорировать при сборке Docker образа
+.env
+.env.local
+.git
+.gitignore
+*.md
+README.md
+gateway
+gateway-build
+tmp/
