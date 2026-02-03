@@ -104,10 +104,30 @@ func handleGetUsers(w http.ResponseWriter, _ *http.Request) {
 	users := []models.User{}
 	for rows.Next() {
 		var user models.User
-		if err := rows.Scan(&user.ID, &user.Name, &user.LastName, &user.Email, &user.Avatar, &user.CreatedAt, &user.Verified, &user.VerifiedAt); err != nil {
+		var lastName, avatar sql.NullString
+		var verified sql.NullBool
+		var verifiedAt sql.NullString
+
+		if err := rows.Scan(&user.ID, &user.Name, &lastName, &user.Email, &avatar, &user.CreatedAt, &verified, &verifiedAt); err != nil {
 			sendError(w, err.Error(), http.StatusInternalServerError)
 			return
 		}
+
+		// Конвертируем NULL значения
+		if lastName.Valid {
+			user.LastName = lastName.String
+		}
+		if avatar.Valid {
+			user.Avatar = avatar.String
+		}
+		if verified.Valid {
+			user.Verified = verified.Bool
+		}
+		if verifiedAt.Valid {
+			verifiedAtStr := verifiedAt.String
+			user.VerifiedAt = &verifiedAtStr
+		}
+
 		users = append(users, user)
 	}
 
@@ -204,7 +224,8 @@ func handleGetUser(w http.ResponseWriter, _ *http.Request, id int) {
 		user.Verified = verified.Bool
 	}
 	if verifiedAt.Valid {
-		user.VerifiedAt = &verifiedAt.String
+		verifiedAtStr := verifiedAt.String
+		user.VerifiedAt = &verifiedAtStr
 	}
 	if createdAt.Valid {
 		user.CreatedAt = createdAt.String

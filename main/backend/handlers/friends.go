@@ -83,16 +83,17 @@ func SendFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 	id, _ := result.LastInsertId()
 
 	// Создаем уведомление для получателя запроса
-	var senderName, senderLastName string
+	var senderName string
+	var senderLastName sql.NullString
 	query = convertPlaceholdersFriends(`
-		SELECT name, COALESCE(last_name, '') FROM users WHERE id = ?
+		SELECT name, last_name FROM users WHERE id = ?
 	`)
 	err = database.DB.QueryRow(query, userID).Scan(&senderName, &senderLastName)
 
 	if err == nil {
 		fullName := senderName
-		if senderLastName != "" {
-			fullName += " " + senderLastName
+		if senderLastName.Valid && senderLastName.String != "" {
+			fullName += " " + senderLastName.String
 		}
 
 		notifHandler := &NotificationsHandler{DB: database.DB}
@@ -151,9 +152,10 @@ func AcceptFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Создаем уведомление для отправителя запроса
 	var senderID int
-	var acceptorName, acceptorLastName string
+	var acceptorName string
+	var acceptorLastName sql.NullString
 	query = convertPlaceholdersFriends(`
-		SELECT f.user_id, u.name, COALESCE(u.last_name, '')
+		SELECT f.user_id, u.name, u.last_name
 		FROM friendships f
 		JOIN users u ON u.id = ?
 		WHERE f.id = ?
@@ -162,8 +164,8 @@ func AcceptFriendRequestHandler(w http.ResponseWriter, r *http.Request) {
 
 	if err == nil {
 		fullName := acceptorName
-		if acceptorLastName != "" {
-			fullName += " " + acceptorLastName
+		if acceptorLastName.Valid && acceptorLastName.String != "" {
+			fullName += " " + acceptorLastName.String
 		}
 
 		notifHandler := &NotificationsHandler{DB: database.DB}

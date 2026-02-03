@@ -536,8 +536,24 @@ func getUserPosts(w http.ResponseWriter, r *http.Request, userID int) {
 			post.ScheduledAt = &timeStr
 		}
 
-		// User и Organization будут nil (можно загрузить позже если нужно)
-		post.User = nil
+		// Загружаем данные пользователя
+		var user models.User
+		var lastName, avatar sql.NullString
+		userQuery := ConvertPlaceholders("SELECT id, name, last_name, email, avatar FROM users WHERE id = ?")
+		err = database.DB.QueryRow(userQuery, post.AuthorID).Scan(&user.ID, &user.Name, &lastName, &user.Email, &avatar)
+		if err == nil {
+			if lastName.Valid {
+				user.LastName = lastName.String
+			}
+			if avatar.Valid {
+				user.Avatar = avatar.String
+			}
+			post.User = &user
+		} else {
+			log.Printf("⚠️ getUserPosts: Failed to load user %d: %v", post.AuthorID, err)
+			post.User = nil
+		}
+
 		post.Organization = nil
 		post.Pets = []models.Pet{}
 		post.CommentsCount = 0

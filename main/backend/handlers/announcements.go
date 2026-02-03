@@ -323,18 +323,34 @@ func handleDeleteAnnouncement(w http.ResponseWriter, r *http.Request, id int) {
 func loadAnnouncementRelations(a *models.PetAnnouncement) {
 	// Загружаем автора
 	var author models.User
+	var lastName, avatar sql.NullString
+
 	err := database.DB.QueryRow(ConvertPlaceholders("SELECT id, name, last_name, email, avatar FROM users WHERE id = ?"), a.AuthorID).
-		Scan(&author.ID, &author.Name, &author.LastName, &author.Email, &author.Avatar)
+		Scan(&author.ID, &author.Name, &lastName, &author.Email, &avatar)
 	if err == nil {
+		if lastName.Valid {
+			author.LastName = lastName.String
+		}
+		if avatar.Valid {
+			author.Avatar = avatar.String
+		}
 		a.Author = &author
 	}
 
 	// Загружаем контактное лицо
 	if a.ContactPersonID != nil {
 		var contact models.User
+		var contactLastName, contactAvatar sql.NullString
+
 		err := database.DB.QueryRow(ConvertPlaceholders("SELECT id, name, last_name, email, avatar FROM users WHERE id = ?"), *a.ContactPersonID).
-			Scan(&contact.ID, &contact.Name, &contact.LastName, &contact.Email, &contact.Avatar)
+			Scan(&contact.ID, &contact.Name, &contactLastName, &contact.Email, &contactAvatar)
 		if err == nil {
+			if contactLastName.Valid {
+				contact.LastName = contactLastName.String
+			}
+			if contactAvatar.Valid {
+				contact.Avatar = contactAvatar.String
+			}
 			a.ContactPerson = &contact
 		}
 	}
@@ -520,10 +536,11 @@ func handleCreateDonation(w http.ResponseWriter, r *http.Request, announcementID
 		donorName = *req.DonorName
 	} else if donorID != nil {
 		// Загружаем имя из профиля
-		var name, lastName string
+		var name string
+		var lastName sql.NullString
 		database.DB.QueryRow(ConvertPlaceholders("SELECT name, last_name FROM users WHERE id = ?"), *donorID).Scan(&name, &lastName)
-		if lastName != "" {
-			donorName = name + " " + lastName
+		if lastName.Valid && lastName.String != "" {
+			donorName = name + " " + lastName.String
 		} else {
 			donorName = name
 		}
