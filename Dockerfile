@@ -18,6 +18,7 @@ COPY owner/backend/go.mod owner/backend/go.sum ./owner/backend/
 COPY petbase/backend/go.mod petbase/backend/go.sum ./petbase/backend/
 COPY shelter/backend/go.mod shelter/backend/go.sum ./shelter/backend/
 COPY volunteer/backend/go.mod volunteer/backend/go.sum ./volunteer/backend/
+COPY gateway/go.mod ./gateway/
 COPY pkg ./pkg
 
 # Копируем весь проект (нужно для resolve local modules)
@@ -41,11 +42,15 @@ RUN go mod download -C database && \
     go mod download -C shelter/backend && \
     go mod tidy -C shelter/backend && \
     go mod download -C volunteer/backend && \
-    go mod tidy -C volunteer/backend
+    go mod tidy -C volunteer/backend && \
+    go mod download -C gateway && \
+    go mod tidy -C gateway
 
 # Собираем все backend сервисы
 # Auth Service требует CGO для sqlite3
 RUN cd auth/backend && CGO_ENABLED=1 go build -o /app/bin/auth-backend . && \
+    cd /app && \
+    cd gateway && go build -o /app/bin/gateway . && \
     cd /app && \
     cd main/backend && go build -o /app/bin/main-backend . && \
     cd /app && \
@@ -96,7 +101,7 @@ RUN cd /app/petbase/frontend && npm run build
 # Runtime образ
 FROM node:20-alpine
 
-RUN apk add --no-cache ca-certificates nginx postgresql-client
+RUN apk add --no-cache ca-certificates postgresql-client
 
 WORKDIR /app
 
@@ -141,9 +146,6 @@ COPY fix_posts_table.sql /app/fix_posts_table.sql
 # Копируем конфигурационные файлы
 COPY infrastructure /app/infrastructure
 
-# Копируем nginx конфиг в правильное место
-COPY nginx.conf /etc/nginx/nginx.conf
-
 # Создаем папку для загруженных файлов
 RUN mkdir -p /app/uploads/users /app/uploads/messages /app/uploads/posts /app/uploads/pets /app/uploads/temp && \
     chmod -R 777 /app/uploads
@@ -173,9 +175,21 @@ case $SERVICE in
       PGPASSWORD=${DATABASE_PASSWORD:-lmLG7k2ed4vas19} psql -h ${DATABASE_HOST:-zooplatforma-db} -U ${DATABASE_USER:-zp} -d ${DATABASE_NAME:-zp-db} -f /app/fix_posts_table.sql || echo "⚠️ Posts fix failed (maybe already applied)"
     fi
     
-    # Запускаем nginx
-    echo "🚀 Starting nginx..."
-    nginx
+    # Запускаем API Gateway (порт 80)
+    echo "🚀 Starting API Gateway..."
+    export GATEWAY_PORT=80
+    export JWT_SECRET=${JWT_SECRET:-your-secret-key}
+    export AUTH_SERVICE_URL=http://localhost:7100
+    export MAIN_SERVICE_URL=http://localhost:8000
+    export PETBASE_SERVICE_URL=http://localhost:8100
+    export CLINIC_SERVICE_URL=http://localhost:8600
+    export OWNER_SERVICE_URL=http://localhost:8400
+    export SHELTER_SERVICE_URL=http://localhost:8200
+    export VOLUNTEER_SERVICE_URL=http://localhost:8500
+    export ADMIN_SERVICE_URL=http://localhost:9000
+    export UPLOAD_PATH=/app/uploads
+    /app/gateway &
+    GATEWAY_PID=$!
     
     # Запускаем Auth Service (порт 7100)
     echo "🚀 Starting Auth Service..."
@@ -240,7 +254,7 @@ RUN chmod +x /app/start.sh
 
 
 # Expose все порты
-EXPOSE 7100 8000 8100 8200 8400 8500 8600 9000 3000 4000 4100 5100 6100 6200 6300
+EXPOSE 80 7100 8000 8100 8200 8400 8500 8600 9000 3000 4000 4100 5100 6100 6200 6300
 
 # Запускаем сервис (по умолчанию main)
 CMD ["/app/start.sh"]
