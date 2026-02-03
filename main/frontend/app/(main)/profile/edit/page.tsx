@@ -44,8 +44,9 @@ export default function EditProfilePage() {
     }
 
     if (user) {
+      console.log('Loading user data:', user); // Для отладки
       setEditForm({
-        name: user.name,
+        name: user.name || '',
         last_name: user.last_name || '',
         bio: user.bio || '',
         phone: user.phone || '',

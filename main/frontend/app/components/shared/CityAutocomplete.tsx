@@ -70,7 +70,8 @@ export default function CityAutocomplete({ value, onChange, placeholder = 'Мо�
 
     const apiKey = process.env.NEXT_PUBLIC_DADATA_API_KEY;
     if (!apiKey) {
-      console.error('DaData API key not found');
+      console.error('❌ DaData API key not found. Please add NEXT_PUBLIC_DADATA_API_KEY to .env.local');
+      console.error('Current env:', process.env.NEXT_PUBLIC_DADATA_API_KEY);
       return;
     }
 
@@ -95,10 +96,10 @@ export default function CityAutocomplete({ value, onChange, placeholder = 'Мо�
         setSuggestions(data.suggestions || []);
         setShowSuggestions(true);
       } else {
-        console.error('DaData API error:', res.status, res.statusText);
+        console.error('❌ DaData API error:', res.status, res.statusText);
       }
     } catch (e) {
-      console.error('DaData search failed:', e);
+      console.error('❌ DaData search failed:', e);
     } finally {
       setSearching(false);
     }
