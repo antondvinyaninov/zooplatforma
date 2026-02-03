@@ -214,7 +214,25 @@ export default function EditProfilePage() {
         // Обновляем данные пользователя в контексте
         await refreshUser();
         toast.success('Профиль успешно обновлен!');
-        // Остаемся на странице редактирования
+        
+        // Обновляем форму с новыми данными после refreshUser
+        // Даем время на обновление контекста
+        setTimeout(() => {
+          if (user) {
+            setEditForm({
+              name: user.name || '',
+              last_name: user.last_name || '',
+              bio: user.bio || '',
+              phone: user.phone || '',
+              location: user.location || '',
+              profile_visibility: user.profile_visibility || 'public',
+              show_phone: user.show_phone || 'nobody',
+              show_email: user.show_email || 'nobody',
+              allow_messages: user.allow_messages || 'everyone',
+              show_online: user.show_online || 'yes',
+            });
+          }
+        }, 500);
       } else {
         toast.error(response.error || 'Ошибка обновления профиля');
       }
