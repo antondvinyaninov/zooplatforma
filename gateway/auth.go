@@ -2,6 +2,7 @@ package main
 
 import (
 	"context"
+	"database/sql"
 	"encoding/json"
 	"fmt"
 	"io"
@@ -11,9 +12,13 @@ import (
 	"time"
 
 	"github.com/golang-jwt/jwt/v5"
+	_ "github.com/lib/pq"
+	_ "github.com/mattn/go-sqlite3"
 )
 
 var jwtSecret []byte
+var authDB *sql.DB
+var isPostgres bool
 
 // InitJWT инициализирует JWT secret
 func InitJWT() {
@@ -23,6 +28,56 @@ func InitJWT() {
 	}
 	jwtSecret = []byte(secret)
 	log.Printf("✅ JWT Secret initialized")
+}
+
+// InitAuthDB инициализирует подключение к БД для авторизации
+func InitAuthDB() error {
+	var err error
+
+	// Определяем тип БД
+	isPostgres = os.Getenv("ENVIRONMENT") == "production"
+
+	if isPostgres {
+		// PostgreSQL для production
+		dbHost := os.Getenv("DATABASE_HOST")
+		dbPort := os.Getenv("DATABASE_PORT")
+		dbUser := os.Getenv("DATABASE_USER")
+		dbPassword := os.Getenv("DATABASE_PASSWORD")
+		dbName := os.Getenv("DATABASE_NAME")
+
+		connStr := "host=" + dbHost + " port=" + dbPort + " user=" + dbUser +
+			" password=" + dbPassword + " dbname=" + dbName + " sslmode=disable"
+
+		authDB, err = sql.Open("postgres", connStr)
+		if err != nil {
+			return err
+		}
+
+		if err = authDB.Ping(); err != nil {
+			return err
+		}
+
+		log.Printf("✅ PostgreSQL connected for auth: %s@%s:%s/%s", dbUser, dbHost, dbPort, dbName)
+	} else {
+		// SQLite для локальной разработки
+		dbPath := os.Getenv("DATABASE_PATH")
+		if dbPath == "" {
+			dbPath = "../database/data.db"
+		}
+
+		authDB, err = sql.Open("sqlite3", dbPath)
+		if err != nil {
+			return err
+		}
+
+		if err = authDB.Ping(); err != nil {
+			return err
+		}
+
+		log.Printf("✅ SQLite connected for auth: %s", dbPath)
+	}
+
+	return nil
 }
 
 // Claims - JWT claims
@@ -151,6 +206,22 @@ func parseJWT(tokenString string) (*Claims, error) {
 	}
 
 	return claims, nil
+}
+
+// createJWT создает JWT токен
+func createJWT(userID int, email, role string) (string, error) {
+	claims := Claims{
+		UserID: userID,
+		Email:  email,
+		Role:   role,
+		RegisteredClaims: jwt.RegisteredClaims{
+			ExpiresAt: jwt.NewNumericDate(time.Now().Add(24 * time.Hour * 7)), // 7 дней
+			IssuedAt:  jwt.NewNumericDate(time.Now()),
+		},
+	}
+
+	token := jwt.NewWithClaims(jwt.SigningMethodHS256, claims)
+	return token.SignedString(jwtSecret)
 }
 
 // VerifyTokenWithAuthService проверяет токен через Auth Service (альтернативный метод)

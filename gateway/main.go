@@ -19,6 +19,12 @@ func main() {
 	// Инициализировать JWT Secret
 	InitJWT()
 
+	// Инициализировать БД для авторизации
+	if err := InitAuthDB(); err != nil {
+		log.Fatal("❌ Failed to connect to auth database:", err)
+	}
+	defer authDB.Close()
+
 	// Инициализировать сервисы
 	services := InitServices()
 
@@ -34,9 +40,11 @@ func main() {
 	r.HandleFunc("/health", HealthCheckHandler(services)).Methods("GET")
 	r.HandleFunc("/api/health", HealthCheckHandler(services)).Methods("GET")
 
-	// Auth Service (без авторизации)
-	authRouter := r.PathPrefix("/api/auth").Subrouter()
-	authRouter.PathPrefix("").HandlerFunc(ProxyHandler(services.Auth))
+	// Auth endpoints (встроенные в Gateway)
+	r.HandleFunc("/api/auth/register", RegisterHandler).Methods("POST")
+	r.HandleFunc("/api/auth/login", LoginHandler).Methods("POST")
+	r.HandleFunc("/api/auth/logout", LogoutHandler).Methods("POST")
+	r.HandleFunc("/api/auth/me", GetMeHandler).Methods("GET")
 
 	// Main Backend (с авторизацией для некоторых endpoints)
 	mainRouter := r.PathPrefix("/api").Subrouter()
