@@ -64,8 +64,16 @@ func ProxyHandler(service *Service) http.HandlerFunc {
 		}
 		defer resp.Body.Close()
 
-		// Копируем заголовки ответа
+		// Копируем заголовки ответа от backend
+		// ВАЖНО: Пропускаем CORS заголовки (Access-Control-*) потому что:
+		// 1. CORS управляется только Gateway (CORSMiddleware)
+		// 2. Backend сервисы НЕ должны устанавливать CORS
+		// 3. Это предотвращает дублирование заголовков
 		for key, values := range resp.Header {
+			// Пропускаем CORS заголовки - они уже установлены в CORSMiddleware
+			if strings.HasPrefix(key, "Access-Control-") {
+				continue
+			}
 			for _, value := range values {
 				w.Header().Add(key, value)
 			}

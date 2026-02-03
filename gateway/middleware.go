@@ -44,34 +44,37 @@ func (rw *responseWriter) WriteHeader(code int) {
 }
 
 // CORSMiddleware добавляет CORS заголовки
+// ВАЖНО: Это единственное место где устанавливаются CORS заголовки!
+// Backend сервисы НЕ должны устанавливать CORS - они фильтруются в ProxyHandler
 func CORSMiddleware(next http.Handler) http.Handler {
+	// Список разрешенных origins (все frontend приложения)
+	allowedOrigins := map[string]bool{
+		"http://localhost:3000":                                  true, // Main Frontend (dev)
+		"http://localhost:4000":                                  true, // Admin Frontend (dev)
+		"http://localhost:4100":                                  true, // PetBase Frontend (dev)
+		"http://localhost:5100":                                  true, // Shelter Frontend (dev)
+		"http://localhost:6100":                                  true, // Owner Frontend (dev)
+		"http://localhost:6200":                                  true, // Volunteer Frontend (dev)
+		"http://localhost:6300":                                  true, // Clinic Frontend (dev)
+		"https://my-projects-zooplatforma.crv1ic.easypanel.host": true, // Main Frontend (prod)
+		"https://my-projects-admin.crv1ic.easypanel.host":        true, // Admin Frontend (prod)
+		"https://my-projects-petbase.crv1ic.easypanel.host":      true, // PetBase Frontend (prod)
+		"https://my-projects-shelter.crv1ic.easypanel.host":      true, // Shelter Frontend (prod)
+		"https://my-projects-owner.crv1ic.easypanel.host":        true, // Owner Frontend (prod)
+		"https://my-projects-volunteer.crv1ic.easypanel.host":    true, // Volunteer Frontend (prod)
+		"https://my-projects-clinic.crv1ic.easypanel.host":       true, // Clinic Frontend (prod)
+	}
+
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
-		allowedOrigins := []string{
-			"http://localhost:3000",                                  // Main Frontend (dev)
-			"http://localhost:4000",                                  // Admin Frontend (dev)
-			"http://localhost:4100",                                  // PetBase Frontend (dev)
-			"http://localhost:5100",                                  // Shelter Frontend (dev)
-			"http://localhost:6100",                                  // Owner Frontend (dev)
-			"http://localhost:6200",                                  // Volunteer Frontend (dev)
-			"http://localhost:6300",                                  // Clinic Frontend (dev)
-			"https://my-projects-zooplatforma.crv1ic.easypanel.host", // Main Frontend (prod)
-			"https://my-projects-admin.crv1ic.easypanel.host",        // Admin Frontend (prod)
-			"https://my-projects-petbase.crv1ic.easypanel.host",      // PetBase Frontend (prod)
-			"https://my-projects-shelter.crv1ic.easypanel.host",      // Shelter Frontend (prod)
-			"https://my-projects-owner.crv1ic.easypanel.host",        // Owner Frontend (prod)
-			"https://my-projects-volunteer.crv1ic.easypanel.host",    // Volunteer Frontend (prod)
-			"https://my-projects-clinic.crv1ic.easypanel.host",       // Clinic Frontend (prod)
-		}
-
 		origin := r.Header.Get("Origin")
-		for _, allowed := range allowedOrigins {
-			if origin == allowed {
-				w.Header().Set("Access-Control-Allow-Origin", origin)
-				break
-			}
+
+		// Проверяем что origin разрешен
+		if allowedOrigins[origin] {
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
 		}
 
-		w.Header().Set("Access-Control-Allow-Credentials", "true")
+		// Устанавливаем остальные CORS заголовки
 		w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS")
 		w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-ID, X-User-Email, X-User-Role")
 

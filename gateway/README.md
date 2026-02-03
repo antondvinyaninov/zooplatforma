@@ -15,7 +15,7 @@ Gateway выполняет следующие функции:
 ## 🏗️ Архитектура
 
 ```
-Frontend → Gateway (80) → Auth Service (7100)
+Frontend → Gateway (80) 
                         → Main Backend (8000)
                         → PetBase Backend (8100)
                         → Clinic Backend (8600)
