@@ -49,14 +49,18 @@ func (rw *responseWriter) WriteHeader(code int) {
 func CORSMiddleware(next http.Handler) http.Handler {
 	// Список разрешенных origins (все frontend приложения)
 	allowedOrigins := map[string]bool{
-		"http://localhost:3000":                                  true, // Main Frontend (dev)
-		"http://localhost:4000":                                  true, // Admin Frontend (dev)
-		"http://localhost:4100":                                  true, // PetBase Frontend (dev)
-		"http://localhost:5100":                                  true, // Shelter Frontend (dev)
-		"http://localhost:6100":                                  true, // Owner Frontend (dev)
-		"http://localhost:6200":                                  true, // Volunteer Frontend (dev)
-		"http://localhost:6300":                                  true, // Clinic Frontend (dev)
-		"http://localhost:8000":                                  true, // Main Backend (dev) - если нужен
+		// Development (localhost)
+		"http://localhost:3000": true, // Main Frontend (dev)
+		"http://localhost:3001": true, // Main Frontend (dev альтернативный порт)
+		"http://localhost:4000": true, // Admin Frontend (dev)
+		"http://localhost:4100": true, // PetBase Frontend (dev)
+		"http://localhost:5100": true, // Shelter Frontend (dev)
+		"http://localhost:6100": true, // Owner Frontend (dev)
+		"http://localhost:6200": true, // Volunteer Frontend (dev)
+		"http://localhost:6300": true, // Clinic Frontend (dev)
+		"http://localhost:8000": true, // Main Backend (dev) - если нужен
+
+		// Production (Easypanel)
 		"https://my-projects-zooplatforma.crv1ic.easypanel.host": true, // Main Frontend (prod)
 		"https://my-projects-admin.crv1ic.easypanel.host":        true, // Admin Frontend (prod)
 		"https://my-projects-petbase.crv1ic.easypanel.host":      true, // PetBase Frontend (prod)
@@ -72,19 +76,20 @@ func CORSMiddleware(next http.Handler) http.Handler {
 		// Логируем для отладки
 		log.Printf("🌐 CORS: Origin=%s, Method=%s, Path=%s", origin, r.Method, r.URL.Path)
 
-		// Проверяем что origin разрешен
+		// ✅ КРИТИЧНО: Проверяем origin и устанавливаем заголовки ДО проверки метода
 		if allowedOrigins[origin] {
-			// Устанавливаем CORS заголовки для разрешенного origin
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Credentials", "true")
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
-			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, X-User-ID, X-User-Email, X-User-Role")
-			w.Header().Set("Access-Control-Max-Age", "3600") // Кеш preflight на 1 час
-
 			log.Printf("✅ CORS: Allowed origin %s", origin)
 
-			// Обработать preflight запрос
+			// Устанавливаем CORS заголовки
+			w.Header().Set("Access-Control-Allow-Origin", origin)
+			w.Header().Set("Access-Control-Allow-Credentials", "true")
+			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
+			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie, X-User-ID, X-User-Email, X-User-Role")
+			w.Header().Set("Access-Control-Max-Age", "3600") // Кеш preflight на 1 час
+
+			// ✅ Обрабатываем preflight ПОСЛЕ установки заголовков
 			if r.Method == "OPTIONS" {
+				log.Printf("✅ CORS: Preflight OK for %s", origin)
 				w.WriteHeader(http.StatusOK)
 				return
 			}
@@ -92,8 +97,9 @@ func CORSMiddleware(next http.Handler) http.Handler {
 			// Origin не разрешен
 			log.Printf("⚠️ CORS: Blocked origin %s", origin)
 
-			// Для OPTIONS все равно возвращаем 403 с объяснением
+			// Для OPTIONS возвращаем 403
 			if r.Method == "OPTIONS" {
+				log.Printf("❌ CORS: Preflight blocked for %s", origin)
 				w.WriteHeader(http.StatusForbidden)
 				return
 			}
