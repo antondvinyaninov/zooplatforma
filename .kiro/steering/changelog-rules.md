@@ -2,6 +2,10 @@
 inclusion: manual
 ---
 
+---
+inclusion: manual
+---
+
 # Правила ведения CHANGELOG.md
 
 ## Общие принципы

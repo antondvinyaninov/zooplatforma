@@ -387,6 +387,10 @@ func getMeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Логируем полученные данные для отладки
+	log.Printf("🔍 User data from DB: id=%d, name=%s, last_name=%s, phone=%s, location=%s, bio=%s",
+		user.ID, user.Name, user.LastName, user.Phone, user.Location, user.Bio)
+
 	// Загрузить роли из user_roles
 	roles := []string{}
 	rows, err := db.Query(sqlQuery("SELECT role FROM user_roles WHERE user_id = ?"), user.ID)

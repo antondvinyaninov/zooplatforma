@@ -2,6 +2,10 @@
 inclusion: always
 ---
 
+---
+inclusion: manual
+---
+
 # Процесс релиза
 
 ## Команда "релиз"

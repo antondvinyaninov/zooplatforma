@@ -160,6 +160,10 @@ case $SERVICE in
     exec /app/auth-backend
     ;;
   main)
+    # Устанавливаем переменные окружения для production в самом начале
+    export ENVIRONMENT=production
+    export DATABASE_URL="host=${DATABASE_HOST:-zooplatforma-db} port=${DATABASE_PORT:-5432} user=${DATABASE_USER:-zp} password=${DATABASE_PASSWORD:-lmLG7k2ed4vas19} dbname=${DATABASE_NAME:-zp-db} sslmode=disable"
+    
     # Применяем SQL fixes (если в production)
     if [ "$ENVIRONMENT" = "production" ]; then
       echo "🔧 Applying organizations table fix..."
@@ -172,10 +176,6 @@ case $SERVICE in
     # Запускаем nginx
     echo "🚀 Starting nginx..."
     nginx
-    
-    # Устанавливаем переменные окружения для production
-    export ENVIRONMENT=production
-    export DATABASE_URL="host=${DATABASE_HOST:-zooplatforma-db} port=${DATABASE_PORT:-5432} user=${DATABASE_USER:-zp} password=${DATABASE_PASSWORD:-lmLG7k2ed4vas19} dbname=${DATABASE_NAME:-zp-db} sslmode=disable"
     
     # Запускаем Auth Service (порт 7100)
     echo "🚀 Starting Auth Service..."

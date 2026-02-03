@@ -2,6 +2,10 @@
 inclusion: always
 ---
 
+---
+inclusion: manual
+---
+
 # API Design Rules - Правила проектирования API
 
 ## ⚠️ КРИТИЧЕСКОЕ ПРАВИЛО: Единый стиль API

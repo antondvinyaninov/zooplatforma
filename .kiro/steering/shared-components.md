@@ -3,6 +3,10 @@ title: Работа с @pet/shared компонентами
 inclusion: always
 ---
 
+---
+inclusion: manual
+---
+
 # Правила работы с @pet/shared
 
 ## Назначение папки shared/
