@@ -359,6 +359,14 @@ func getMeHandler(w http.ResponseWriter, r *http.Request) {
 		FROM users WHERE id = ?
 	`), claims.UserID).Scan(&user.ID, &user.Email, &user.Name, &lastName, &avatar, &bio, &phone, &location, &coverPhoto, &createdAt)
 
+	// СНАЧАЛА проверяем ошибку!
+	if err != nil {
+		log.Printf("❌ Failed to get user: %v", err)
+		http.Error(w, `{"success":false,"error":"User not found"}`, http.StatusNotFound)
+		return
+	}
+
+	// ПОТОМ копируем данные из NullString
 	if lastName.Valid {
 		user.LastName = lastName.String
 	}
@@ -379,12 +387,6 @@ func getMeHandler(w http.ResponseWriter, r *http.Request) {
 	}
 	if createdAt.Valid {
 		user.CreatedAt = createdAt.String
-	}
-
-	if err != nil {
-		log.Printf("❌ Failed to get user: %v", err)
-		http.Error(w, `{"success":false,"error":"User not found"}`, http.StatusNotFound)
-		return
 	}
 
 	// Логируем полученные данные для отладки
