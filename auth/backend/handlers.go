@@ -421,6 +421,10 @@ func getMeHandler(w http.ResponseWriter, r *http.Request) {
 
 	log.Printf("✅ User loaded: id=%d, email=%s, role=%s, all_roles=%v", user.ID, user.Email, user.Role, roles)
 
+	// Логируем данные перед отправкой
+	log.Printf("📤 Sending user to client: id=%d, name=%s, last_name=%s, phone=%s, location=%s, bio=%s",
+		user.ID, user.Name, user.LastName, user.Phone, user.Location, user.Bio)
+
 	// Ответ
 	response := map[string]interface{}{
 		"success": true,
