@@ -63,8 +63,17 @@ func UploadAvatarHandler(w http.ResponseWriter, r *http.Request) {
 	ext := filepath.Ext(header.Filename)
 	fileName := fmt.Sprintf("%s%s", uuid.New().String(), ext)
 
+	// Определяем базовый путь для uploads
+	// В Docker: /app/uploads
+	// В локальной разработке: ../../uploads (относительно main/backend)
+	baseUploadPath := os.Getenv("UPLOAD_PATH")
+	if baseUploadPath == "" {
+		// По умолчанию для локальной разработки
+		baseUploadPath = "../../uploads"
+	}
+
 	// Создаем папку для аватаров пользователя
-	uploadDir := fmt.Sprintf("/app/uploads/users/%d/avatars", userID)
+	uploadDir := fmt.Sprintf("%s/users/%d/avatars", baseUploadPath, userID)
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		logSystemEvent("error", "profile", "upload_avatar", fmt.Sprintf("Ошибка создания директории: %v", err), &userID, ipAddress)
 		sendErrorResponse(w, "Ошибка создания директории", http.StatusInternalServerError)
@@ -158,8 +167,14 @@ func UploadCoverPhotoHandler(w http.ResponseWriter, r *http.Request) {
 	ext := filepath.Ext(header.Filename)
 	fileName := fmt.Sprintf("%s%s", uuid.New().String(), ext)
 
+	// Определяем базовый путь для uploads
+	baseUploadPath := os.Getenv("UPLOAD_PATH")
+	if baseUploadPath == "" {
+		baseUploadPath = "../../uploads"
+	}
+
 	// Создаем папку для обложек пользователя
-	uploadDir := fmt.Sprintf("/app/uploads/users/%d/covers", userID)
+	uploadDir := fmt.Sprintf("%s/users/%d/covers", baseUploadPath, userID)
 	if err := os.MkdirAll(uploadDir, 0755); err != nil {
 		logSystemEvent("error", "profile", "upload_cover", fmt.Sprintf("Ошибка создания директории: %v", err), &userID, ipAddress)
 		sendErrorResponse(w, "Ошибка создания директории", http.StatusInternalServerError)

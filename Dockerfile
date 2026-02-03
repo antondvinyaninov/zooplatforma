@@ -181,12 +181,14 @@ case $SERVICE in
     # Запускаем PetBase Backend (порт 8100)
     echo "🚀 Starting PetBase Backend..."
     export AUTH_SERVICE_URL=http://localhost:7100
+    export UPLOAD_PATH=/app/uploads
     /app/petbase-backend &
     PETBASE_PID=$!
     
     # Запускаем Main Backend (порт 8000)
     echo "🚀 Starting Main Backend..."
     export AUTH_SERVICE_URL=http://localhost:7100
+    export UPLOAD_PATH=/app/uploads
     /app/main-backend &
     BACKEND_PID=$!
     
