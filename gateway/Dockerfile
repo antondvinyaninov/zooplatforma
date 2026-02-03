@@ -1,5 +1,5 @@
 # Gateway Dockerfile - минимальный образ для API Gateway
-FROM golang:1.23-alpine AS builder
+FROM golang:1.25-alpine AS builder
 
 # Установить зависимости для сборки
 RUN apk add --no-cache git
