@@ -84,6 +84,9 @@ RUN cd /app/main/frontend && npm install
 # Устанавливаем зависимости petbase/frontend
 RUN cd /app/petbase/frontend && npm install
 
+# Устанавливаем переменные окружения для Next.js build
+ENV NEXT_PUBLIC_DADATA_API_KEY=300ba9e25ef32f0d6ea7c41826b2255b138e19e2
+
 # Собираем Next.js (для production)
 RUN cd /app/main/frontend && npm run build
 
