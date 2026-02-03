@@ -32,10 +32,21 @@ func main() {
 	// Создать роутер
 	r := mux.NewRouter()
 
-	// Middleware
-	r.Use(LoggingMiddleware)
+	// ✅ КРИТИЧНО: Middleware в правильном порядке
+	// 1. CORS - ПЕРВЫМ! Обрабатывает OPTIONS и устанавливает заголовки
 	r.Use(CORSMiddleware)
+	// 2. Logging - логирует все запросы
+	r.Use(LoggingMiddleware)
+	// 3. Rate Limiting - ограничивает количество запросов
 	r.Use(RateLimitMiddleware)
+
+	// ✅ КРИТИЧНО: Глобальный обработчик OPTIONS для всех маршрутов
+	// Это нужно чтобы preflight запросы не получали 405 Method Not Allowed
+	r.Methods("OPTIONS").HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// CORS заголовки уже установлены в CORSMiddleware
+		// Просто возвращаем 200 OK
+		w.WriteHeader(http.StatusOK)
+	})
 
 	// Health check
 	r.HandleFunc("/health", HealthCheckHandler(services)).Methods("GET")

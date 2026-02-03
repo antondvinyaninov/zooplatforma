@@ -76,7 +76,7 @@ func CORSMiddleware(next http.Handler) http.Handler {
 		// Логируем для отладки
 		log.Printf("🌐 CORS: Origin=%s, Method=%s, Path=%s", origin, r.Method, r.URL.Path)
 
-		// ✅ КРИТИЧНО: Проверяем origin и устанавливаем заголовки ДО проверки метода
+		// ✅ КРИТИЧНО: Проверяем origin и устанавливаем заголовки
 		if allowedOrigins[origin] {
 			log.Printf("✅ CORS: Allowed origin %s", origin)
 
@@ -86,25 +86,13 @@ func CORSMiddleware(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, PATCH, OPTIONS")
 			w.Header().Set("Access-Control-Allow-Headers", "Content-Type, Authorization, Cookie, X-User-ID, X-User-Email, X-User-Role")
 			w.Header().Set("Access-Control-Max-Age", "3600") // Кеш preflight на 1 час
-
-			// ✅ Обрабатываем preflight ПОСЛЕ установки заголовков
-			if r.Method == "OPTIONS" {
-				log.Printf("✅ CORS: Preflight OK for %s", origin)
-				w.WriteHeader(http.StatusOK)
-				return
-			}
 		} else if origin != "" {
 			// Origin не разрешен
 			log.Printf("⚠️ CORS: Blocked origin %s", origin)
-
-			// Для OPTIONS возвращаем 403
-			if r.Method == "OPTIONS" {
-				log.Printf("❌ CORS: Preflight blocked for %s", origin)
-				w.WriteHeader(http.StatusForbidden)
-				return
-			}
 		}
 
+		// ✅ OPTIONS обрабатывается глобальным обработчиком в main.go
+		// Здесь просто пропускаем запрос дальше
 		next.ServeHTTP(w, r)
 	})
 }
