@@ -123,11 +123,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
   const refreshUser = async () => {
     try {
+      console.log('🔄 Refreshing user data...');
       const authResponse = await authApi.me();
+      console.log('📥 Auth response:', authResponse);
       
       if (authResponse.success && authResponse.data) {
         const userData = authResponse.data as any;
         const user = userData.user || userData;
+        console.log('✅ Setting user in context:', user);
         setUser(user);
       }
     } catch (error) {
