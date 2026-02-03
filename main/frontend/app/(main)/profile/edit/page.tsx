@@ -206,33 +206,36 @@ export default function EditProfilePage() {
     e.preventDefault();
     if (!user || isSaving) return;
 
+    console.log('📤 Sending profile data:', editForm);
+
     setIsSaving(true);
     try {
       const response = await usersApi.updateProfile(editForm);
+      
+      console.log('📥 Received response:', response);
       
       if (response.success) {
         // Обновляем данные пользователя в контексте
         await refreshUser();
         toast.success('Профиль успешно обновлен!');
         
-        // Обновляем форму с новыми данными после refreshUser
-        // Даем время на обновление контекста
-        setTimeout(() => {
-          if (user) {
-            setEditForm({
-              name: user.name || '',
-              last_name: user.last_name || '',
-              bio: user.bio || '',
-              phone: user.phone || '',
-              location: user.location || '',
-              profile_visibility: user.profile_visibility || 'public',
-              show_phone: user.show_phone || 'nobody',
-              show_email: user.show_email || 'nobody',
-              allow_messages: user.allow_messages || 'everyone',
-              show_online: user.show_online || 'yes',
-            });
-          }
-        }, 500);
+        // Используем данные из ответа API напрямую
+        if (response.data) {
+          const userData = response.data as any;
+          console.log('✅ Form updated with saved data:', userData);
+          setEditForm({
+            name: userData.name || '',
+            last_name: userData.last_name || '',
+            bio: userData.bio || '',
+            phone: userData.phone || '',
+            location: userData.location || '',
+            profile_visibility: userData.profile_visibility || 'public',
+            show_phone: userData.show_phone || 'nobody',
+            show_email: userData.show_email || 'nobody',
+            allow_messages: userData.allow_messages || 'everyone',
+            show_online: userData.show_online || 'yes',
+          });
+        }
       } else {
         toast.error(response.error || 'Ошибка обновления профиля');
       }
