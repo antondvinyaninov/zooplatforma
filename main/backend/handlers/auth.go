@@ -216,13 +216,22 @@ func MeHandler(w http.ResponseWriter, r *http.Request) {
 		Success bool `json:"success"`
 		Data    struct {
 			User struct {
-				ID        int       `json:"id"`
-				Email     string    `json:"email"`
-				Name      string    `json:"name"`
-				Bio       string    `json:"bio"`
-				Phone     string    `json:"phone"`
-				Avatar    string    `json:"avatar"`
-				CreatedAt time.Time `json:"created_at"`
+				ID                int    `json:"id"`
+				Email             string `json:"email"`
+				Name              string `json:"name"`
+				LastName          string `json:"last_name"`
+				Bio               string `json:"bio"`
+				Phone             string `json:"phone"`
+				Location          string `json:"location"`
+				Avatar            string `json:"avatar"`
+				CoverPhoto        string `json:"cover_photo"`
+				ProfileVisibility string `json:"profile_visibility"`
+				ShowPhone         string `json:"show_phone"`
+				ShowEmail         string `json:"show_email"`
+				AllowMessages     string `json:"allow_messages"`
+				ShowOnline        string `json:"show_online"`
+				Verified          bool   `json:"verified"`
+				CreatedAt         string `json:"created_at"`
 			} `json:"user"`
 		} `json:"data"`
 	}
@@ -233,27 +242,30 @@ func MeHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
-	// Формируем ответ в формате Main Backend (для обратной совместимости)
+	log.Printf("🔍 Received from Auth Service: last_name=%s, phone=%s, location=%s, bio=%s",
+		authResp.Data.User.LastName, authResp.Data.User.Phone, authResp.Data.User.Location, authResp.Data.User.Bio)
+
+	// Формируем ответ в формате Main Backend (передаем ВСЕ поля от Auth Service)
 	response := map[string]interface{}{
 		"success": true,
 		"data": map[string]interface{}{
 			"user": map[string]interface{}{
-				"id":         authResp.Data.User.ID,
-				"name":       authResp.Data.User.Name,
-				"email":      authResp.Data.User.Email,
-				"bio":        authResp.Data.User.Bio,
-				"phone":      authResp.Data.User.Phone,
-				"avatar":     authResp.Data.User.Avatar,
-				"created_at": authResp.Data.User.CreatedAt,
-				// Поля для обратной совместимости (пока не в Auth Service)
-				"last_name":          "",
-				"location":           "",
-				"cover_photo":        "",
-				"profile_visibility": "public",
-				"show_phone":         "nobody",
-				"show_email":         "nobody",
-				"allow_messages":     "everyone",
-				"show_online":        "yes",
+				"id":                 authResp.Data.User.ID,
+				"name":               authResp.Data.User.Name,
+				"last_name":          authResp.Data.User.LastName,
+				"email":              authResp.Data.User.Email,
+				"bio":                authResp.Data.User.Bio,
+				"phone":              authResp.Data.User.Phone,
+				"location":           authResp.Data.User.Location,
+				"avatar":             authResp.Data.User.Avatar,
+				"cover_photo":        authResp.Data.User.CoverPhoto,
+				"profile_visibility": authResp.Data.User.ProfileVisibility,
+				"show_phone":         authResp.Data.User.ShowPhone,
+				"show_email":         authResp.Data.User.ShowEmail,
+				"allow_messages":     authResp.Data.User.AllowMessages,
+				"show_online":        authResp.Data.User.ShowOnline,
+				"verified":           authResp.Data.User.Verified,
+				"created_at":         authResp.Data.User.CreatedAt,
 			},
 			"token": token,
 		},
