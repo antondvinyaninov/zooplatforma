@@ -74,6 +74,7 @@ func CORSMiddleware(next http.Handler) http.Handler {
 
 		// Проверяем что origin разрешен
 		if allowedOrigins[origin] {
+			// Устанавливаем CORS заголовки для разрешенного origin
 			w.Header().Set("Access-Control-Allow-Origin", origin)
 			w.Header().Set("Access-Control-Allow-Credentials", "true")
 			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, PUT, DELETE, OPTIONS, PATCH")
@@ -81,15 +82,21 @@ func CORSMiddleware(next http.Handler) http.Handler {
 			w.Header().Set("Access-Control-Max-Age", "3600") // Кеш preflight на 1 час
 
 			log.Printf("✅ CORS: Allowed origin %s", origin)
+
+			// Обработать preflight запрос
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusOK)
+				return
+			}
 		} else if origin != "" {
 			// Origin не разрешен
 			log.Printf("⚠️ CORS: Blocked origin %s", origin)
-		}
 
-		// Обработать preflight запрос
-		if r.Method == "OPTIONS" {
-			w.WriteHeader(http.StatusOK)
-			return
+			// Для OPTIONS все равно возвращаем 403 с объяснением
+			if r.Method == "OPTIONS" {
+				w.WriteHeader(http.StatusForbidden)
+				return
+			}
 		}
 
 		next.ServeHTTP(w, r)
