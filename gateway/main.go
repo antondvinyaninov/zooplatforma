@@ -47,47 +47,60 @@ func main() {
 	r.HandleFunc("/api/auth/logout", LogoutHandler).Methods("POST")
 	r.HandleFunc("/api/auth/me", GetMeHandler).Methods("GET")
 
+	// PetBase Backend (публичный) - регистрируем ПЕРВЫМ
+	petbaseRouter := r.PathPrefix("/api/petbase").Subrouter()
+	petbaseRouter.PathPrefix("").HandlerFunc(ProxyHandler(services.PetBase))
+
+	// Clinic Backend (защищенный)
+	clinicRouter := r.PathPrefix("/api/clinic").Subrouter()
+	clinicRouter.Use(AuthMiddleware)
+	clinicRouter.PathPrefix("").HandlerFunc(ProxyHandler(services.Clinic))
+
+	// Owner Backend (защищенный)
+	ownerRouter := r.PathPrefix("/api/owner").Subrouter()
+	ownerRouter.Use(AuthMiddleware)
+	ownerRouter.PathPrefix("").HandlerFunc(ProxyHandler(services.Owner))
+
+	// Shelter Backend (защищенный)
+	shelterRouter := r.PathPrefix("/api/shelter").Subrouter()
+	shelterRouter.Use(AuthMiddleware)
+	shelterRouter.PathPrefix("").HandlerFunc(ProxyHandler(services.Shelter))
+
+	// Volunteer Backend (защищенный)
+	volunteerRouter := r.PathPrefix("/api/volunteer").Subrouter()
+	volunteerRouter.Use(AuthMiddleware)
+	volunteerRouter.PathPrefix("").HandlerFunc(ProxyHandler(services.Volunteer))
+
+	// Admin Backend (защищенный + только админы)
+	adminRouter := r.PathPrefix("/api/admin").Subrouter()
+	adminRouter.Use(AuthMiddleware)
+	adminRouter.Use(AdminOnlyMiddleware)
+	adminRouter.PathPrefix("").HandlerFunc(ProxyHandler(services.Admin))
+
 	// Main Backend - публичные endpoints (без авторизации)
+	// Регистрируем ПОСЛЕ специфичных маршрутов (/api/petbase, /api/clinic и т.д.)
 	r.HandleFunc("/api/posts", ProxyHandler(services.Main)).Methods("GET")
 	r.HandleFunc("/api/users/{id:[0-9]+}", ProxyHandler(services.Main)).Methods("GET")
 	r.HandleFunc("/api/organizations/all", ProxyHandler(services.Main)).Methods("GET")
 	r.HandleFunc("/api/species", ProxyHandler(services.Main)).Methods("GET")
 	r.HandleFunc("/api/breeds", ProxyHandler(services.Main)).Methods("GET")
 
-	// Main Backend - все остальные endpoints (требуют авторизации)
+	// Main Backend - защищенные endpoints (требуют авторизации)
+	// Используем конкретные маршруты вместо PathPrefix("/api")
 	mainProtected := r.NewRoute().Subrouter()
 	mainProtected.Use(AuthMiddleware)
-	mainProtected.PathPrefix("/api").HandlerFunc(ProxyHandler(services.Main))
-
-	// PetBase Backend
-	petbaseRouter := r.PathPrefix("/api/petbase").Subrouter()
-	petbaseRouter.PathPrefix("").HandlerFunc(ProxyHandler(services.PetBase))
-
-	// Clinic Backend
-	clinicRouter := r.PathPrefix("/api/clinic").Subrouter()
-	clinicRouter.Use(AuthMiddleware)
-	clinicRouter.PathPrefix("").HandlerFunc(ProxyHandler(services.Clinic))
-
-	// Owner Backend
-	ownerRouter := r.PathPrefix("/api/owner").Subrouter()
-	ownerRouter.Use(AuthMiddleware)
-	ownerRouter.PathPrefix("").HandlerFunc(ProxyHandler(services.Owner))
-
-	// Shelter Backend
-	shelterRouter := r.PathPrefix("/api/shelter").Subrouter()
-	shelterRouter.Use(AuthMiddleware)
-	shelterRouter.PathPrefix("").HandlerFunc(ProxyHandler(services.Shelter))
-
-	// Volunteer Backend
-	volunteerRouter := r.PathPrefix("/api/volunteer").Subrouter()
-	volunteerRouter.Use(AuthMiddleware)
-	volunteerRouter.PathPrefix("").HandlerFunc(ProxyHandler(services.Volunteer))
-
-	// Admin Backend
-	adminRouter := r.PathPrefix("/api/admin").Subrouter()
-	adminRouter.Use(AuthMiddleware)
-	adminRouter.Use(AdminOnlyMiddleware)
-	adminRouter.PathPrefix("").HandlerFunc(ProxyHandler(services.Admin))
+	mainProtected.HandleFunc("/api/profile", ProxyHandler(services.Main)).Methods("GET", "PUT")
+	mainProtected.HandleFunc("/api/posts", ProxyHandler(services.Main)).Methods("POST")
+	mainProtected.HandleFunc("/api/posts/{id:[0-9]+}", ProxyHandler(services.Main)).Methods("PUT", "DELETE")
+	mainProtected.HandleFunc("/api/comments", ProxyHandler(services.Main)).Methods("POST", "PUT", "DELETE")
+	mainProtected.HandleFunc("/api/comments/{id:[0-9]+}", ProxyHandler(services.Main)).Methods("PUT", "DELETE")
+	mainProtected.HandleFunc("/api/likes", ProxyHandler(services.Main)).Methods("POST", "DELETE")
+	mainProtected.HandleFunc("/api/follows", ProxyHandler(services.Main)).Methods("POST", "DELETE")
+	mainProtected.HandleFunc("/api/notifications", ProxyHandler(services.Main)).Methods("GET", "PUT")
+	mainProtected.HandleFunc("/api/messages", ProxyHandler(services.Main)).Methods("GET", "POST")
+	mainProtected.HandleFunc("/api/chats", ProxyHandler(services.Main)).Methods("GET", "POST")
+	mainProtected.HandleFunc("/api/chats/{id:[0-9]+}", ProxyHandler(services.Main)).Methods("GET", "PUT", "DELETE")
+	mainProtected.HandleFunc("/api/chats/{id:[0-9]+}/messages", ProxyHandler(services.Main)).Methods("GET", "POST")
 
 	// Статические файлы (uploads)
 	uploadsDir := os.Getenv("UPLOAD_PATH")
