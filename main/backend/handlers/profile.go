@@ -3,6 +3,7 @@ package handlers
 import (
 	"backend/models"
 	"database"
+	"database/sql"
 	"encoding/json"
 	"net/http"
 )
@@ -56,18 +57,40 @@ func UpdateProfileHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Получаем обновленные данные пользователя
 	var user models.User
+	var lastName, bio, phone, location, avatar, coverPhoto sql.NullString
+
 	query = ConvertPlaceholders(`SELECT id, name, last_name, email, bio, phone, location, avatar, cover_photo,
 	         profile_visibility, show_phone, show_email, allow_messages, show_online, created_at 
 	         FROM users WHERE id = ?`)
 	err = database.DB.QueryRow(query, userID).Scan(
-		&user.ID, &user.Name, &user.LastName, &user.Email, &user.Bio, &user.Phone,
-		&user.Location, &user.Avatar, &user.CoverPhoto,
+		&user.ID, &user.Name, &lastName, &user.Email, &bio, &phone,
+		&location, &avatar, &coverPhoto,
 		&user.ProfileVisibility, &user.ShowPhone, &user.ShowEmail, &user.AllowMessages, &user.ShowOnline,
 		&user.CreatedAt,
 	)
 	if err != nil {
-		sendErrorResponse(w, "Ошибка получения данных пользователя", http.StatusInternalServerError)
+		sendErrorResponse(w, "Ошибка получения данных пользователя: "+err.Error(), http.StatusInternalServerError)
 		return
+	}
+
+	// Конвертируем NULL значения
+	if lastName.Valid {
+		user.LastName = lastName.String
+	}
+	if bio.Valid {
+		user.Bio = bio.String
+	}
+	if phone.Valid {
+		user.Phone = phone.String
+	}
+	if location.Valid {
+		user.Location = location.String
+	}
+	if avatar.Valid {
+		user.Avatar = avatar.String
+	}
+	if coverPhoto.Valid {
+		user.CoverPhoto = coverPhoto.String
 	}
 
 	sendSuccessResponse(w, models.UserResponse{
