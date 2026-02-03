@@ -124,18 +124,18 @@ func RegisterHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Создать пользователя
-	result, err := authDB.Exec(sqlQuery(`
+	var userID int64
+	err = authDB.QueryRow(sqlQuery(`
 		INSERT INTO users (email, password, name, last_name)
 		VALUES (?, ?, ?, ?)
-	`), req.Email, string(hashedPassword), req.Name, req.LastName)
+		RETURNING id
+	`), req.Email, string(hashedPassword), req.Name, req.LastName).Scan(&userID)
 
 	if err != nil {
 		log.Printf("❌ Failed to create user: %v", err)
 		http.Error(w, `{"success":false,"error":"Failed to create user"}`, http.StatusInternalServerError)
 		return
 	}
-
-	userID, _ := result.LastInsertId()
 
 	// Создать JWT токен
 	token, err := createJWT(int(userID), req.Email, "user")

@@ -186,8 +186,12 @@ func checkCanEditPost(userID int, post *models.Post) bool {
 
 // getAllPosts получает все посты для Feed
 func getAllPosts(w http.ResponseWriter, r *http.Request) {
-	// Получаем userID из контекста (может быть 0 для неавторизованных)
-	userID, _ := r.Context().Value("userID").(int)
+	// Получаем userID из заголовка Gateway (может быть 0 для неавторизованных)
+	userID, _ := GetUserIDFromGateway(r)
+
+	// Debug: логируем все заголовки
+	log.Printf("🔍 getAllPosts: X-User-ID header=%s", r.Header.Get("X-User-ID"))
+	log.Printf("🔍 getAllPosts: userID=%d", userID)
 
 	// Получаем параметр фильтра
 	filter := r.URL.Query().Get("filter")
@@ -685,11 +689,15 @@ func getOrganizationPosts(w http.ResponseWriter, r *http.Request, orgID int) {
 
 // createPost создаёт новый пост
 func createPost(w http.ResponseWriter, r *http.Request) {
-	userID, ok := r.Context().Value("userID").(int)
+	// Получаем userID из заголовка Gateway
+	userID, ok := GetUserIDFromGateway(r)
 	if !ok {
+		log.Printf("❌ createPost: No user ID in Gateway headers")
 		sendErrorResponse(w, "Не авторизован", http.StatusUnauthorized)
 		return
 	}
+
+	log.Printf("✅ createPost: userID=%d from Gateway", userID)
 
 	var req models.CreatePostRequest
 	if err := json.NewDecoder(r.Body).Decode(&req); err != nil {

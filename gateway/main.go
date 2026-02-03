@@ -46,26 +46,17 @@ func main() {
 	r.HandleFunc("/api/auth/logout", LogoutHandler).Methods("POST")
 	r.HandleFunc("/api/auth/me", GetMeHandler).Methods("GET")
 
-	// Main Backend (с авторизацией для некоторых endpoints)
-	mainRouter := r.PathPrefix("/api").Subrouter()
+	// Main Backend - публичные endpoints (без авторизации)
+	r.HandleFunc("/api/posts", ProxyHandler(services.Main)).Methods("GET")
+	r.HandleFunc("/api/users/{id:[0-9]+}", ProxyHandler(services.Main)).Methods("GET")
+	r.HandleFunc("/api/organizations/all", ProxyHandler(services.Main)).Methods("GET")
+	r.HandleFunc("/api/species", ProxyHandler(services.Main)).Methods("GET")
+	r.HandleFunc("/api/breeds", ProxyHandler(services.Main)).Methods("GET")
 
-	// Публичные endpoints (без авторизации)
-	publicPaths := []string{
-		"/api/posts",         // Просмотр постов
-		"/api/users/{id}",    // Просмотр профиля
-		"/api/organizations", // Просмотр организаций
-		"/api/species",       // Справочник видов
-		"/api/breeds",        // Справочник пород
-	}
-
-	for _, path := range publicPaths {
-		mainRouter.HandleFunc(path, ProxyHandler(services.Main)).Methods("GET")
-	}
-
-	// Защищенные endpoints (требуют авторизации)
-	protectedRouter := mainRouter.PathPrefix("").Subrouter()
-	protectedRouter.Use(AuthMiddleware)
-	protectedRouter.PathPrefix("").HandlerFunc(ProxyHandler(services.Main))
+	// Main Backend - все остальные endpoints (требуют авторизации)
+	mainProtected := r.NewRoute().Subrouter()
+	mainProtected.Use(AuthMiddleware)
+	mainProtected.PathPrefix("/api").HandlerFunc(ProxyHandler(services.Main))
 
 	// PetBase Backend
 	petbaseRouter := r.PathPrefix("/api/petbase").Subrouter()
