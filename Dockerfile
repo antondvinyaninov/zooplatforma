@@ -173,6 +173,10 @@ case $SERVICE in
     echo "🚀 Starting nginx..."
     nginx
     
+    # Устанавливаем переменные окружения для production
+    export ENVIRONMENT=production
+    export DATABASE_URL="host=${DATABASE_HOST:-zooplatforma-db} port=${DATABASE_PORT:-5432} user=${DATABASE_USER:-zp} password=${DATABASE_PASSWORD:-lmLG7k2ed4vas19} dbname=${DATABASE_NAME:-zp-db} sslmode=disable"
+    
     # Запускаем Auth Service (порт 7100)
     echo "🚀 Starting Auth Service..."
     /app/auth-backend &
