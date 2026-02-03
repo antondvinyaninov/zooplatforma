@@ -96,8 +96,18 @@ func UploadAvatarHandler(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 
+	// Проверяем что файл действительно создан
+	if _, err := os.Stat(filePath); os.IsNotExist(err) {
+		logSystemEvent("error", "profile", "upload_avatar", fmt.Sprintf("Файл не найден после сохранения: %s", filePath), &userID, ipAddress)
+		sendErrorResponse(w, "Файл не сохранился", http.StatusInternalServerError)
+		return
+	}
+
 	// Формируем URL для доступа к файлу
 	avatarURL := fmt.Sprintf("/uploads/users/%d/avatars/%s", userID, fileName)
+
+	// Логируем детали для отладки
+	logSystemEvent("info", "profile", "upload_avatar", fmt.Sprintf("Файл сохранён: %s → URL: %s", filePath, avatarURL), &userID, ipAddress)
 
 	// Обновляем аватар в базе данных
 	query := ConvertPlaceholders(`UPDATE users SET avatar = ? WHERE id = ?`)
