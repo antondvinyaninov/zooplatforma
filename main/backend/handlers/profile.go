@@ -39,9 +39,9 @@ func UpdateProfileHandler(w http.ResponseWriter, r *http.Request) {
 	}
 
 	// Обновляем профиль (БЕЗ avatar и cover_photo - для них отдельные endpoints)
-	query := `UPDATE users SET name = ?, last_name = ?, bio = ?, phone = ?, location = ?,
+	query := ConvertPlaceholders(`UPDATE users SET name = ?, last_name = ?, bio = ?, phone = ?, location = ?,
 	          profile_visibility = ?, show_phone = ?, show_email = ?, allow_messages = ?, show_online = ?
-	          WHERE id = ?`
+	          WHERE id = ?`)
 	_, err := database.DB.Exec(query, req.Name, req.LastName, req.Bio, req.Phone, req.Location,
 		req.ProfileVisibility, req.ShowPhone, req.ShowEmail, req.AllowMessages, req.ShowOnline, userID)
 	if err != nil {
@@ -56,9 +56,9 @@ func UpdateProfileHandler(w http.ResponseWriter, r *http.Request) {
 
 	// Получаем обновленные данные пользователя
 	var user models.User
-	query = `SELECT id, name, last_name, email, bio, phone, location, avatar, cover_photo,
+	query = ConvertPlaceholders(`SELECT id, name, last_name, email, bio, phone, location, avatar, cover_photo,
 	         profile_visibility, show_phone, show_email, allow_messages, show_online, created_at 
-	         FROM users WHERE id = ?`
+	         FROM users WHERE id = ?`)
 	err = database.DB.QueryRow(query, userID).Scan(
 		&user.ID, &user.Name, &user.LastName, &user.Email, &user.Bio, &user.Phone,
 		&user.Location, &user.Avatar, &user.CoverPhoto,
