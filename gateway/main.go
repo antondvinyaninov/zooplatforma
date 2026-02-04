@@ -1,7 +1,6 @@
 package main
 
 import (
-	"encoding/json"
 	"log"
 	"net/http"
 	"os"
@@ -120,21 +119,12 @@ func main() {
 	}
 	r.PathPrefix("/uploads/").Handler(http.StripPrefix("/uploads/", http.FileServer(http.Dir(uploadsDir))))
 
-	// Корневой путь - информация о Gateway
-	r.HandleFunc("/", func(w http.ResponseWriter, r *http.Request) {
-		w.Header().Set("Content-Type", "application/json")
-		json.NewEncoder(w).Encode(map[string]interface{}{
-			"success": true,
-			"service": "API Gateway",
-			"version": "1.0.0",
-			"endpoints": map[string]string{
-				"health":  "/health",
-				"auth":    "/api/auth/*",
-				"api":     "/api/*",
-				"uploads": "/uploads/*",
-			},
-		})
-	}).Methods("GET")
+	// ⚠️ ВАЖНО: Frontend проксирование - ПОСЛЕДНИЙ маршрут!
+	// Проксирует все запросы (кроме /api/*, /uploads/*, /health) на Main Service
+	// Main Service внутри контейнера имеет nginx который направляет:
+	//   - /api/* → Backend (localhost:8000)
+	//   - /* → Frontend (localhost:3000)
+	r.PathPrefix("/").HandlerFunc(ProxyHandler(services.Main))
 
 	// Запустить сервер
 	port := os.Getenv("GATEWAY_PORT")

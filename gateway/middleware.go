@@ -61,6 +61,7 @@ func CORSMiddleware(next http.Handler) http.Handler {
 		"http://localhost:8000": true, // Main Backend (dev) - если нужен
 
 		// Production (Easypanel)
+		"https://my-projects-gateway-zp.crv1ic.easypanel.host":   true, // Gateway (prod) - главный домен
 		"https://my-projects-zooplatforma.crv1ic.easypanel.host": true, // Main Frontend (prod)
 		"https://my-projects-admin.crv1ic.easypanel.host":        true, // Admin Frontend (prod)
 		"https://my-projects-petbase.crv1ic.easypanel.host":      true, // PetBase Frontend (prod)
