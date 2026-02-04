@@ -7,13 +7,13 @@ RUN apk add --no-cache git
 WORKDIR /build
 
 # Копировать go.mod и go.sum
-COPY gateway/go.mod gateway/go.sum ./
+COPY go.mod go.sum ./
 
 # Скачать зависимости
 RUN go mod download
 
 # Копировать исходный код Gateway
-COPY gateway/*.go ./
+COPY *.go ./
 
 # Собрать Gateway
 RUN CGO_ENABLED=0 GOOS=linux go build -a -installsuffix cgo -o gateway .
