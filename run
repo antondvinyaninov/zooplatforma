@@ -1,0 +1,129 @@
+#!/bin/bash
+
+# Добавляем Go bin в PATH
+export PATH=$PATH:$(go env GOPATH)/bin
+
+echo "🚀 Starting Main Project..."
+echo ""
+
+# Цвета для вывода
+GREEN='\033[0;32m'
+BLUE='\033[0;34m'
+YELLOW='\033[1;33m'
+RED='\033[0;31m'
+NC='\033[0m' # No Color
+
+# Функция для проверки порта
+check_port() {
+    lsof -ti:$1 >/dev/null 2>&1
+}
+
+# Функция для очистки порта
+clean_port() {
+    if check_port $1; then
+        echo -e "${YELLOW}🧹 Cleaning port $1...${NC}"
+        lsof -ti:$1 | xargs kill -9 2>/dev/null || true
+        sleep 1
+    fi
+}
+
+# Очистка кэша
+echo -e "${BLUE}🧹 Cleaning cache...${NC}"
+rm -rf frontend/.next 2>/dev/null || true
+echo -e "${GREEN}✅ Cache cleared${NC}"
+echo ""
+
+# Очистка портов
+echo -e "${BLUE}🧹 Cleaning up ports...${NC}"
+clean_port 7100  # Auth Service
+clean_port 8100  # PetBase Service
+clean_port 8000  # Main Backend
+clean_port 3000  # Main Frontend
+echo -e "${GREEN}✅ Ports cleared${NC}"
+echo ""
+
+# Запуск Auth Service
+echo -e "${BLUE}🔐 Starting Auth Service on port 7100...${NC}"
+(cd ../auth/backend && go run .) > /tmp/auth-service.log 2>&1 &
+AUTH_PID=$!
+sleep 3
+
+if check_port 7100; then
+    echo -e "${GREEN}✅ Auth Service started (PID: $AUTH_PID)${NC}"
+else
+    echo -e "${RED}❌ Failed to start Auth Service${NC}"
+    cat /tmp/auth-service.log
+    exit 1
+fi
+echo ""
+
+# Запуск PetBase Service
+echo -e "${BLUE}🐾 Starting PetBase Service on port 8100...${NC}"
+(cd ../petbase/backend && go run .) > /tmp/petbase-service.log 2>&1 &
+PETBASE_PID=$!
+sleep 3
+
+if check_port 8100; then
+    echo -e "${GREEN}✅ PetBase Service started (PID: $PETBASE_PID)${NC}"
+else
+    echo -e "${RED}❌ Failed to start PetBase Service${NC}"
+    cat /tmp/petbase-service.log
+    exit 1
+fi
+echo ""
+
+# Запуск Main Backend
+echo -e "${BLUE}🔧 Starting Main Backend on port 8000...${NC}"
+(cd backend && air) > /tmp/main-backend.log 2>&1 &
+BACKEND_PID=$!
+sleep 3
+
+if check_port 8000; then
+    echo -e "${GREEN}✅ Main Backend started (PID: $BACKEND_PID)${NC}"
+else
+    echo -e "${RED}❌ Failed to start Main Backend${NC}"
+    cat /tmp/main-backend.log
+    exit 1
+fi
+echo ""
+
+# Запуск Main Frontend
+echo -e "${BLUE}⚛️  Starting Main Frontend on port 3000...${NC}"
+(cd frontend && npm run dev) > /tmp/main-frontend.log 2>&1 &
+FRONTEND_PID=$!
+sleep 3
+
+if check_port 3000; then
+    echo -e "${GREEN}✅ Main Frontend started (PID: $FRONTEND_PID)${NC}"
+else
+    echo -e "${RED}❌ Failed to start Main Frontend${NC}"
+    cat /tmp/main-frontend.log
+    exit 1
+fi
+echo ""
+
+# Успешный запуск
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo -e "${GREEN}✅ Main Project successfully started!${NC}"
+echo -e "${GREEN}━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━━${NC}"
+echo ""
+echo -e "${BLUE}📍 Services:${NC}"
+echo -e "   🔐 Auth Service:    http://localhost:7100"
+echo -e "   🐾 PetBase Service: http://localhost:8100"
+echo -e "   🔧 Main Backend:    http://localhost:8000"
+echo -e "   🌐 Main Frontend:   ${GREEN}http://localhost:3000${NC}"
+echo ""
+echo -e "${YELLOW}📝 Logs:${NC}"
+echo -e "   Auth:     tail -f /tmp/auth-service.log"
+echo -e "   PetBase:  tail -f /tmp/petbase-service.log"
+echo -e "   Backend:  tail -f /tmp/main-backend.log"
+echo -e "   Frontend: tail -f /tmp/main-frontend.log"
+echo ""
+echo -e "${YELLOW}Press Ctrl+C to stop all services${NC}"
+echo ""
+
+# Обработка Ctrl+C
+trap "echo ''; echo -e '${RED}🛑 Stopping all services...${NC}'; kill $AUTH_PID $PETBASE_PID $BACKEND_PID $FRONTEND_PID 2>/dev/null; sleep 1; echo -e '${GREEN}✅ All services stopped${NC}'; exit" INT
+
+# Ожидание
+wait
