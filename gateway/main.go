@@ -142,7 +142,6 @@ func main() {
 
 	log.Printf("🚀 API Gateway started on port %s", port)
 	log.Printf("📋 Services:")
-	log.Printf("   - Auth Service: %s", services.Auth.URL)
 	log.Printf("   - Main Backend: %s", services.Main.URL)
 	log.Printf("   - PetBase Backend: %s", services.PetBase.URL)
 	log.Printf("   - Clinic Backend: %s", services.Clinic.URL)

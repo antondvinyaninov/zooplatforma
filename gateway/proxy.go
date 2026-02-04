@@ -114,7 +114,6 @@ func getScheme(r *http.Request) string {
 func HealthCheckHandler(services *Services) http.HandlerFunc {
 	return func(w http.ResponseWriter, r *http.Request) {
 		allServices := []*Service{
-			services.Auth,
 			services.Main,
 			services.PetBase,
 			services.Clinic,
